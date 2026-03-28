@@ -1,6 +1,5 @@
 import { useState } from "react";
-import { MenuUnfoldOutlined } from "@ant-design/icons";
-import { App as AntdApp, Button } from "antd";
+import { App as AntdApp, Drawer, Grid } from "antd";
 import { ChatWorkspace } from "./components/ChatWorkspace";
 import { DocumentSidebar } from "./components/DocumentSidebar";
 import { useDocumentLibrary } from "./hooks/useDocumentLibrary";
@@ -9,49 +8,32 @@ import { useServiceHealth } from "./hooks/useServiceHealth";
 
 function App() {
   const { message } = AntdApp.useApp();
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const screens = Grid.useBreakpoint();
+  const [documentDrawerOpen, setDocumentDrawerOpen] = useState(false);
   const documentLibrary = useDocumentLibrary(message);
   const serviceHealth = useServiceHealth();
   const conversation = useRagConversation(message);
+  const documentDrawerWidth = screens.xl
+    ? "32vw"
+    : screens.lg
+      ? "38vw"
+      : screens.md
+        ? "46vw"
+        : "100vw";
 
   return (
-    <main className={`app-shell ${sidebarCollapsed ? "sidebar-collapsed" : ""}`}>
-      <section className="orb orb-left" />
-      <section className="orb orb-right" />
-
-      {sidebarCollapsed ? (
-        <Button
-          type="text"
-          icon={<MenuUnfoldOutlined />}
-          className="sidebar-expand-dock"
-          onClick={() => setSidebarCollapsed(false)}
-          title="展开文档侧边栏"
-        />
-      ) : null}
-
-      <div className={`app-grid ${sidebarCollapsed ? "sidebar-collapsed" : ""}`}>
-        {!sidebarCollapsed ? (
-          <DocumentSidebar
-            documents={documentLibrary.documents}
-            documentsLoading={documentLibrary.documentsLoading}
-            uploading={documentLibrary.uploading}
-            deletingId={documentLibrary.deletingId}
-            ragHealth={serviceHealth.ragHealth}
-            documentHealth={serviceHealth.documentHealth}
-            refreshingHealth={serviceHealth.refreshingHealth}
-            onToggleCollapse={() => setSidebarCollapsed(true)}
-            onRefreshDocuments={documentLibrary.refreshDocuments}
-            onRefreshHealth={serviceHealth.refreshHealth}
-            onUpload={documentLibrary.handleUpload}
-            onDeleteDocument={documentLibrary.handleDeleteDocument}
-          />
-        ) : null}
-
+    <main
+      className="relative isolate h-screen min-h-dvh overflow-hidden p-7 max-[1120px]:p-5 max-[720px]:p-3.5 [--message-shell-max:clamp(760px,84%,1220px)] max-[1120px]:[--message-shell-max:min(100%,920px)] max-[720px]:[--message-shell-max:100%]"
+    >
+      <div
+        className="relative z-10 mx-auto flex h-full min-h-0 w-full max-w-[1600px]"
+      >
         <ChatWorkspace
           messages={conversation.messages}
           prompt={conversation.prompt}
           maxResults={conversation.maxResults}
           streaming={conversation.streaming}
+          onOpenDocuments={() => setDocumentDrawerOpen(true)}
           onPromptChange={conversation.setPrompt}
           onMaxResultsChange={conversation.setMaxResults}
           onSend={conversation.handleSend}
@@ -59,6 +41,36 @@ function App() {
           onClearConversation={conversation.handleClearConversation}
         />
       </div>
+
+      <Drawer
+        open={documentDrawerOpen}
+        onClose={() => setDocumentDrawerOpen(false)}
+        placement="left"
+        width={documentDrawerWidth}
+        closable={false}
+        title={null}
+        classNames={{
+          mask: "!backdrop-blur-[3px]",
+          wrapper: "!shadow-none",
+          section: "!bg-[#fffaf4]",
+          body: "!h-full !p-0"
+        }}
+      >
+        <DocumentSidebar
+          documents={documentLibrary.documents}
+          documentsLoading={documentLibrary.documentsLoading}
+          uploading={documentLibrary.uploading}
+          deletingId={documentLibrary.deletingId}
+          ragHealth={serviceHealth.ragHealth}
+          documentHealth={serviceHealth.documentHealth}
+          refreshingHealth={serviceHealth.refreshingHealth}
+          onClose={() => setDocumentDrawerOpen(false)}
+          onRefreshDocuments={documentLibrary.refreshDocuments}
+          onRefreshHealth={serviceHealth.refreshHealth}
+          onUpload={documentLibrary.handleUpload}
+          onDeleteDocument={documentLibrary.handleDeleteDocument}
+        />
+      </Drawer>
     </main>
   );
 }

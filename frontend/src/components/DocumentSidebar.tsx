@@ -1,18 +1,15 @@
 import {
+  CloseOutlined,
   CloudUploadOutlined,
   DatabaseOutlined,
   DeleteOutlined,
   LoadingOutlined,
-  MenuFoldOutlined,
   ReloadOutlined
 } from "@ant-design/icons";
 import {
   Button,
   Empty,
-  List,
   Spin,
-  Tag,
-  Typography,
   Upload,
   type UploadProps
 } from "antd";
@@ -27,7 +24,7 @@ interface DocumentSidebarProps {
   ragHealth: HealthState;
   documentHealth: HealthState;
   refreshingHealth: boolean;
-  onToggleCollapse: () => void;
+  onClose: () => void;
   onRefreshDocuments: () => Promise<void>;
   onRefreshHealth: () => Promise<void>;
   onUpload: (file: File) => Promise<void>;
@@ -53,64 +50,63 @@ export function DocumentSidebar(props: DocumentSidebarProps) {
   }
 
   return (
-    <aside className="surface panel-side">
-      <div className="panel-header">
-        <div>
-          <Tag color="orange" bordered={false}>
-            Knowledge Base
-          </Tag>
-          <Typography.Title level={3} className="panel-title">
+    <section className="flex h-full min-h-0 flex-col overflow-hidden px-6 py-6 max-[720px]:px-[18px] max-[720px]:py-[18px]">
+      <div className="flex items-start justify-between gap-4">
+        <div className="min-w-0">
+          <p className="text-xs font-bold uppercase tracking-[0.12em] text-ink-500">
             文档控制台
-          </Typography.Title>
-          <Typography.Paragraph className="panel-copy">
-            把 PDF 和 TXT 推进知识库，再用右侧对话流直接验证检索与生成效果。
-          </Typography.Paragraph>
+          </p>
+          <h2 className="mt-1 text-lg font-semibold text-ink-950">
+            管理知识库文档
+          </h2>
         </div>
-        <div className="sidebar-header-actions">
-          <Button icon={<ReloadOutlined />} onClick={refreshAll} loading={refreshing}>
-            刷新
-          </Button>
-          <Button
-            type="text"
-            shape="circle"
-            icon={<MenuFoldOutlined />}
-            onClick={props.onToggleCollapse}
-            title="收起文档侧边栏"
-          />
-        </div>
+        <Button
+          type="text"
+          shape="circle"
+          className="!text-ink-500 hover:!bg-white/[0.8] hover:!text-ink-950"
+          icon={<CloseOutlined />}
+          onClick={props.onClose}
+          title="关闭文档控制台"
+        />
+
       </div>
 
-      <div className="status-row">
-        <HealthBadge label="RAG" state={props.ragHealth} />
-        <HealthBadge label="文档" state={props.documentHealth} />
-        <Tag icon={<DatabaseOutlined />} bordered={false} className="health-tag">
-          {props.documents.length} 份文档
-        </Tag>
-      </div>
-
-      <div className="upload-panel">
-        <div className="upload-copy">
-          <CloudUploadOutlined />
-          <span>支持 PDF / TXT，上传后自动切分并向量化</span>
-        </div>
+      <div className="mt-4 flex flex-wrap items-center gap-2">
         <Upload {...uploadProps}>
           <Button
             type="primary"
             icon={props.uploading ? <LoadingOutlined /> : <CloudUploadOutlined />}
             loading={props.uploading}
-            block
           >
-            上传知识文档
+            上传文档
           </Button>
         </Upload>
+        <Button
+          icon={<ReloadOutlined />}
+          onClick={refreshAll}
+          loading={refreshing}
+        >
+          刷新
+        </Button>
+
       </div>
 
-      <div className="documents-section">
-        <div className="section-heading">
+      <div className="my-[18px] flex flex-wrap items-center gap-3">
+        <HealthBadge label="RAG" state={props.ragHealth} />
+        <HealthBadge label="文档" state={props.documentHealth} />
+        <span className="inline-flex items-center gap-2 rounded-full bg-white/[0.72] px-3 py-1 text-sm font-medium text-ink-700 shadow-[inset_0_0_0_1px_rgba(19,34,56,0.08)]">
+          <DatabaseOutlined />
+          {props.documents.length} 份文档
+        </span>
+      </div>
+
+      <div className="mt-[18px] flex min-h-0 flex-1 flex-col border-t border-ink-950/8 pt-[18px]">
+        <div className="mb-3 flex items-center justify-between gap-3 text-sm font-bold text-ink-900">
           <span>已入库文档</span>
           <Button
             type="text"
             size="small"
+            className="!px-0 !text-ink-500 hover:!text-accent-500"
             icon={<ReloadOutlined />}
             onClick={() => void props.onRefreshDocuments()}
           >
@@ -119,46 +115,50 @@ export function DocumentSidebar(props: DocumentSidebarProps) {
         </div>
 
         {props.documentsLoading ? (
-          <div className="empty-state">
+          <div className="grid min-h-[180px] place-items-center">
             <Spin />
           </div>
         ) : props.documents.length === 0 ? (
-          <div className="empty-state">
+          <div className="grid min-h-[180px] place-items-center">
             <Empty
               description="还没有文档，先上传一份试试"
               image={Empty.PRESENTED_IMAGE_SIMPLE}
             />
           </div>
         ) : (
-          <List
-            dataSource={props.documents}
-            className="documents-list"
-            renderItem={(item) => (
-              <List.Item
+          <div className="flex min-h-0 flex-1 flex-col overflow-auto pr-1">
+            {props.documents.map((item) => (
+              <article
                 key={item.documentId}
-                actions={[
+                className="flex items-start gap-3 border-b border-ink-950/8 py-3 last:border-b-0"
+              >
+                <div className="min-w-0 flex-1">
+                  <h3 className="truncate text-sm font-semibold text-ink-900">
+                    {item.filename}
+                  </h3>
+                  <p className="mt-1 truncate text-xs text-ink-500">
+                    文档 ID: {item.documentId}
+                  </p>
+                </div>
+                <div className="flex shrink-0 items-center gap-3">
+                  <span className="inline-flex rounded-full bg-ink-950/6 px-3 py-1 text-xs font-medium text-ink-700">
+                    {item.segmentCount} 段
+                  </span>
                   <Button
-                    key="delete"
-                    danger
                     type="text"
+                    className="!px-0 !text-rose-500 hover:!text-rose-600"
                     icon={<DeleteOutlined />}
                     loading={props.deletingId === item.documentId}
                     onClick={() => void props.onDeleteDocument(item.documentId)}
                   >
                     删除
                   </Button>
-                ]}
-              >
-                <List.Item.Meta
-                  title={item.filename}
-                  description={`文档 ID: ${item.documentId}`}
-                />
-                <Tag bordered={false}>{item.segmentCount} 段</Tag>
-              </List.Item>
-            )}
-          />
+                </div>
+              </article>
+            ))}
+          </div>
         )}
       </div>
-    </aside>
+    </section>
   );
 }

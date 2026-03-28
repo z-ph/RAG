@@ -39,7 +39,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
     : "bg-white/[0.14] text-white";
 
   return (
-    <article className={`flex items-end gap-2 ${rowClass}`}>
+    <article className={`flex w-full items-end gap-2 ${rowClass}`}>
       <div
         className={`grid h-8 w-8 shrink-0 place-items-center rounded-full text-xs font-bold tracking-[0.04em] ${avatarClass}`}
         aria-hidden="true"
@@ -47,7 +47,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
         {avatarLabel}
       </div>
       <div
-        className={`flex w-full max-w-[min(100%,var(--message-shell-max,920px))] flex-col gap-0.5 ${shellClass}`}
+        className={`flex min-w-0 flex-1 max-w-[var(--message-shell-max,920px)] flex-col gap-0.5 ${shellClass}`}
       >
         <div className={`flex items-center gap-2 text-[11px] text-ink-950/[0.56] ${metaClass}`}>
           <span>{speakerName}</span>

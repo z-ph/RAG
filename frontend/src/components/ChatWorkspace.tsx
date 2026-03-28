@@ -1,5 +1,6 @@
 import {
   ClearOutlined,
+  DatabaseOutlined,
   MessageOutlined,
   SendOutlined,
   StopOutlined
@@ -13,6 +14,7 @@ interface ChatWorkspaceProps {
   prompt: string;
   maxResults: number;
   streaming: boolean;
+  onOpenDocuments: () => void;
   onPromptChange: (value: string) => void;
   onMaxResultsChange: (value: number) => void;
   onSend: (question?: string) => Promise<void>;
@@ -22,7 +24,7 @@ interface ChatWorkspaceProps {
 
 export function ChatWorkspace(props: ChatWorkspaceProps) {
   return (
-    <section className="flex min-h-0 flex-col overflow-hidden rounded-[24px] border border-ink-950/10 bg-white/[0.74] p-[18px] shadow-panel backdrop-blur-[18px] min-[721px]:rounded-[32px] min-[721px]:p-6">
+    <section className="flex min-h-0 w-full flex-1 flex-col overflow-hidden rounded-[24px] border border-ink-950/10 bg-white/[0.74] p-[18px] shadow-panel backdrop-blur-[18px] min-[721px]:rounded-[32px] min-[721px]:p-6">
       <div className="grid min-h-0 flex-1 grid-rows-[auto_minmax(0,1fr)_auto] gap-4">
         <div className="flex flex-col items-stretch justify-between gap-3 border-b border-ink-950/8 pb-4 min-[721px]:flex-row min-[721px]:items-center">
           <div className="flex items-center gap-2.5 text-sm font-bold tracking-[0.08em] text-ink-900">
@@ -30,6 +32,13 @@ export function ChatWorkspace(props: ChatWorkspaceProps) {
             <span>对话流</span>
           </div>
           <div className="flex flex-wrap items-center gap-2 min-[721px]:justify-end">
+            <Button
+              className="!rounded-full !border-ink-950/10 !bg-sky-50/90 !px-4 !text-ink-900 !shadow-none hover:!border-accent-500/[0.25] hover:!text-accent-500"
+              icon={<DatabaseOutlined />}
+              onClick={props.onOpenDocuments}
+            >
+              文档控制台
+            </Button>
             <Select
               value={props.maxResults}
               className="!w-[108px]"
@@ -50,7 +59,7 @@ export function ChatWorkspace(props: ChatWorkspaceProps) {
           </div>
         </div>
 
-        <div className="flex min-h-0 flex-col gap-2.5 overflow-auto pr-0.5">
+        <div className="flex min-h-0 flex-col gap-2.5 overflow-y-auto overflow-x-hidden pr-0.5">
           {props.messages.map((entry) => (
             <MessageBubble key={entry.id} message={entry} />
           ))}

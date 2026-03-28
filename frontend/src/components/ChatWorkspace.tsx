@@ -24,7 +24,7 @@ interface ChatWorkspaceProps {
 
 export function ChatWorkspace(props: ChatWorkspaceProps) {
   return (
-    <section className="flex min-h-0 w-full flex-1 flex-col overflow-hidden px-[18px] py-2 min-[721px]:px-6 min-[721px]:py-3">
+    <section className="flex min-h-0 w-full flex-1 flex-col overflow-hidden">
       <div className="grid min-h-0 flex-1 grid-rows-[auto_minmax(0,1fr)_auto] gap-4">
         <div className="flex flex-col items-stretch justify-between gap-3 border-b border-ink-950/8 pb-4 min-[721px]:flex-row min-[721px]:items-center">
           <div className="flex items-center gap-2.5 text-sm font-bold tracking-[0.08em] text-ink-900">
@@ -78,30 +78,26 @@ export function ChatWorkspace(props: ChatWorkspaceProps) {
               }
             }}
           />
-            <Button
-              type={props.streaming ? "default" : "primary"}
-              danger={props.streaming}
-              size="large"
-              className={
-                props.streaming
-                  ? "!rounded-full !px-6 !shadow-none"
-                  : "!rounded-full !border-none !bg-accent-500 !px-6 !shadow-none hover:!bg-accent-400"
+          <Button
+            type={props.streaming ? "default" : "primary"}
+            danger={props.streaming}
+            size="large"
+            className={
+              props.streaming
+                ? "!rounded-full !px-6 !shadow-none"
+                : "!rounded-full !border-none !bg-accent-500 !px-6 !shadow-none hover:!bg-accent-400"
+            }
+            icon={props.streaming ? <PauseCircleFilled /> : <SendOutlined />}
+            disabled={!props.streaming && !props.prompt.trim()}
+            onClick={() => {
+              if (props.streaming) {
+                void props.onCancel();
+                return;
               }
-              icon={props.streaming ? <PauseCircleFilled /> : <SendOutlined />}
-              disabled={!props.streaming && !props.prompt.trim()}
-              onClick={() => {
-                if (props.streaming) {
-                  void props.onCancel();
-                  return;
-                }
 
-                void props.onSend();
-              }}
-            >
-            </Button>
-          <div className="flex flex-col items-stretch justify-end gap-3">
-
-          </div>
+              void props.onSend();
+            }}
+          />
         </div>
       </div>
     </section>

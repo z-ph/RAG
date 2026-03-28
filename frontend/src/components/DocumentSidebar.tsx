@@ -50,7 +50,7 @@ export function DocumentSidebar(props: DocumentSidebarProps) {
   }
 
   return (
-    <section className="flex h-full min-h-0 flex-col overflow-hidden">
+    <section className="flex h-full min-h-0 flex-col overflow-hidden px-6 py-6 max-[720px]:px-[18px] max-[720px]:py-[18px]">
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
           <p className="text-xs font-bold uppercase tracking-[0.12em] text-ink-500">

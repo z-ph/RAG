@@ -10,7 +10,6 @@
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 </div>
-
 ---
 
 ## 📋 目录
@@ -194,11 +193,17 @@ curl -N -X POST http://localhost:8080/api/rag/ask/stream \
 ### application.yaml 关键配置
 
 ```yaml
-# Ollama 配置
-ollama:
-  base-url: http://localhost:11434
-  chat-model: qwen2.5:7b
-  embedding-model: qwen3-embedding:0.6b
+# LLM 配置
+llm:
+  chat-provider: vllm
+  embedding-provider: ollama
+  ollama:
+    embedding-base-url: http://localhost:11434
+    embedding-model: qwen3-embedding:0.6b
+  vllm:
+    chat-base-url: http://localhost:8000/v1
+    chat-model: Qwen/Qwen2.5-7B-Instruct
+    chat-api-key: ${VLLM_CHAT_API_KEY:}
 
 # Qdrant 配置
 qdrant:
@@ -230,6 +235,8 @@ model-router:
     aliyun: 0                  # 0% 使用阿里云（仅本地）
     local: 100                 # 100% 使用本地模型
 ```
+
+`llm.chat-provider` 和 `llm.embedding-provider` 是两个独立配置。每个 provider 自己维护 chat / embedding 各自的 `base-url`、`model` 和认证信息，不再有顶层覆盖层。
 
 ---
 
@@ -400,7 +407,7 @@ Agent：
          - TOOL_CALLING     # 工具调用
    ```
 
-**重要**：向量嵌入模型固定使用本地 Ollama，不受路由影响。
+**重要**：向量嵌入模型可以通过 `llm.embedding-provider` 单独指定 provider，但不参与 `model-router` 的聊天模型路由。
 
 ### 4. 金融计算功能
 
@@ -422,8 +429,16 @@ Agent：
 
 A: 修改 `application.yaml`：
 ```yaml
-ollama:
-  chat-model: your-model-name
+llm:
+  chat-provider: vllm
+  embedding-provider: ollama
+  ollama:
+    embedding-base-url: http://your-embedding-endpoint
+    embedding-model: your-embedding-model
+  vllm:
+    chat-base-url: http://your-chat-endpoint/v1
+    chat-model: your-chat-model
+    chat-api-key: your-chat-api-key
 ```
 
 ### Q: 如何调整对话历史窗口？

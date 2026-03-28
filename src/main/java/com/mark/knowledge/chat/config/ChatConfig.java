@@ -1,6 +1,5 @@
 package com.mark.knowledge.chat.config;
 
-import dev.langchain4j.data.segment.TextSegment;
 import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.model.chat.StreamingChatModel;
 import dev.langchain4j.model.embedding.EmbeddingModel;
@@ -10,8 +9,6 @@ import dev.langchain4j.model.ollama.OllamaStreamingChatModel;
 import dev.langchain4j.model.openai.OpenAiChatModel;
 import dev.langchain4j.model.openai.OpenAiEmbeddingModel;
 import dev.langchain4j.model.openai.OpenAiStreamingChatModel;
-import dev.langchain4j.store.embedding.EmbeddingStore;
-import dev.langchain4j.store.embedding.qdrant.QdrantEmbeddingStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -31,14 +28,20 @@ public class ChatConfig {
     private static final Logger log = LoggerFactory.getLogger(ChatConfig.class);
     private static final Duration DEFAULT_TIMEOUT = Duration.ofSeconds(120);
 
-    @Value("${llm.provider:ollama}")
-    private String llmProvider;
+    @Value("${llm.chat-provider:ollama}")
+    private String chatProvider;
+
+    @Value("${llm.embedding-provider:ollama}")
+    private String embeddingProvider;
 
     @Value("${llm.timeout:120s}")
     private String llmTimeout;
 
-    @Value("${llm.ollama.base-url:http://localhost:11434}")
-    private String ollamaBaseUrl;
+    @Value("${llm.ollama.chat-base-url:http://localhost:11434}")
+    private String ollamaChatBaseUrl;
+
+    @Value("${llm.ollama.embedding-base-url:http://localhost:11434}")
+    private String ollamaEmbeddingBaseUrl;
 
     @Value("${llm.ollama.chat-model:qwen2.5:7b}")
     private String ollamaChatModelName;
@@ -49,14 +52,11 @@ public class ChatConfig {
     @Value("${llm.ollama.think:${ollama.think:false}}")
     private Boolean ollamaThink;
 
-    @Value("${llm.chat-model:${ollama.chat-model:}}")
-    private String chatModelName;
+    @Value("${llm.vllm.chat-base-url:http://localhost:8000/v1}")
+    private String vllmChatBaseUrl;
 
-    @Value("${llm.embedding-model:${ollama.embedding-model:}}")
-    private String embeddingModelName;
-
-    @Value("${llm.vllm.base-url:http://localhost:8000/v1}")
-    private String vllmBaseUrl;
+    @Value("${llm.vllm.embedding-base-url:http://localhost:8000/v1}")
+    private String vllmEmbeddingBaseUrl;
 
     @Value("${llm.vllm.chat-model:Qwen/Qwen2.5-7B-Instruct}")
     private String vllmChatModelName;
@@ -64,67 +64,47 @@ public class ChatConfig {
     @Value("${llm.vllm.embedding-model:BAAI/bge-base-zh-v1.5}")
     private String vllmEmbeddingModelName;
 
-    @Value("${llm.vllm.api-key:}")
-    private String vllmApiKey;
+    @Value("${llm.vllm.chat-api-key:}")
+    private String vllmChatApiKey;
 
-    @Value("${qdrant.host:localhost}")
-    private String qdrantHost;
-
-    @Value("${qdrant.port:6334}")
-    private int qdrantPort;
-
-    @Value("${qdrant.collection-name:knowledge-base}")
-    private String collectionName;
-
-    @Value("${qdrant.vector-size:1024}")
-    private int vectorSize;
+    @Value("${llm.vllm.embedding-api-key:}")
+    private String vllmEmbeddingApiKey;
 
     @Bean
     public ChatModel chatModel() {
         Duration timeout = parseTimeout(llmTimeout);
-        return switch (normalizedProvider()) {
+        return switch (normalizedChatProvider()) {
             case "ollama" -> createOllamaChatModel(timeout);
             case "vllm" -> createVllmChatModel(timeout);
-            default -> throw unsupportedProvider();
+            default -> throw unsupportedProvider("llm.chat-provider", chatProvider);
         };
     }
 
     @Bean
     public EmbeddingModel embeddingModel() {
         Duration timeout = parseTimeout(llmTimeout);
-        return switch (normalizedProvider()) {
+        return switch (normalizedEmbeddingProvider()) {
             case "ollama" -> createOllamaEmbeddingModel(timeout);
             case "vllm" -> createVllmEmbeddingModel(timeout);
-            default -> throw unsupportedProvider();
+            default -> throw unsupportedProvider("llm.embedding-provider", embeddingProvider);
         };
     }
 
     @Bean
     public StreamingChatModel streamingChatModel() {
         Duration timeout = parseTimeout(llmTimeout);
-        return switch (normalizedProvider()) {
+        return switch (normalizedChatProvider()) {
             case "ollama" -> createOllamaStreamingChatModel(timeout);
             case "vllm" -> createVllmStreamingChatModel(timeout);
-            default -> throw unsupportedProvider();
+            default -> throw unsupportedProvider("llm.chat-provider", chatProvider);
         };
     }
 
-    @Bean
-    public EmbeddingStore<TextSegment> embeddingStore() {
-        log.info("初始化 Qdrant 向量存储: {}:{} / {} / {}", qdrantHost, qdrantPort, collectionName, vectorSize);
-        return QdrantEmbeddingStore.builder()
-                .host(qdrantHost)
-                .port(qdrantPort)
-                .collectionName(collectionName)
-                .build();
-    }
-
     private ChatModel createOllamaChatModel(Duration timeout) {
-        String resolvedModelName = resolveOllamaChatModelName();
-        log.info("初始化聊天模型: provider=ollama, baseUrl={}, model={}, think={}", ollamaBaseUrl, resolvedModelName, ollamaThink);
+        log.info("初始化聊天模型: provider=ollama, baseUrl={}, model={}, think={}", ollamaChatBaseUrl, ollamaChatModelName, ollamaThink);
         return OllamaChatModel.builder()
-                .baseUrl(ollamaBaseUrl)
-                .modelName(resolvedModelName)
+                .baseUrl(ollamaChatBaseUrl)
+                .modelName(ollamaChatModelName)
                 .temperature(0.7)
                 .think(Boolean.TRUE.equals(ollamaThink))
                 .timeout(timeout)
@@ -132,21 +112,19 @@ public class ChatConfig {
     }
 
     private EmbeddingModel createOllamaEmbeddingModel(Duration timeout) {
-        String resolvedModelName = resolveOllamaEmbeddingModelName();
-        log.info("初始化嵌入模型: provider=ollama, baseUrl={}, model={}", ollamaBaseUrl, resolvedModelName);
+        log.info("初始化嵌入模型: provider=ollama, baseUrl={}, model={}", ollamaEmbeddingBaseUrl, ollamaEmbeddingModelName);
         return OllamaEmbeddingModel.builder()
-                .baseUrl(ollamaBaseUrl)
-                .modelName(resolvedModelName)
+                .baseUrl(ollamaEmbeddingBaseUrl)
+                .modelName(ollamaEmbeddingModelName)
                 .timeout(timeout)
                 .build();
     }
 
     private StreamingChatModel createOllamaStreamingChatModel(Duration timeout) {
-        String resolvedModelName = resolveOllamaChatModelName();
-        log.info("初始化流式聊天模型: provider=ollama, baseUrl={}, model={}, think={}", ollamaBaseUrl, resolvedModelName, ollamaThink);
+        log.info("初始化流式聊天模型: provider=ollama, baseUrl={}, model={}, think={}", ollamaChatBaseUrl, ollamaChatModelName, ollamaThink);
         return OllamaStreamingChatModel.builder()
-                .baseUrl(ollamaBaseUrl)
-                .modelName(resolvedModelName)
+                .baseUrl(ollamaChatBaseUrl)
+                .modelName(ollamaChatModelName)
                 .temperature(0.7)
                 .think(Boolean.TRUE.equals(ollamaThink))
                 .timeout(timeout)
@@ -154,84 +132,61 @@ public class ChatConfig {
     }
 
     private ChatModel createVllmChatModel(Duration timeout) {
-        String resolvedModelName = resolveVllmChatModelName();
-        log.info("初始化聊天模型: provider=vllm, baseUrl={}, model={}", vllmBaseUrl, resolvedModelName);
+        log.info("初始化聊天模型: provider=vllm, baseUrl={}, model={}", vllmChatBaseUrl, vllmChatModelName);
         var builder = OpenAiChatModel.builder()
-                .baseUrl(vllmBaseUrl)
-                .modelName(resolvedModelName)
+                .baseUrl(vllmChatBaseUrl)
+                .modelName(vllmChatModelName)
                 .temperature(0.7)
                 .timeout(timeout);
-        if (StringUtils.hasText(vllmApiKey)) {
-            builder.apiKey(vllmApiKey);
+        if (StringUtils.hasText(vllmChatApiKey)) {
+            builder.apiKey(vllmChatApiKey);
         }
         return builder.build();
     }
 
     private StreamingChatModel createVllmStreamingChatModel(Duration timeout) {
-        String resolvedModelName = resolveVllmChatModelName();
-        log.info("初始化流式聊天模型: provider=vllm, baseUrl={}, model={}", vllmBaseUrl, resolvedModelName);
+        log.info("初始化流式聊天模型: provider=vllm, baseUrl={}, model={}", vllmChatBaseUrl, vllmChatModelName);
         var builder = OpenAiStreamingChatModel.builder()
-                .baseUrl(vllmBaseUrl)
-                .modelName(resolvedModelName)
+                .baseUrl(vllmChatBaseUrl)
+                .modelName(vllmChatModelName)
                 .temperature(0.7)
                 .timeout(timeout);
-        if (StringUtils.hasText(vllmApiKey)) {
-            builder.apiKey(vllmApiKey);
+        if (StringUtils.hasText(vllmChatApiKey)) {
+            builder.apiKey(vllmChatApiKey);
         }
         return builder.build();
     }
 
     private EmbeddingModel createVllmEmbeddingModel(Duration timeout) {
-        String resolvedModelName = resolveVllmEmbeddingModelName();
-        log.info("初始化嵌入模型: provider=vllm, baseUrl={}, model={}", vllmBaseUrl, resolvedModelName);
+        log.info("初始化嵌入模型: provider=vllm, baseUrl={}, model={}", vllmEmbeddingBaseUrl, vllmEmbeddingModelName);
         var builder = OpenAiEmbeddingModel.builder()
-                .baseUrl(vllmBaseUrl)
-                .modelName(resolvedModelName)
+                .baseUrl(vllmEmbeddingBaseUrl)
+                .modelName(vllmEmbeddingModelName)
                 .timeout(timeout);
-        if (StringUtils.hasText(vllmApiKey)) {
-            builder.apiKey(vllmApiKey);
+        if (StringUtils.hasText(vllmEmbeddingApiKey)) {
+            builder.apiKey(vllmEmbeddingApiKey);
         }
         return builder.build();
     }
 
-    private String resolveOllamaChatModelName() {
-        if (StringUtils.hasText(chatModelName)) {
-            return chatModelName;
-        }
-        return ollamaChatModelName;
+    private String normalizedChatProvider() {
+        return normalizedProvider(chatProvider, "llm.chat-provider");
     }
 
-    private String resolveOllamaEmbeddingModelName() {
-        if (StringUtils.hasText(embeddingModelName)) {
-            return embeddingModelName;
-        }
-        return ollamaEmbeddingModelName;
+    private String normalizedEmbeddingProvider() {
+        return normalizedProvider(embeddingProvider, "llm.embedding-provider");
     }
 
-    private String resolveVllmChatModelName() {
-        if (StringUtils.hasText(chatModelName)) {
-            return chatModelName;
-        }
-        return vllmChatModelName;
-    }
-
-    private String resolveVllmEmbeddingModelName() {
-        if (StringUtils.hasText(embeddingModelName)) {
-            return embeddingModelName;
-        }
-        return vllmEmbeddingModelName;
-    }
-
-    private String normalizedProvider() {
-        String provider = llmProvider == null ? "" : llmProvider.trim().toLowerCase(Locale.ROOT);
+    private String normalizedProvider(String providerValue, String propertyName) {
+        String provider = providerValue == null ? "" : providerValue.trim().toLowerCase(Locale.ROOT);
         if ("ollama".equals(provider) || "vllm".equals(provider)) {
             return provider;
         }
-        throw unsupportedProvider();
+        throw unsupportedProvider(propertyName, providerValue);
     }
 
-    private IllegalArgumentException unsupportedProvider() {
-        return new IllegalArgumentException("不支持的 llm.provider=" + llmProvider + "，仅支持 ollama 或 vllm");
+    private IllegalArgumentException unsupportedProvider(String propertyName, String propertyValue) {
+        return new IllegalArgumentException("不支持的 " + propertyName + "=" + propertyValue + "，仅支持 ollama 或 vllm");
     }
 
     private Duration parseTimeout(String timeout) {

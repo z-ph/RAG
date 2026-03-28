@@ -11,7 +11,7 @@
   --color-accent-100: #fff4ed;
   --color-sky-100: #eef3ff;
   --color-sky-50: #f7fbff;
-  --shadow-panel: 0 24px 72px rgba(24, 46, 79, 0.12);
+  --color-canvas: #f6f0e8;
 }
 
 @layer base {
@@ -33,10 +33,7 @@
     min-height: 100dvh;
     overflow: hidden;
     color: theme(--color-ink-950);
-    background:
-      radial-gradient(circle at top left, rgb(255 140 66 / 22%), transparent 30%),
-      radial-gradient(circle at top right, rgb(52 127 255 / 18%), transparent 28%),
-      linear-gradient(135deg, #fff6ea 0%, #f7fbff 54%, #eef3ff 100%);
+    background: theme(--color-canvas);
     font-family: theme(--font-sans);
     font-synthesis: none;
     text-rendering: optimizeLegibility;

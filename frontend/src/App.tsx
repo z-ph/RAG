@@ -25,9 +25,6 @@ function App() {
     <main
       className="relative isolate h-screen min-h-dvh overflow-hidden p-7 max-[1120px]:p-5 max-[720px]:p-3.5 [--message-shell-max:clamp(760px,84%,1220px)] max-[1120px]:[--message-shell-max:min(100%,920px)] max-[720px]:[--message-shell-max:100%]"
     >
-      <section className="pointer-events-none absolute -left-[60px] -top-[80px] z-0 h-[260px] w-[260px] rounded-full bg-[rgb(255_143_71_/32%)] opacity-[0.55] blur-[28px]" />
-      <section className="pointer-events-none absolute -bottom-[40px] -right-[40px] z-0 h-[320px] w-[320px] rounded-full bg-[rgb(70_118_255_/20%)] opacity-[0.55] blur-[28px]" />
-
       <div
         className="relative z-10 mx-auto flex h-full min-h-0 w-full max-w-[1600px]"
       >
@@ -54,10 +51,9 @@ function App() {
         title={null}
         classNames={{
           mask: "!backdrop-blur-[3px]",
-          wrapper: "!shadow-[0_28px_76px_rgba(24,46,79,0.18)]",
-          section:
-            "!bg-[linear-gradient(180deg,rgba(255,250,244,0.88),rgba(247,251,255,0.88))] !backdrop-blur-[22px]",
-          body: "!h-full !p-6 max-[720px]:!p-[18px]"
+          wrapper: "!shadow-none",
+          section: "!bg-[#fffaf4]",
+          body: "!h-full !p-0"
         }}
       >
         <DocumentSidebar

@@ -23,11 +23,11 @@ export function MessageBubble({ message }: MessageBubbleProps) {
   const shellClass = isAssistant ? "items-start" : "items-end";
   const metaClass = isAssistant ? "justify-start" : "justify-end";
   const avatarClass = isAssistant
-    ? "border border-sky-500/[0.14] bg-[linear-gradient(135deg,rgba(255,255,255,0.98),rgba(230,240,255,0.96))] text-ink-900"
-    : "bg-[linear-gradient(135deg,rgba(242,91,42,0.98),rgba(255,137,81,0.92))] text-white";
+    ? "border border-sky-500/[0.14] bg-white text-ink-900"
+    : "bg-accent-500 text-white";
   const bubbleClass = isAssistant
-    ? "rounded-tl-[8px] bg-[linear-gradient(135deg,rgba(255,255,255,0.96),rgba(247,250,255,0.90))] text-ink-950"
-    : "rounded-tr-[8px] bg-[linear-gradient(135deg,rgba(242,91,42,0.96),rgba(255,131,74,0.88))] text-white";
+    ? "rounded-tl-[8px] bg-white text-ink-950"
+    : "rounded-tr-[8px] bg-accent-500 text-white";
   const sourceDividerClass = isAssistant ? "border-ink-950/8" : "border-white/[0.2]";
   const sourceLabelClass = isAssistant ? "text-ink-700" : "text-white/[0.82]";
   const sourceHintClass = isAssistant ? "text-ink-500" : "text-white/70";

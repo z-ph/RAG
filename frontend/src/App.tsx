@@ -13,23 +13,30 @@ function App() {
   const documentLibrary = useDocumentLibrary(message);
   const serviceHealth = useServiceHealth();
   const conversation = useRagConversation(message);
+  const messageShellClass = sidebarCollapsed
+    ? "[--message-shell-max:clamp(760px,84%,1220px)] max-[1120px]:[--message-shell-max:min(100%,920px)] max-[720px]:[--message-shell-max:100%]"
+    : "[--message-shell-max:clamp(640px,74%,920px)] max-[720px]:[--message-shell-max:100%]";
 
   return (
-    <main className={`app-shell ${sidebarCollapsed ? "sidebar-collapsed" : ""}`}>
-      <section className="orb orb-left" />
-      <section className="orb orb-right" />
+    <main
+      className={`relative isolate h-screen min-h-dvh overflow-hidden p-7 max-[1120px]:h-auto max-[1120px]:overflow-auto max-[1120px]:p-5 max-[720px]:p-3.5 ${messageShellClass}`}
+    >
+      <section className="pointer-events-none absolute -left-[60px] -top-[80px] z-0 h-[260px] w-[260px] rounded-full bg-[rgb(255_143_71_/32%)] opacity-[0.55] blur-[28px]" />
+      <section className="pointer-events-none absolute -bottom-[40px] -right-[40px] z-0 h-[320px] w-[320px] rounded-full bg-[rgb(70_118_255_/20%)] opacity-[0.55] blur-[28px]" />
 
       {sidebarCollapsed ? (
         <Button
           type="text"
           icon={<MenuUnfoldOutlined />}
-          className="sidebar-expand-dock"
+          className="!fixed !left-0 !z-20 !w-[46px] !rounded-l-none !rounded-r-[20px] !border !border-l-0 !border-ink-950/8 !bg-white/[0.92] !text-ink-700 !shadow-[0_18px_36px_rgba(24,46,79,0.14)] !backdrop-blur-md hover:!bg-white/[0.98] hover:!text-ink-950 focus-visible:!bg-white/[0.98] focus-visible:!text-ink-950 max-[1120px]:!top-5 max-[1120px]:!h-14 max-[1120px]:!w-[42px] min-[1121px]:!top-1/2 min-[1121px]:!-mt-9 min-[1121px]:!h-[72px]"
           onClick={() => setSidebarCollapsed(false)}
           title="展开文档侧边栏"
         />
       ) : null}
 
-      <div className={`app-grid ${sidebarCollapsed ? "sidebar-collapsed" : ""}`}>
+      <div
+        className={`relative z-10 mx-auto grid h-full min-h-0 max-w-[1600px] grid-cols-1 gap-5 max-[1120px]:h-auto max-[1120px]:min-h-[calc(100vh-40px)] max-[1120px]:min-h-[calc(100dvh-40px)] ${sidebarCollapsed ? "" : "min-[1121px]:grid-cols-[minmax(320px,380px)_minmax(0,1fr)]"}`}
+      >
         {!sidebarCollapsed ? (
           <DocumentSidebar
             documents={documentLibrary.documents}

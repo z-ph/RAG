@@ -1,10 +1,9 @@
-import { Tag } from "antd";
 import type { HealthState } from "../types";
 
-const colorMap: Record<HealthState, string> = {
-  checking: "default",
-  ok: "success",
-  error: "error"
+const toneMap: Record<HealthState, string> = {
+  checking: "bg-white/[0.72] text-ink-700 shadow-[inset_0_0_0_1px_rgba(19,34,56,0.08)]",
+  ok: "bg-emerald-500/[0.12] text-emerald-700 shadow-[inset_0_0_0_1px_rgba(16,185,129,0.16)]",
+  error: "bg-rose-500/[0.12] text-rose-700 shadow-[inset_0_0_0_1px_rgba(244,63,94,0.16)]"
 };
 
 const textMap: Record<HealthState, string> = {
@@ -20,8 +19,10 @@ interface HealthBadgeProps {
 
 export function HealthBadge({ label, state }: HealthBadgeProps) {
   return (
-    <Tag color={colorMap[state]} bordered={false} className="health-tag">
+    <span
+      className={`inline-flex items-center rounded-full px-3 py-1 text-sm font-medium ${toneMap[state]}`}
+    >
       {label} · {textMap[state]}
-    </Tag>
+    </span>
   );
 }

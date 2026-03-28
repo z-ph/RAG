@@ -12,6 +12,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
@@ -33,6 +34,9 @@ public class EmbeddingService {
 
     private final EmbeddingModel embeddingModel;
     private final QdrantEmbeddingStoreFactory embeddingStoreFactory;
+
+    @Value("${rag.embedding-request.batch-size:10}")
+    private int embeddingRequestBatchSize;
 
     @Value("${rag.embedding-store.batch-size:32}")
     private int embeddingStoreBatchSize;
@@ -83,9 +87,10 @@ public class EmbeddingService {
             // 步骤1：生成嵌入向量
             log.info("🔢 [步骤1/2] 为 {} 个文本块生成嵌入向量...", segments.size());
             long embedStart = System.currentTimeMillis();
+            int requestBatchSize = Math.max(1, embeddingRequestBatchSize);
+            log.info("  Embedding请求批次大小: {}", requestBatchSize);
 
-            Response<List<Embedding>> response = embeddingModel.embedAll(segments);
-            List<Embedding> embeddings = response.content();
+            List<Embedding> embeddings = generateEmbeddings(segments, requestBatchSize);
 
             long embedTime = System.currentTimeMillis() - embedStart;
             log.info("✓ 嵌入向量生成成功，耗时: {} ms", embedTime);
@@ -159,6 +164,41 @@ public class EmbeddingService {
             log.error("==========================================");
             throw new RuntimeException("嵌入向量存储失败: " + e.getMessage(), e);
         }
+    }
+
+    private List<Embedding> generateEmbeddings(List<TextSegment> segments, int requestBatchSize) {
+        List<Embedding> embeddings = new ArrayList<>(segments.size());
+
+        for (int i = 0; i < segments.size(); i += requestBatchSize) {
+            int endIndex = Math.min(i + requestBatchSize, segments.size());
+            List<TextSegment> segmentBatch = segments.subList(i, endIndex);
+
+            Response<List<Embedding>> response = embeddingModel.embedAll(segmentBatch);
+            if (response == null) {
+                throw new IllegalStateException(
+                    "嵌入模型未返回响应: range=%d-%d/%d".formatted(i + 1, endIndex, segments.size())
+                );
+            }
+
+            List<Embedding> embeddingBatch = response.content();
+            if (embeddingBatch == null || embeddingBatch.size() != segmentBatch.size()) {
+                int actualSize = embeddingBatch == null ? 0 : embeddingBatch.size();
+                throw new IllegalStateException(
+                    "嵌入向量数量不匹配: range=%d-%d/%d, expected=%d, actual=%d"
+                        .formatted(i + 1, endIndex, segments.size(), segmentBatch.size(), actualSize)
+                );
+            }
+
+            embeddings.addAll(embeddingBatch);
+
+            if (segments.size() > requestBatchSize) {
+                double progress = (endIndex * 100.0) / segments.size();
+                log.info("  Embedding进度: {}/{} 文本块 ({}%) 已生成",
+                    endIndex, segments.size(), String.format("%.1f", progress));
+            }
+        }
+
+        return embeddings;
     }
 
     private QdrantEmbeddingStore writeBatchWithRetry(

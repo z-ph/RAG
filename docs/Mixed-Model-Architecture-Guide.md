@@ -119,6 +119,7 @@ VLLM_CHAT_MODEL=Qwen/Qwen2.5-7B-Instruct
 VLLM_EMBEDDING_MODEL=BAAI/bge-base-zh-v1.5
 VLLM_CHAT_API_KEY=
 VLLM_EMBEDDING_API_KEY=
+RAG_EMBEDDING_REQUEST_BATCH_SIZE=10
 ```
 
 适合：
@@ -172,7 +173,19 @@ provider 只在应用启动时读取一次配置。
 - `2m`
 - 标准 `Duration` 字符串
 
-### 4. `ollama.think` 只对 Ollama chat 生效
+### 4. OpenAI-compatible embedding 接口可能有单次输入上限
+
+当前文档入库会按 `rag.embedding-request.batch-size` 分批调用 `EmbeddingModel.embedAll(...)`。
+
+默认值是：
+
+```dotenv
+RAG_EMBEDDING_REQUEST_BATCH_SIZE=10
+```
+
+这个批次只影响 embedding 请求，不影响后续写入 Qdrant 的 `rag.embedding-store.batch-size`。
+
+### 5. `ollama.think` 只对 Ollama chat 生效
 
 当前代码会把 `llm.ollama.think` 传给：
 

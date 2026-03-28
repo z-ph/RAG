@@ -1,0 +1,51 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Space Grotesk", "Noto Sans SC", "Segoe UI", "PingFang SC", sans-serif;
+  --color-ink-950: #132238;
+  --color-ink-900: #24364d;
+  --color-ink-700: #42546d;
+  --color-ink-500: #63738b;
+  --color-accent-500: #f25b2a;
+  --color-accent-400: #ff894f;
+  --color-accent-100: #fff4ed;
+  --color-sky-100: #eef3ff;
+  --color-sky-50: #f7fbff;
+  --color-canvas: #f6f0e8;
+}
+
+@layer base {
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+
+  html,
+  body,
+  #app,
+  #app > .ant-app {
+    height: 100%;
+  }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+    min-height: 100dvh;
+    overflow: hidden;
+    color: theme(--color-ink-950);
+    background: theme(--color-canvas);
+    font-family: theme(--font-sans);
+    font-synthesis: none;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  button,
+  input,
+  textarea,
+  select {
+    font: inherit;
+  }
+}

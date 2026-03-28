@@ -37,6 +37,8 @@ rag:
   chunk-min-size: ${RAG_CHUNK_MIN_SIZE:250}
   chunk-max-size: ${RAG_CHUNK_MAX_SIZE:350}
   chunk-overlap: ${RAG_CHUNK_OVERLAP:40}
+  embedding-request:
+    batch-size: ${RAG_EMBEDDING_REQUEST_BATCH_SIZE:10}
   embedding-store:
     batch-size: ${RAG_EMBEDDING_STORE_BATCH_SIZE:32}
     max-retries: ${RAG_EMBEDDING_STORE_MAX_RETRIES:3}

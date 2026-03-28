@@ -134,7 +134,10 @@ QDRANT_PORT=6334
 QDRANT_HTTP_PORT=6333
 QDRANT_COLLECTION_NAME=knowledge-base
 QDRANT_VECTOR_SIZE=768
+RAG_EMBEDDING_REQUEST_BATCH_SIZE=10
 ```
+
+如果 embedding provider 是带输入条数上限的 OpenAI-compatible 接口，保留默认的 `RAG_EMBEDDING_REQUEST_BATCH_SIZE=10` 即可，文档入库时会自动分批请求 embedding。
 
 ### 5. 启动后端
 
@@ -243,6 +246,8 @@ rag:
   chunk-min-size: ${RAG_CHUNK_MIN_SIZE:250}
   chunk-max-size: ${RAG_CHUNK_MAX_SIZE:350}
   chunk-overlap: ${RAG_CHUNK_OVERLAP:40}
+  embedding-request:
+    batch-size: ${RAG_EMBEDDING_REQUEST_BATCH_SIZE:10}
   embedding-store:
     batch-size: ${RAG_EMBEDDING_STORE_BATCH_SIZE:32}
     max-retries: ${RAG_EMBEDDING_STORE_MAX_RETRIES:3}
@@ -256,6 +261,11 @@ rag:
   memory-cleanup-interval-ms: ${RAG_MEMORY_CLEANUP_INTERVAL_MS:300000}
   stream-timeout-ms: ${RAG_STREAM_TIMEOUT_MS:300000}
 ```
+
+注意：
+
+- `rag.embedding-request.batch-size` 控制单次 embedding 请求包含的文本块数量，适合规避 OpenAI-compatible 接口的单请求输入上限
+- `rag.embedding-store.batch-size` 只控制写入 Qdrant 的批次大小，和 embedding 请求批次无关
 
 ## 数据与存储
 

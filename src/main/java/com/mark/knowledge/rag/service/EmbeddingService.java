@@ -4,12 +4,18 @@ import dev.langchain4j.data.embedding.Embedding;
 import dev.langchain4j.data.segment.TextSegment;
 import dev.langchain4j.model.embedding.EmbeddingModel;
 import dev.langchain4j.model.output.Response;
-import dev.langchain4j.store.embedding.EmbeddingStore;
+import dev.langchain4j.store.embedding.qdrant.QdrantEmbeddingStore;
+import io.grpc.Status;
+import io.grpc.StatusRuntimeException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Locale;
+
+import com.mark.knowledge.rag.store.QdrantEmbeddingStoreFactory;
 
 /**
  * 嵌入服务 - 使用当前配置的嵌入模型生成和管理嵌入向量
@@ -26,7 +32,16 @@ public class EmbeddingService {
     private static final Logger log = LoggerFactory.getLogger(EmbeddingService.class);
 
     private final EmbeddingModel embeddingModel;
-    private final EmbeddingStore<TextSegment> embeddingStore;
+    private final QdrantEmbeddingStoreFactory embeddingStoreFactory;
+
+    @Value("${rag.embedding-store.batch-size:32}")
+    private int embeddingStoreBatchSize;
+
+    @Value("${rag.embedding-store.max-retries:3}")
+    private int embeddingStoreMaxRetries;
+
+    @Value("${rag.embedding-store.retry-backoff-ms:1000}")
+    private long embeddingStoreRetryBackoffMs;
 
     /**
      * 构造函数
@@ -36,9 +51,9 @@ public class EmbeddingService {
      */
     public EmbeddingService(
             EmbeddingModel embeddingModel,
-            EmbeddingStore<TextSegment> embeddingStore) {
+            QdrantEmbeddingStoreFactory embeddingStoreFactory) {
         this.embeddingModel = embeddingModel;
-        this.embeddingStore = embeddingStore;
+        this.embeddingStoreFactory = embeddingStoreFactory;
     }
 
     /**
@@ -46,7 +61,7 @@ public class EmbeddingService {
      *
      * 处理流程：
      * 1. 使用当前配置的模型生成嵌入向量
-     * 2. 批量存储到Qdrant（每批100个）
+     * 2. 批量存储到Qdrant（批次大小可配置）
      * 3. 记录进度和性能指标
      *
      * @param segments 文本块列表
@@ -80,24 +95,42 @@ public class EmbeddingService {
             log.info("💾 [步骤2/2] 存储嵌入向量到Qdrant...");
             long storeStart = System.currentTimeMillis();
 
-            int batchSize = 100;
+            int batchSize = Math.max(1, embeddingStoreBatchSize);
+            int retryCount = Math.max(0, embeddingStoreMaxRetries);
+            long retryBackoffMs = Math.max(0L, embeddingStoreRetryBackoffMs);
             int totalStored = 0;
+            QdrantEmbeddingStore activeStore = embeddingStoreFactory.createStore();
 
-            // 批量存储并记录进度
-            for (int i = 0; i < segments.size(); i += batchSize) {
-                int endIndex = Math.min(i + batchSize, segments.size());
-                int batchCount = endIndex - i;
+            log.info("  Qdrant目标: {}", embeddingStoreFactory.describeTarget());
+            log.info("  写入批次大小: {}", batchSize);
+            log.info("  单批最大重试次数: {}", retryCount);
 
-                List<Embedding> embeddingBatch = embeddings.subList(i, endIndex);
-                List<TextSegment> segmentBatch = segments.subList(i, endIndex);
+            try {
+                for (int i = 0; i < segments.size(); i += batchSize) {
+                    int endIndex = Math.min(i + batchSize, segments.size());
+                    int batchCount = endIndex - i;
 
-                embeddingStore.addAll(embeddingBatch, segmentBatch);
-                totalStored += batchCount;
+                    List<Embedding> embeddingBatch = embeddings.subList(i, endIndex);
+                    List<TextSegment> segmentBatch = segments.subList(i, endIndex);
 
-                // 记录进度
-                double progress = (endIndex * 100.0) / segments.size();
-                log.info("  进度: {}/{} 文本块 ({}%) 已存储",
-                         endIndex, segments.size(), String.format("%.1f", progress));
+                    activeStore = writeBatchWithRetry(
+                        activeStore,
+                        embeddingBatch,
+                        segmentBatch,
+                        i,
+                        endIndex,
+                        segments.size(),
+                        retryCount,
+                        retryBackoffMs
+                    );
+                    totalStored += batchCount;
+
+                    double progress = (endIndex * 100.0) / segments.size();
+                    log.info("  进度: {}/{} 文本块 ({}%) 已存储",
+                             endIndex, segments.size(), String.format("%.1f", progress));
+                }
+            } finally {
+                closeQuietly(activeStore);
             }
 
             long storeTime = System.currentTimeMillis() - storeStart;
@@ -125,6 +158,143 @@ public class EmbeddingService {
             log.error("  错误: {}", e.getMessage(), e);
             log.error("==========================================");
             throw new RuntimeException("嵌入向量存储失败: " + e.getMessage(), e);
+        }
+    }
+
+    private QdrantEmbeddingStore writeBatchWithRetry(
+            QdrantEmbeddingStore activeStore,
+            List<Embedding> embeddingBatch,
+            List<TextSegment> segmentBatch,
+            int startIndex,
+            int endIndex,
+            int totalSegments,
+            int maxRetries,
+            long retryBackoffMs) {
+        int maxAttempts = Math.max(1, maxRetries + 1);
+        QdrantEmbeddingStore currentStore = activeStore;
+
+        for (int attempt = 1; attempt <= maxAttempts; attempt++) {
+            try {
+                if (currentStore == null) {
+                    currentStore = embeddingStoreFactory.createStore();
+                }
+                currentStore.addAll(embeddingBatch, segmentBatch);
+                return currentStore;
+            } catch (Exception e) {
+                Throwable rootCause = rootCause(e);
+                boolean retryable = isRetryableStoreException(e);
+                log.warn(
+                    "Qdrant批次写入失败: range={}-{} / {}, batchSize={}, attempt={}/{}, endpoint={}, retryable={}, errorType={}, rootCause={}",
+                    startIndex + 1,
+                    endIndex,
+                    totalSegments,
+                    embeddingBatch.size(),
+                    attempt,
+                    maxAttempts,
+                    embeddingStoreFactory.describeTarget(),
+                    retryable,
+                    e.getClass().getSimpleName(),
+                    safeMessage(rootCause),
+                    e
+                );
+
+                closeQuietly(currentStore);
+                currentStore = null;
+
+                if (!retryable || attempt >= maxAttempts) {
+                    throw new RuntimeException(
+                        "Qdrant批次写入失败: range=%d-%d/%d, attempt=%d/%d, cause=%s"
+                            .formatted(startIndex + 1, endIndex, totalSegments, attempt, maxAttempts, safeMessage(rootCause)),
+                        e
+                    );
+                }
+
+                sleepBeforeRetry(retryBackoffMs, attempt, startIndex, endIndex, totalSegments, maxAttempts);
+            }
+        }
+
+        throw new IllegalStateException("未命中的重试终止条件");
+    }
+
+    private boolean isRetryableStoreException(Throwable error) {
+        Throwable current = error;
+        while (current != null) {
+            if (current instanceof StatusRuntimeException statusRuntimeException) {
+                Status.Code code = statusRuntimeException.getStatus().getCode();
+                if (code == Status.Code.UNAVAILABLE
+                    || code == Status.Code.DEADLINE_EXCEEDED
+                    || code == Status.Code.RESOURCE_EXHAUSTED
+                    || code == Status.Code.INTERNAL) {
+                    return true;
+                }
+            }
+
+            String message = current.getMessage();
+            if (message != null) {
+                String normalized = message.toLowerCase(Locale.ROOT);
+                if (normalized.contains("connection reset")
+                    || normalized.contains("connection refused")
+                    || normalized.contains("broken pipe")
+                    || normalized.contains("io exception")
+                    || normalized.contains("channel shutdown")
+                    || normalized.contains("goaway")
+                    || normalized.contains("unavailable")) {
+                    return true;
+                }
+            }
+
+            current = current.getCause();
+        }
+        return false;
+    }
+
+    private Throwable rootCause(Throwable error) {
+        Throwable current = error;
+        while (current != null && current.getCause() != null && current.getCause() != current) {
+            current = current.getCause();
+        }
+        return current == null ? error : current;
+    }
+
+    private String safeMessage(Throwable error) {
+        if (error == null || error.getMessage() == null || error.getMessage().isBlank()) {
+            return "unknown";
+        }
+        return error.getMessage();
+    }
+
+    private void sleepBeforeRetry(
+            long retryBackoffMs,
+            int attempt,
+            int startIndex,
+            int endIndex,
+            int totalSegments,
+            int maxAttempts) {
+        long sleepMs = Math.max(0L, retryBackoffMs) * attempt;
+        if (sleepMs == 0L) {
+            log.info("重建Qdrant连接后立即重试批次: range={}-{} / {}, nextAttempt={}/{}",
+                startIndex + 1, endIndex, totalSegments, attempt + 1, maxAttempts);
+            return;
+        }
+
+        log.info("等待 {} ms 后重试Qdrant批次写入: range={}-{} / {}, nextAttempt={}/{}",
+            sleepMs, startIndex + 1, endIndex, totalSegments, attempt + 1, maxAttempts);
+        try {
+            Thread.sleep(sleepMs);
+        } catch (InterruptedException interruptedException) {
+            Thread.currentThread().interrupt();
+            throw new RuntimeException("Qdrant批次重试等待被中断", interruptedException);
+        }
+    }
+
+    private void closeQuietly(QdrantEmbeddingStore store) {
+        if (store == null) {
+            return;
+        }
+        try {
+            store.close();
+        } catch (Exception e) {
+            log.debug("关闭Qdrant store时忽略异常: {}", e.getMessage());
         }
     }
 }

@@ -3,6 +3,7 @@ package com.mark.knowledge.rag.service;
 import com.mark.knowledge.rag.dto.RagRequest;
 import com.mark.knowledge.rag.dto.RagResponse;
 import com.mark.knowledge.rag.dto.SourceReference;
+import com.mark.knowledge.rag.store.QdrantEmbeddingStoreFactory;
 import dev.langchain4j.data.segment.TextSegment;
 import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.model.chat.StreamingChatModel;
@@ -15,7 +16,7 @@ import dev.langchain4j.model.embedding.EmbeddingModel;
 import dev.langchain4j.store.embedding.EmbeddingMatch;
 import dev.langchain4j.store.embedding.EmbeddingSearchRequest;
 import dev.langchain4j.store.embedding.EmbeddingSearchResult;
-import dev.langchain4j.store.embedding.EmbeddingStore;
+import dev.langchain4j.store.embedding.qdrant.QdrantEmbeddingStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -65,7 +66,7 @@ public class RagService {
     private final ChatModel chatModel;
     private final StreamingChatModel streamingChatModel;
     private final EmbeddingModel embeddingModel;
-    private final EmbeddingStore<TextSegment> embeddingStore;
+    private final QdrantEmbeddingStoreFactory embeddingStoreFactory;
     private final ConversationMemoryService conversationMemoryService;
     private final Bm25Scorer bm25Scorer;
     private final ConcurrentHashMap<String, InFlightGeneration> inFlightGenerations = new ConcurrentHashMap<>();
@@ -74,13 +75,13 @@ public class RagService {
             ChatModel chatModel,
             StreamingChatModel streamingChatModel,
             EmbeddingModel embeddingModel,
-            EmbeddingStore<TextSegment> embeddingStore,
+            QdrantEmbeddingStoreFactory embeddingStoreFactory,
             ConversationMemoryService conversationMemoryService,
             Bm25Scorer bm25Scorer) {
         this.chatModel = chatModel;
         this.streamingChatModel = streamingChatModel;
         this.embeddingModel = embeddingModel;
-        this.embeddingStore = embeddingStore;
+        this.embeddingStoreFactory = embeddingStoreFactory;
         this.conversationMemoryService = conversationMemoryService;
         this.bm25Scorer = bm25Scorer;
     }
@@ -111,7 +112,7 @@ public class RagService {
 
             log.info("问题向量维度: {}", questionEmbedding.dimension());
 
-            EmbeddingSearchResult<TextSegment> searchResult = embeddingStore.search(searchRequest);
+            EmbeddingSearchResult<TextSegment> searchResult = searchEmbeddingStore(searchRequest);
             List<EmbeddingMatch<TextSegment>> vectorMatches = searchResult.matches();
 
             log.info("向量检索召回 {} 条候选片段，最小分数阈值: {}", vectorMatches.size(), minScore);
@@ -223,7 +224,7 @@ public class RagService {
 
             log.info("流式问题向量维度: conversationId={}, dimension={}", conversationId, questionEmbedding.dimension());
 
-            EmbeddingSearchResult<TextSegment> searchResult = embeddingStore.search(searchRequest);
+            EmbeddingSearchResult<TextSegment> searchResult = searchEmbeddingStore(searchRequest);
             List<EmbeddingMatch<TextSegment>> vectorMatches = searchResult.matches();
             log.info("流式向量检索召回: conversationId={}, matches={}, minScore={}",
                 conversationId, vectorMatches.size(), minScore);
@@ -345,6 +346,15 @@ public class RagService {
 
     private long elapsedMillis(long startNanos) {
         return (System.nanoTime() - startNanos) / 1_000_000;
+    }
+
+    private EmbeddingSearchResult<TextSegment> searchEmbeddingStore(EmbeddingSearchRequest searchRequest) {
+        QdrantEmbeddingStore embeddingStore = embeddingStoreFactory.createStore();
+        try {
+            return embeddingStore.search(searchRequest);
+        } finally {
+            closeQuietly(embeddingStore);
+        }
     }
 
     private int resolveRequestedMaxResults(RagRequest request) {
@@ -512,6 +522,17 @@ public class RagService {
             return "未知错误";
         }
         return error.getMessage();
+    }
+
+    private void closeQuietly(QdrantEmbeddingStore embeddingStore) {
+        if (embeddingStore == null) {
+            return;
+        }
+        try {
+            embeddingStore.close();
+        } catch (Exception e) {
+            log.debug("关闭Qdrant搜索store时忽略异常: {}", e.getMessage());
+        }
     }
 
     private final class RagStreamingResponseHandler implements StreamingChatResponseHandler {

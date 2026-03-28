@@ -1,9 +1,9 @@
 import {
+  CloseOutlined,
   CloudUploadOutlined,
   DatabaseOutlined,
   DeleteOutlined,
   LoadingOutlined,
-  MenuFoldOutlined,
   ReloadOutlined
 } from "@ant-design/icons";
 import {
@@ -24,7 +24,7 @@ interface DocumentSidebarProps {
   ragHealth: HealthState;
   documentHealth: HealthState;
   refreshingHealth: boolean;
-  onToggleCollapse: () => void;
+  onClose: () => void;
   onRefreshDocuments: () => Promise<void>;
   onRefreshHealth: () => Promise<void>;
   onUpload: (file: File) => Promise<void>;
@@ -50,15 +50,28 @@ export function DocumentSidebar(props: DocumentSidebarProps) {
   }
 
   return (
-    <aside className="flex h-full min-h-0 flex-col overflow-hidden rounded-[32px] border border-ink-950/10 bg-white/[0.74] p-6 shadow-panel backdrop-blur-[18px] max-[1120px]:h-auto max-[720px]:rounded-3xl max-[720px]:p-[18px]">
-      <div className="flex flex-wrap items-center justify-end gap-2">
+    <section className="flex h-full min-h-0 flex-col overflow-hidden">
+      <div className="flex items-start justify-between gap-4">
+        <div className="min-w-0">
+          <p className="text-xs font-bold uppercase tracking-[0.12em] text-ink-500">
+            文档控制台
+          </p>
+          <h2 className="mt-1 text-lg font-semibold text-ink-950">
+            管理知识库文档
+          </h2>
+        </div>
         <Button
-          icon={<ReloadOutlined />}
-          onClick={refreshAll}
-          loading={refreshing}
-        >
-          刷新
-        </Button>
+          type="text"
+          shape="circle"
+          className="!text-ink-500 hover:!bg-white/[0.8] hover:!text-ink-950"
+          icon={<CloseOutlined />}
+          onClick={props.onClose}
+          title="关闭文档控制台"
+        />
+
+      </div>
+
+      <div className="mt-4 flex flex-wrap items-center gap-2">
         <Upload {...uploadProps}>
           <Button
             type="primary"
@@ -69,13 +82,13 @@ export function DocumentSidebar(props: DocumentSidebarProps) {
           </Button>
         </Upload>
         <Button
-          type="text"
-          shape="circle"
-          className="!text-ink-500 hover:!bg-white/[0.8] hover:!text-ink-950"
-          icon={<MenuFoldOutlined />}
-          onClick={props.onToggleCollapse}
-          title="收起文档侧边栏"
-        />
+          icon={<ReloadOutlined />}
+          onClick={refreshAll}
+          loading={refreshing}
+        >
+          刷新
+        </Button>
+
       </div>
 
       <div className="my-[18px] flex flex-wrap items-center gap-3">
@@ -146,6 +159,6 @@ export function DocumentSidebar(props: DocumentSidebarProps) {
           </div>
         )}
       </div>
-    </aside>
+    </section>
   );
 }

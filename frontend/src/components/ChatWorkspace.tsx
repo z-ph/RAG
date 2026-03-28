@@ -3,7 +3,7 @@ import {
   DatabaseOutlined,
   MessageOutlined,
   SendOutlined,
-  StopOutlined
+  PauseCircleFilled
 } from "@ant-design/icons";
 import { Button, Input, Select } from "antd";
 import { MessageBubble } from "./MessageBubble";
@@ -54,7 +54,7 @@ export function ChatWorkspace(props: ChatWorkspaceProps) {
               icon={<ClearOutlined />}
               onClick={() => void props.onClearConversation()}
             >
-              清空
+              清空对话
             </Button>
           </div>
         </div>
@@ -65,12 +65,10 @@ export function ChatWorkspace(props: ChatWorkspaceProps) {
           ))}
         </div>
 
-        <div className="grid gap-3 border-t border-ink-950/8 pt-4">
-          <Input.TextArea
-            className="!rounded-[24px] !border-ink-950/10 !bg-white/[0.9] !px-[18px] !pt-[18px] !pb-[14px] !shadow-none placeholder:!text-ink-500/[0.7]"
+        <div className="flex items-center gap-1">
+          <Input
             value={props.prompt}
-            rows={4}
-            placeholder="输入你的问题，例如：请提炼这批制度文档的办理流程和责任边界。"
+            placeholder="输入你的问题。"
             onChange={(event) => props.onPromptChange(event.target.value)}
             onPressEnter={(event) => {
               if (!event.shiftKey && !props.streaming) {
@@ -79,8 +77,6 @@ export function ChatWorkspace(props: ChatWorkspaceProps) {
               }
             }}
           />
-
-          <div className="flex flex-col items-stretch justify-end gap-3 min-[721px]:flex-row min-[721px]:items-center">
             <Button
               type={props.streaming ? "default" : "primary"}
               danger={props.streaming}
@@ -90,7 +86,7 @@ export function ChatWorkspace(props: ChatWorkspaceProps) {
                   ? "!rounded-full !px-6 !shadow-none"
                   : "!rounded-full !border-none !bg-accent-500 !px-6 !shadow-none hover:!bg-accent-400"
               }
-              icon={props.streaming ? <StopOutlined /> : <SendOutlined />}
+              icon={props.streaming ? <PauseCircleFilled /> : <SendOutlined />}
               disabled={!props.streaming && !props.prompt.trim()}
               onClick={() => {
                 if (props.streaming) {
@@ -101,8 +97,9 @@ export function ChatWorkspace(props: ChatWorkspaceProps) {
                 void props.onSend();
               }}
             >
-              {props.streaming ? "取消生成" : "发送问题"}
             </Button>
+          <div className="flex flex-col items-stretch justify-end gap-3">
+
           </div>
         </div>
       </div>

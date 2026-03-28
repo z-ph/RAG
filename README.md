@@ -1,496 +1,312 @@
-# ✨ 智能知识库系统
+# 智能知识库系统
 
-<div align="center">
+基于 `Spring Boot 4`、`LangChain4j`、`Qdrant` 的 RAG 知识库系统。
 
-基于 **Spring Boot 4** + **LangChain4j** + **Ollama** + **Qdrant** 的企业级 RAG（检索增强生成）知识库问答系统
+当前仓库由两部分组成：
 
-[![Java](https://img.shields.io/badge/Java-21-orange.svg)](https://openjdk.org/)
-[![Spring Boot](https://img.shields.io/badge/Spring%20Boot-4.0.2-green.svg)](https://spring.io/projects/spring-boot)
-[![LangChain4j](https://img.shields.io/badge/LangChain4j-1.11.0-blue.svg)](https://docs.langchain4j.dev/)
-[![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+- 后端：`src/` 下的 Spring Boot API，负责文档解析、向量写入、检索增强问答和 SSE 流式输出
+- 前端：`frontend/` 下的 React + Vite 控制台，负责文档管理和对话界面
 
-</div>
----
+## 当前能力
 
-## 📋 目录
+- 上传 `PDF` / `TXT` 文档并自动清洗、分块、去重
+- 使用当前配置的 embedding provider 生成向量并写入 Qdrant
+- 同步问答和流式问答
+- 返回来源片段，支持会话取消和上下文清空
+- 聊天模型和向量模型可分别选择 `ollama` 或 `vllm`
+- 会话上下文使用内存滑动窗口，支持 TTL 自动清理
+- 启动时自动检查 Qdrant collection；若维度不匹配会按配置重建
 
-- [功能特性](#-功能特性)
-- [快速开始](#-快速开始)
-- [功能界面](#-功能界面)
-- [API 接口](#-api-接口)
-- [配置说明](#-配置说明)
-- [数据库结构](#-数据库结构)
-- [项目结构](#-项目结构)
-- [核心功能详解](#-核心功能详解)
-- [常见问题](#-常见问题)
-- [更多文档](#-更多文档)
+## 当前架构
 
----
+```text
+frontend (React + Vite)
+        |
+        v
+Spring Boot API
+  |- /api/documents/*
+  |- /api/rag/*
+  |
+  |- ChatModel            <- llm.chat-provider
+  |- StreamingChatModel   <- llm.chat-provider
+  |- EmbeddingModel       <- llm.embedding-provider
+  |
+  |- Qdrant (持久化文档向量)
+  \- In-memory sessions (会话上下文)
+```
 
-## 🎯 功能特性
+说明：
 
-### 核心功能
+- 当前实现没有旧版文档中提到的 `Agent`、`领域文档管理`、`SQLite/JPA`、`登录系统`、`model-router`
+- 后端默认不再提供旧的静态 HTML 页面；使用前端时请启动 `frontend/` 子项目
 
-- 📄 **文档上传** - 支持 PDF/TXT，智能分块
-- 🧠 **智能问答** - RAG检索增强，流式响应
-- 🤖 **智能体对话** - LangChain4j Agentic架构，工具自主调用
-- 📚 **领域文档管理** - 10+领域，异步处理
-- 🗂️ **Qdrant管理** - 集合管理，自动创建
-- 💾 **数据持久化** - SQLite + Qdrant
-- 🎨 **现代化UI** - 抽屉式文档控制台、暖色克制界面与轻量层次反馈
-- 🌐 **混合模型** - 本地+云端智能路由
+## 仓库结构
 
-### 智能体工具
+```text
+.
+├── src/
+│   ├── main/java/com/mark/knowledge/
+│   │   ├── KnowledgeApplication.java
+│   │   ├── chat/config/ChatConfig.java
+│   │   ├── config/QdrantInitializer.java
+│   │   └── rag/
+│   │       ├── app/
+│   │       ├── dto/
+│   │       ├── service/
+│   │       └── store/
+│   └── main/resources/application.yaml
+├── frontend/
+│   ├── src/
+│   ├── package.json
+│   └── README.md
+├── docs/
+│   ├── openapi.yaml
+│   ├── Mixed-Model-Architecture-Guide.md
+│   └── Database-Schema.md
+├── .env.example
+└── HELP.md
+```
 
-- 🔢 **数学计算** - exp4j精确计算
-- 📊 **金融计算** - IRR、债券、期权（Black-Scholes）
-- 📎 **文件分析** - MCP文件系统，上传文件并分析
-- 🌤️ **天气查询** - 实时天气
-- 🕐 **时间查询** - 当前日期时间
-- 🔍 **向量检索** - 知识库智能搜索
-- 💬 **上下文记忆** - 滑动窗口对话历史
+## 快速开始
 
----
-
-## 🖼️ 界面预览
-
-### 智能问答界面
-
-<img src="./src/main/resources/static/images/img.png" alt="智能问答" width="800"/>
-
-### 领域文档管理
-
-<img src="./src/main/resources/static/images/img_1.png" alt="领域文档" width="800"/>
-
-### Qdrant 管理界面
-
-<img src="./src/main/resources/static/images/img_2.png" alt="Qdrant管理" width="800"/>
-
-### 智能体对话界面
-
-#### 1. 文件分析 + 知识库检索
-
-<img src="./src/main/resources/static/images/img_3.png" alt="文件分析" width="800"/>
-
-#### 2. 金融计算 - 贷款利息
-
-<img src="./src/main/resources/static/images/img_4.png" alt="利息计算" width="800"/>
-
-#### 3. 金融计算 - 期权定价
-
-<img src="./src/main/resources/static/images/img_5.png" alt="期权计算" width="800"/>
-
----
-
-## 🚀 快速开始
-
-### 前置要求
+### 1. 前置要求
 
 - Java 21+
 - Maven 3.9+
-- Ollama
+- Node.js 20+ 与 `pnpm`（如果需要启动前端）
 - Qdrant
-- 阿里云DashScope API Key（可选，用于混合模型）
+- 至少一个聊天模型 provider 和一个 embedding provider
+  - `ollama`
+  - `vllm` 或其他 OpenAI-compatible endpoint
 
-### 安装运行
+### 2. 启动 Qdrant
 
 ```bash
-# 1. 启动 Ollama 并拉取模型
-ollama serve
-ollama pull qwen2.5:7b
-ollama pull qwen3-embedding:0.6b
-
-# 2. 启动 Qdrant
-docker run -d -p 6333:6333 -p 6334:6334 qdrant/qdrant
-
-# 3. 运行应用
-mvn spring-boot:run
-
-# 4. 访问系统
-open http://localhost:8080
+docker run -d --name qdrant -p 6333:6333 -p 6334:6334 qdrant/qdrant
 ```
 
----
+端口说明：
 
-## 🎨 功能界面
+- `6333`：HTTP 管理接口，文档列表和删除逻辑会用到
+- `6334`：gRPC 接口，向量写入和检索会用到
 
-| 页面 | 路径 | 功能 |
-|------|------|------|
-| 文件上传 | `/upload.html` | 上传PDF/TXT文档 |
-| 智能问答 | `/chat.html` | RAG知识库问答 |
-| **智能体对话** | `/agent-chat.html` | Agentic AI + 工具调用 |
-| 领域文档 | `/domain.html` | 领域知识管理 |
-| Qdrant管理 | `/qdrant.html` | 向量数据库管理 |
+### 3. 选择模型 provider
 
----
+#### 方案 A：全部使用 Ollama
 
-## 🔌 API 接口
+```bash
+ollama serve
+ollama pull qwen2.5:7b
+ollama pull bge-base-zh
+```
 
-当前代码中的实际接口已整理为 OpenAPI 文档：
+如果你打算使用别的 embedding 模型，需要同时调整 `OLLAMA_EMBEDDING_MODEL` 和 `QDRANT_VECTOR_SIZE`。
 
-- [OpenAPI 规范](docs/openapi.yaml)
+#### 方案 B：聊天走 OpenAI-compatible endpoint，向量仍走 Ollama
 
-### 文档管理
+保留本地 Ollama embedding，并配置：
+
+```bash
+LLM_CHAT_PROVIDER=vllm
+LLM_EMBEDDING_PROVIDER=ollama
+VLLM_CHAT_BASE_URL=http://localhost:8000/v1
+VLLM_CHAT_MODEL=Qwen/Qwen2.5-7B-Instruct
+VLLM_CHAT_API_KEY=
+```
+
+`vllm` 在当前代码里表示“OpenAI-compatible provider”，不要求一定是 vLLM，也可以接入兼容接口的云端服务。
+
+### 4. 配置后端
+
+应用启动时会自动读取根目录 `.env`。推荐以 `.env.example` 为模板创建自己的 `.env`，常用配置如下：
+
+```dotenv
+LLM_CHAT_PROVIDER=ollama
+LLM_EMBEDDING_PROVIDER=ollama
+
+OLLAMA_CHAT_BASE_URL=http://localhost:11434
+OLLAMA_EMBEDDING_BASE_URL=http://localhost:11434
+OLLAMA_CHAT_MODEL=qwen2.5:7b
+OLLAMA_EMBEDDING_MODEL=bge-base-zh
+
+QDRANT_HOST=localhost
+QDRANT_PORT=6334
+QDRANT_HTTP_PORT=6333
+QDRANT_COLLECTION_NAME=knowledge-base
+QDRANT_VECTOR_SIZE=768
+```
+
+### 5. 启动后端
+
+```bash
+mvn spring-boot:run
+```
+
+默认地址：`http://localhost:8080`
+
+### 6. 启动前端
+
+```bash
+cd frontend
+pnpm install
+pnpm dev
+```
+
+默认地址：`http://localhost:5173`
+
+本地开发时，Vite 会把 `/api` 代理到 `http://localhost:8080`。
+
+## API 概览
+
+完整接口规范见 [docs/openapi.yaml](docs/openapi.yaml)。
+
+### 文档接口
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
-| `POST` | `/api/documents/upload` | 上传并处理 PDF/TXT 文档 |
-| `GET` | `/api/documents` | 查询已上传文档列表 |
-| `DELETE` | `/api/documents/{documentId}` | 删除指定文档 |
+| `POST` | `/api/documents/upload` | 上传并处理 `PDF/TXT` 文档 |
+| `GET` | `/api/documents` | 列出当前 Qdrant collection 中的文档 |
+| `DELETE` | `/api/documents/{documentId}` | 删除指定文档对应的全部向量片段 |
 | `GET` | `/api/documents/health` | 文档服务健康检查 |
 
-```bash
-curl -X POST http://localhost:8080/api/documents/upload \
-  -F "file=@document.txt"
-
-curl http://localhost:8080/api/documents
-
-curl -X DELETE http://localhost:8080/api/documents/{documentId}
-```
-
-### RAG 问答
+### RAG 接口
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
 | `POST` | `/api/rag/ask` | 同步返回答案和来源片段 |
-| `POST` | `/api/rag/ask/stream` | 通过 SSE 流式返回答案 |
-| `POST` | `/api/rag/conversations/{conversationId}/cancel` | 取消指定会话的进行中生成任务 |
-| `DELETE` | `/api/rag/conversations/{conversationId}` | 清空指定会话上下文 |
+| `POST` | `/api/rag/ask/stream` | SSE 流式返回答案 |
+| `POST` | `/api/rag/conversations/{conversationId}/cancel` | 取消进行中的流式生成 |
+| `DELETE` | `/api/rag/conversations/{conversationId}` | 清空会话上下文 |
 | `GET` | `/api/rag/health` | RAG 服务健康检查 |
 
-```bash
-curl -X POST http://localhost:8080/api/rag/ask \
-  -H "Content-Type: application/json" \
-  -d '{
-    "question": "什么是 RAG？",
-    "conversationId": "demo-001",
-    "maxResults": 5
-  }'
+### SSE 事件
 
-curl -N -X POST http://localhost:8080/api/rag/ask/stream \
-  -H "Content-Type: application/json" \
-  -d '{
-    "question": "请总结上传文档的重点",
-    "conversationId": "demo-stream-001"
-  }'
-```
+`/api/rag/ask/stream` 可能输出以下事件：
 
-### 流式接口事件
+- `start`
+- `sources`
+- `delta`
+- `complete`
+- `cancelled`
+- `error`
 
-`/api/rag/ask/stream` 会输出以下 SSE 事件：
+## 配置说明
 
-- `start`：返回会话 ID
-- `sources`：返回来源片段数组
-- `delta`：返回增量文本
-- `complete`：返回结束状态
-- `cancelled`：返回取消原因
-- `error`：返回错误信息
+当前有效配置位于 [src/main/resources/application.yaml](src/main/resources/application.yaml)。
 
----
-
-## ⚙️ 配置说明
-
-### application.yaml 关键配置
+### LLM 配置
 
 ```yaml
-# LLM 配置
 llm:
-  chat-provider: vllm
-  embedding-provider: ollama
+  chat-provider: ${LLM_CHAT_PROVIDER:ollama}
+  embedding-provider: ${LLM_EMBEDDING_PROVIDER:ollama}
+  timeout: ${LLM_TIMEOUT:120s}
   ollama:
-    embedding-base-url: http://localhost:11434
-    embedding-model: qwen3-embedding:0.6b
+    chat-base-url: ${OLLAMA_CHAT_BASE_URL:http://localhost:11434}
+    embedding-base-url: ${OLLAMA_EMBEDDING_BASE_URL:http://localhost:11434}
+    chat-model: ${OLLAMA_CHAT_MODEL:qwen2.5:7b}
+    embedding-model: ${OLLAMA_EMBEDDING_MODEL:bge-base-zh}
+    think: ${OLLAMA_THINK:false}
   vllm:
-    chat-base-url: http://localhost:8000/v1
-    chat-model: Qwen/Qwen2.5-7B-Instruct
+    chat-base-url: ${VLLM_CHAT_BASE_URL:http://localhost:8000/v1}
+    embedding-base-url: ${VLLM_EMBEDDING_BASE_URL:http://localhost:8000/v1}
+    chat-model: ${VLLM_CHAT_MODEL:Qwen/Qwen2.5-7B-Instruct}
+    embedding-model: ${VLLM_EMBEDDING_MODEL:BAAI/bge-base-zh-v1.5}
     chat-api-key: ${VLLM_CHAT_API_KEY:}
+    embedding-api-key: ${VLLM_EMBEDDING_API_KEY:}
+```
 
-# Qdrant 配置
+### Qdrant 配置
+
+```yaml
 qdrant:
-  host: localhost
-  port: 6334
-  collection-name: knowledge-base
-  vector-size: 1024
-  create-collection-if-not-exists: true
+  host: ${QDRANT_HOST:localhost}
+  port: ${QDRANT_PORT:6334}
+  http-port: ${QDRANT_HTTP_PORT:6333}
+  collection-name: ${QDRANT_COLLECTION_NAME:knowledge-base}
+  vector-size: ${QDRANT_VECTOR_SIZE:768}
+  create-collection-if-not-exists: ${QDRANT_CREATE_COLLECTION_IF_NOT_EXISTS:true}
+```
 
-# RAG 配置
+注意：
+
+- `qdrant.port` 是 gRPC 端口
+- `qdrant.http-port` 是 HTTP 端口
+- `qdrant.vector-size` 必须和实际 embedding 维度一致
+- 启动时如果 collection 已存在但维度不匹配，应用会删除并重建 collection
+
+### RAG 配置
+
+```yaml
 rag:
-  chunk-size: 500
-  chunk-overlap: 50
-  max-results: 5
-  min-score: 0.5
-
-# Agent 配置
-agent:
-  context-window-size: 10      # 对话历史窗口大小
-  vector-store-enabled: true   # 启用向量检索
-  mcp-file-enabled: true       # 启用文件操作
-  tool-call-enabled: true      # 启用工具调用
-  mcp-allowed-directory: .     # MCP文件系统允许访问的目录
-
-# 模型路由配置
-model-router:
-  strategy: PERCENTAGE         # PERCENTAGE 或 BUSINESS_TYPE
-  percentage:
-    aliyun: 0                  # 0% 使用阿里云（仅本地）
-    local: 100                 # 100% 使用本地模型
+  chunk-size: ${RAG_CHUNK_SIZE:320}
+  chunk-min-size: ${RAG_CHUNK_MIN_SIZE:250}
+  chunk-max-size: ${RAG_CHUNK_MAX_SIZE:350}
+  chunk-overlap: ${RAG_CHUNK_OVERLAP:40}
+  embedding-store:
+    batch-size: ${RAG_EMBEDDING_STORE_BATCH_SIZE:32}
+    max-retries: ${RAG_EMBEDDING_STORE_MAX_RETRIES:3}
+    retry-backoff-ms: ${RAG_EMBEDDING_STORE_RETRY_BACKOFF_MS:1000}
+  min-text-length: ${RAG_MIN_TEXT_LENGTH:80}
+  keyword-count: ${RAG_KEYWORD_COUNT:6}
+  max-results: ${RAG_MAX_RESULTS:5}
+  min-score: ${RAG_MIN_SCORE:0.5}
+  memory-window: ${RAG_MEMORY_WINDOW:6}
+  session-ttl-seconds: ${RAG_SESSION_TTL_SECONDS:1800}
+  memory-cleanup-interval-ms: ${RAG_MEMORY_CLEANUP_INTERVAL_MS:300000}
+  stream-timeout-ms: ${RAG_STREAM_TIMEOUT_MS:300000}
 ```
 
-`llm.chat-provider` 和 `llm.embedding-provider` 是两个独立配置。每个 provider 自己维护 chat / embedding 各自的 `base-url`、`model` 和认证信息，不再有顶层覆盖层。
+## 数据与存储
 
----
+当前实现没有关系型数据库。
 
-## 🗄️ 数据库结构
+- 文档向量和文档元数据保存在 Qdrant
+- 会话上下文保存在内存 `ConcurrentHashMap`
+- 会话清空只影响内存上下文，不会删除 Qdrant 文档
+- 文档列表接口会扫描当前 collection 的 payload 并按 `documentId` 聚合
 
-系统使用 **SQLite** 作为关系型数据库，配合 **Qdrant** 向量数据库。
+每个文本片段写入 Qdrant 时会带上这些 metadata：
 
-### 数据表
+- `filename`
+- `documentId`
+- `chunkIndex`
+- `chunkSize`
+- `rawChunkSize`
+- `chunkHash`
+- `title`
+- `category`
+- `documentTime`
+- `ingestedAt`
+- `keywords`
+- `documentKeywords`
 
-| 表名 | 说明 |
-|------|------|
-| `users` | 用户表 |
-| `chat_messages` | 聊天消息表 |
-| `domain_documents` | 领域文档表 |
+## 前端说明
 
-**重要**：首次启动时，JPA 会自动创建表结构。详见 [数据库建表 SQL](docs/Database-Schema.md)。
+前端在 [frontend/README.md](frontend/README.md) 中单独维护说明。
 
-### 数据库配置
+当前界面能力与代码一致，包括：
 
-```yaml
-spring:
-  datasource:
-    url: jdbc:sqlite:knowledge.db
-    driver-class-name: org.sqlite.JDBC
-  jpa:
-    database-platform: org.hibernate.community.dialect.SQLiteDialect
-    hibernate:
-      ddl-auto: update  # 自动创建/更新表结构
-    show-sql: false
-```
+- 上传文档
+- 刷新文档列表
+- 删除文档
+- 查看服务健康状态
+- 发起流式问答
+- 取消生成
+- 清空当前会话
 
----
+## 更多文档
 
-## 📁 项目结构
+- [HELP.md](HELP.md)：快速运行说明
+- [docs/openapi.yaml](docs/openapi.yaml)：接口定义
+- [docs/Mixed-Model-Architecture-Guide.md](docs/Mixed-Model-Architecture-Guide.md)：provider 配置说明
+- [docs/Database-Schema.md](docs/Database-Schema.md)：当前存储结构说明
 
-```
-src/main/java/com/mark/knowledge/
-├── KnowledgeApplication.java
-├── agent/                          # 智能体模块
-│   ├── controller/
-│   │   ├── AgentFileController.java        # 文件上传控制器
-│   │   └── AgentOrchestrationController.java # Agent 编排控制器
-│   ├── dto/                      # 数据传输对象
-│   ├── service/
-│   │   ├── AgenticService.java            # 统一 Agentic 服务 ⭐
-│   │   ├── McpFileService.java            # MCP 文件系统
-│   │   ├── ToolAgent.java                 # 计算工具 Agent
-│   │   ├── FinancialToolAgent.java        # 金融工具 Agent
-│   │   ├── FinancialCalculationService.java  # 金融计算服务
-│   │   ├── BondCalculationService.java       # 债券计算
-│   │   └── OptionCalculationService.java     # 期权计算
-│   └── tool/
-│       └── VectorSearchTool.java           # 向量检索工具
-├── chat/                           # 聊天模块
-│   ├── controller/
-│   ├── dto/
-│   ├── entity/
-│   ├── repository/
-│   └── service/
-│       ├── ChatService.java             # 聊天服务
-│       ├── AuthService.java             # 认证服务
-│       └── ModelRouterService.java      # 模型路由服务 ⭐
-├── rag/                            # RAG 模块
-│   ├── app/          # RAG 控制器
-│   ├── config/       # RAG 配置
-│   ├── dto/          # RAG DTO
-│   ├── entity/       # RAG 实体
-│   ├── repository/   # RAG Repository
-│   └── service/      # RAG 服务
-└── config/                        # 全局配置
+## 已移除的旧说明
 
-src/main/resources/
-├── static/                        # 静态资源
-│   ├── images/
-│   ├── upload.html
-│   ├── chat.html
-│   ├── agent-chat.html
-│   ├── domain.html
-│   └── qdrant.html
-└── application.yaml
+以下内容不再属于当前代码实现：
 
-docs/                              # 文档目录
-├── Financial-Calculation-Guide.md
-├── Financial-Summary.md
-├── LLM-Tool-Calling-Architecture.md
-└── Mixed-Model-Architecture-Guide.md
-```
-
----
-
-## 💡 核心功能详解
-
-### 1. Agentic AI 架构 ⭐
-
-基于 LangChain4j 1.11.0 的 Agentic 模式：
-
-- **自主工具调用** - Agent 根据用户问题自主决定调用哪些工具
-- **上下文记忆** - MessageWindowChatMemory 滑动窗口管理对话历史
-- **多工具协作** - 向量检索、文件分析、金融计算无缝协作
-- **流式响应** - 实时流式输出，提升用户体验
-
-**可用工具**：
-1. `searchKnowledge` - 向量知识库检索
-2. `readFile` - 读取上传的文件
-3. `listDirectory` - 列出目录文件
-4. `searchFiles` - 搜索文件内容
-5. `calculate` - 数学计算
-6. `calculateAmortization` - 贷款计算
-7. `getCurrentTime` - 获取时间
-8. `getWeather` - 查询天气
-
-### 2. MCP 文件系统 ⭐
-
-**功能特性**：
-- 📎 消息附件 - 在对话中上传文件
-- 🔍 文件读取 - LLM 使用工具读取文件
-- 📝 文件分析 - 结合知识库分析上传文件
-- 🗂️ 智能路径 - 自动提取相对路径
-
-**安全特性**：
-- ✅ 路径限制 - 只能访问指定目录
-- ✅ 路径解析 - 防止目录遍历攻击
-- ✅ 文件大小限制 - 大文件自动截断预览
-- ✅ 对话隔离 - 按对话ID组织存储
-
-**使用示例**：
-```
-用户：上传信访相关文件
-系统：文件上传到 uploads/agent-xxx/信访政策.txt
-
-用户：这里面的做法是不是符合信访的政策？
-Agent：
-1. 使用 readFile 读取文件
-2. 使用 searchKnowledge 查询知识库
-3. 对比分析并回答
-```
-
-### 3. 混合模型架构 ⭐
-
-**支持的模型**：
-
-| 模型 | 提供商 | 用途 |
-|------|--------|------|
-| qwen2.5:7b | Ollama（本地） | 快速响应、工具调用 |
-| qwen-plus | 阿里云DashScope | 复杂推理、长上下文 |
-
-**路由策略**：
-
-1. **百分比路由** - 按比例分配请求
-   ```yaml
-   model-router:
-     strategy: PERCENTAGE
-     percentage:
-       aliyun: 30  # 30% 使用阿里云
-       local: 70   # 70% 使用本地
-   ```
-
-2. **业务类型路由** - 根据问题类型智能选择
-   ```yaml
-   model-router:
-     strategy: BUSINESS_TYPE
-     business-type:
-       aliyun-types:
-         - COMPLEX_QUERY    # 复杂查询
-         - LONG_CONTEXT     # 长上下文
-       local-types:
-         - SIMPLE_QA        # 简单问答
-         - TOOL_CALLING     # 工具调用
-   ```
-
-**重要**：向量嵌入模型可以通过 `llm.embedding-provider` 单独指定 provider，但不参与 `model-router` 的聊天模型路由。
-
-### 4. 金融计算功能
-
-**支持的计算**：
-
-1. **投资分析** - IRR、NPV、摊销计划
-2. **债券计算** - 定价、YTM、久期、凸度
-3. **期权计算** - Black-Scholes、Greeks
-
-详细文档：
-- [金融计算指南](docs/Financial-Calculation-Guide.md)
-- [金融计算总结](docs/Financial-Summary.md)
-
----
-
-## ❓ 常见问题
-
-### Q: 如何切换 LLM 模型？
-
-A: 修改 `application.yaml`：
-```yaml
-llm:
-  chat-provider: vllm
-  embedding-provider: ollama
-  ollama:
-    embedding-base-url: http://your-embedding-endpoint
-    embedding-model: your-embedding-model
-  vllm:
-    chat-base-url: http://your-chat-endpoint/v1
-    chat-model: your-chat-model
-    chat-api-key: your-chat-api-key
-```
-
-### Q: 如何调整对话历史窗口？
-
-A: 修改配置：
-```yaml
-agent:
-  context-window-size: 20  # 改为 20 条历史
-```
-
-### Q: 如何使用阿里云模型？
-
-A: 配置环境变量和 API Key：
-```bash
-export DASHSCOPE_API_KEY=your-api-key
-```
-
-```yaml
-dashscope:
-  api-key: ${DASHSCOPE_API_KEY}
-
-model-router:
-  percentage:
-    aliyun: 30  # 30% 请求使用阿里云
-```
-
-### Q: 上传的文件保存在哪里？
-
-A: `uploads/{conversationId}/` 目录，按对话ID组织。
-
-### Q: 如何选择路由策略？
-
-A:
-- **百分比路由** - 控制成本、负载均衡
-- **业务类型路由** - 优化性能、智能选择
-
-推荐：生产环境用业务类型路由，测试环境用百分比路由。
-
----
-
-## 📚 更多文档
-
-- [数据库建表 SQL](docs/Database-Schema.md) - 数据库表结构
-- [金融计算指南](docs/Financial-Calculation-Guide.md) - 金融计算功能
-- [金融计算总结](docs/Financial-Summary.md) - 金融计算总结
-- [LLM Tool Calling 架构](docs/LLM-Tool-Calling-Architecture.md) - 工具调用架构
-- [混合模型架构指南](docs/Mixed-Model-Architecture-Guide.md) - 混合模型配置
-
----
-
-<div align="center">
-
-**如果这个项目对你有帮助，请给一个 ⭐️**
-
-</div>
+- 旧版静态页面：`/index.html`、`/upload.html`、`/chat.html`、`/agent-chat.html`、`/domain.html`、`/qdrant.html`
+- `Agent`/工具调用/金融计算/领域文档管理
+- `SQLite`、`JPA`、登录账号、默认用户
+- `model-router`、`PERCENTAGE`、`BUSINESS_TYPE`

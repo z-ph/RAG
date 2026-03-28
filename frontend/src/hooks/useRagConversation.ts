@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { cancelConversation, clearConversation, streamRagAnswer } from "../lib/api";
 import {
-  createAssistantIntro,
   createAssistantMessageId,
   createStreamingAssistantMessage,
   createUserMessage
@@ -16,10 +15,10 @@ interface MessageApi {
 }
 
 export function useRagConversation(messageApi: MessageApi) {
-  const [messages, setMessages] = useState<ChatMessage[]>([createAssistantIntro()]);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [prompt, setPrompt] = useState("");
   const [conversationId, setConversationId] = useState<string | null>(null);
-  const [maxResults, setMaxResults] = useState(5);
+  const [maxResults, setMaxResults] = useState(64);
   const [streaming, setStreaming] = useState(false);
   const abortControllerRef = useRef<AbortController | null>(null);
 
@@ -169,7 +168,7 @@ export function useRagConversation(messageApi: MessageApi) {
       }
 
       setConversationId(null);
-      setMessages([createAssistantIntro()]);
+      setMessages([]);
       messageApi.success("会话上下文已清空");
     } catch (error) {
       messageApi.error(error instanceof Error ? error.message : "清空会话失败");

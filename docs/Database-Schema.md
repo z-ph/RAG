@@ -1,308 +1,170 @@
-# 数据库建表 SQL
+# 当前存储结构说明
 
-本文档包含系统所需的数据库表结构。
+这个文件沿用旧文件名，但当前项目已经没有关系型数据库表结构。
 
-## 📋 概述
+当前实现不包含：
 
-系统使用 **SQLite** 作为关系型数据库，配合 **Qdrant** 向量数据库使用。
+- SQLite
+- JPA Entity
+- Repository
+- 用户表
+- 聊天消息表
+- 领域文档表
 
-### 自动建表
+如果你是从旧版本文档进入这个仓库，应该把这里理解为“当前数据如何存放”，而不是“建表 SQL”。
 
-默认情况下，Spring Boot + JPA 会在首次启动时自动创建表（配置：`spring.jpa.hibernate.ddl-auto: update`）
+## 存储总览
 
-如需手动创建表，可参考以下 SQL。
+当前项目只有两类数据存储：
 
----
+### 1. 持久化存储：Qdrant
 
-## 🗄️ 表结构
+用于保存：
 
-### 1. users 表
+- 文档分块后的文本片段
+- 对应的 embedding 向量
+- 文档 metadata
 
-用户表，存储系统用户信息。
+相关代码：
 
-```sql
-CREATE TABLE users (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    username VARCHAR(50) NOT NULL UNIQUE,
-    password VARCHAR(255) NOT NULL,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-);
+- [src/main/java/com/mark/knowledge/config/QdrantInitializer.java](../src/main/java/com/mark/knowledge/config/QdrantInitializer.java)
+- [src/main/java/com/mark/knowledge/rag/store/QdrantEmbeddingStoreFactory.java](../src/main/java/com/mark/knowledge/rag/store/QdrantEmbeddingStoreFactory.java)
+- [src/main/java/com/mark/knowledge/rag/service/EmbeddingService.java](../src/main/java/com/mark/knowledge/rag/service/EmbeddingService.java)
+- [src/main/java/com/mark/knowledge/rag/service/DocumentAdminService.java](../src/main/java/com/mark/knowledge/rag/service/DocumentAdminService.java)
 
--- 创建索引
-CREATE UNIQUE INDEX idx_users_username ON users(username);
+### 2. 非持久化存储：内存会话
 
--- 插入默认用户（密码：mark，使用 BCrypt 加密）
-INSERT INTO users (username, password)
-VALUES ('mark', '$2a$10$2B2tppkLZ4.dvCegcZ4l0.vDUU.atdOUryF//K2nZw1qTCXj8KHJK');
-```
+用于保存：
 
-**字段说明**：
-- `id` - 主键，自增
-- `username` - 用户名，唯一
-- `password` - 密码（BCrypt 加密）
-- `created_at` - 创建时间
+- 最近若干轮用户消息
+- 最近若干轮助手消息
+- 会话最近访问时间
 
----
+相关代码：
 
-### 2. chat_messages 表
+- [src/main/java/com/mark/knowledge/rag/service/ConversationMemoryService.java](../src/main/java/com/mark/knowledge/rag/service/ConversationMemoryService.java)
 
-聊天消息表，存储用户和 AI 的对话记录。
+应用重启后，这部分数据会丢失。
 
-```sql
-CREATE TABLE chat_messages (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    conversation_id VARCHAR(255) NOT NULL,
-    user_id INTEGER,
-    role VARCHAR(20) NOT NULL,
-    content VARCHAR(10000) NOT NULL,
-    sources VARCHAR(5000),
-    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES users(id)
-);
+## Qdrant 配置
 
--- 创建索引
-CREATE INDEX idx_chat_messages_conversation_id ON chat_messages(conversation_id);
-CREATE INDEX idx_chat_messages_user_id ON chat_messages(user_id);
-CREATE INDEX idx_chat_messages_created_at ON chat_messages(created_at);
-```
-
-**字段说明**：
-- `id` - 主键，自增
-- `conversation_id` - 会话 ID（如 "chat-xxx" 或 "agent-xxx"）
-- `user_id` - 用户 ID（外键关联 users 表）
-- `role` - 角色（"user" 或 "assistant"）
-- `content` - 消息内容
-- `sources` - 来源信息（JSON 字符串）
-- `created_at` - 创建时间
-
-**会话 ID 前缀**：
-- `chat-` - 智能问答会话
-- `agent-` - 智能体会话
-
----
-
-### 3. domain_documents 表
-
-领域文档表，存储上传的领域知识文档。
-
-```sql
-CREATE TABLE domain_documents (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    domain VARCHAR(100) NOT NULL,
-    title VARCHAR(255) NOT NULL,
-    source VARCHAR(255),
-    content TEXT NOT NULL,
-    status VARCHAR(50) NOT NULL DEFAULT 'pending',
-    error_message TEXT,
-    vector_count INTEGER,
-    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    completed_at DATETIME
-);
-
--- 创建索引
-CREATE INDEX idx_domain_documents_domain ON domain_documents(domain);
-CREATE INDEX idx_domain_documents_status ON domain_documents(status);
-CREATE INDEX idx_domain_documents_created_at ON domain_documents(created_at);
-```
-
-**字段说明**：
-- `id` - 主键，自增
-- `domain` - 领域名称（如 "TECHNOLOGY", "FINANCE" 等）
-- `title` - 文档标题
-- `source` - 来源
-- `content` - 文档内容（TEXT 类型，支持长文本）
-- `status` - 处理状态（"pending", "success", "failed"）
-- `error_message` - 错误信息
-- `vector_count` - 向量数量
-- `created_at` - 创建时间
-- `updated_at` - 更新时间
-- `completed_at` - 完成时间
-
-**支持的业务领域**：
-- TECHNOLOGY - 技术文档
-- FINANCE - 金融文档
-- LAW - 法律文档
-- MEDICINE - 医疗文档
-- EDUCATION - 教育文档
-- GOVERNMENT - 政府文档
-- INSURANCE - 保险文档
-- TAX - 税务文档
-- HR - 人力资源
-- COMPLIANCE - 合规文档
-- 其他自定义领域
-
----
-
-## 🔧 使用说明
-
-### 方式一：自动建表（推荐）
-
-无需手动创建表，启动应用即可：
-
-```bash
-mvn spring-boot:run
-```
-
-JPA 会自动检测实体类并创建表结构。
-
-### 方式二：手动建表
-
-如果需要手动创建表（如生产环境）：
-
-```bash
-# 1. 创建数据库文件
-touch knowledge.db
-
-# 2. 执行建表 SQL
-sqlite3 knowledge.db < schema.sql
-
-# 3. 启动应用
-mvn spring-boot:run
-```
-
-### 方式三：禁用自动建表
-
-修改 `application.yaml`：
+当前有效配置：
 
 ```yaml
-spring:
-  jpa:
-    hibernate:
-      ddl-auto: none  # 禁用自动建表
-    show-sql: true   # 显示 SQL 语句
+qdrant:
+  host: ${QDRANT_HOST:localhost}
+  port: ${QDRANT_PORT:6334}
+  http-port: ${QDRANT_HTTP_PORT:6333}
+  collection-name: ${QDRANT_COLLECTION_NAME:knowledge-base}
+  vector-size: ${QDRANT_VECTOR_SIZE:768}
+  create-collection-if-not-exists: ${QDRANT_CREATE_COLLECTION_IF_NOT_EXISTS:true}
 ```
 
----
+端口职责：
 
-## 📊 数据完整性
+- `qdrant.port`：gRPC，LangChain4j store 读写向量时使用
+- `qdrant.http-port`：HTTP，collection 初始化、文档列表、文档删除时使用
 
-### 外键约束
+## 启动时的 collection 行为
 
-- `chat_messages.user_id` → `users.id`
-  - 删除用户时，相关消息不会被自动删除（需手动处理）
+应用启动后，`QdrantInitializer` 会：
 
-### 索引策略
+1. 检查 `collection-name` 是否存在
+2. 如果不存在且 `create-collection-if-not-exists=true`，则自动创建
+3. 如果已存在但 `vector-size` 不匹配，则删除并重建
+4. 如果已存在且维度一致，则直接复用
 
-- `username` - 唯一索引，加速用户名查询
-- `conversation_id` - 普通索引，加速会话查询
-- `user_id` - 普通索引，加速用户消息查询
-- `created_at` - 普通索引，支持时间范围查询
-- `domain` - 普通索引，加速领域文档查询
-- `status` - 普通索引，加速状态筛选
+这意味着切换 embedding 模型时，必须同步检查 `QDRANT_VECTOR_SIZE`。
 
----
+## 文档片段在 Qdrant 中的 metadata
 
-## 🗑️ 清空数据
+每个文本片段在构造 `TextSegment` 时会写入以下 metadata：
 
-### 清空所有消息
+- `filename`
+- `documentId`
+- `chunkIndex`
+- `chunkSize`
+- `rawChunkSize`
+- `chunkHash`
+- `title`
+- `category`
+- `documentTime`
+- `ingestedAt`
+- `keywords`
+- `documentKeywords`
 
-```sql
-DELETE FROM chat_messages;
-```
+这些字段来自 [src/main/java/com/mark/knowledge/rag/service/DocumentService.java](../src/main/java/com/mark/knowledge/rag/service/DocumentService.java) 中的 `createSegment(...)`。
 
-### 清空所有用户（慎用）
+## 文档列表和删除是怎么实现的
 
-```sql
-DELETE FROM users WHERE username != 'mark';
-```
+当前并没有单独的“文档表”。
 
-### 重置数据库
+后端通过 `DocumentAdminService`：
 
-```bash
-# 删除数据库文件
-rm knowledge.db
+1. 调用 Qdrant HTTP `scroll` 接口遍历当前 collection
+2. 从 payload 中读取 `documentId` 和 `filename`
+3. 按 `documentId` 聚合，得到文档列表和分段数
+4. 删除文档时，先找出同一 `documentId` 的全部 point id，再批量删除
 
-# 重启应用自动创建
-mvn spring-boot:run
-```
+因此：
 
----
+- “文档列表”是从 Qdrant 现算出来的
+- “删除文档”会删除对应向量片段
+- 不存在独立的文档主表
 
-## 🔍 数据查询示例
+## 会话上下文的实际结构
 
-### 查询用户的所有会话
+`ConversationMemoryService` 使用 `ConcurrentHashMap<String, ConversationSession>` 保存会话。
 
-```sql
-SELECT DISTINCT conversation_id
-FROM chat_messages
-WHERE user_id = 1
-  AND conversation_id LIKE 'agent-%'
-ORDER BY created_at DESC;
-```
+每个会话包含：
 
-### 查询会话历史
+- `messages`
+- `lastAccessTime`
 
-```sql
-SELECT id, role, content, created_at
-FROM chat_messages
-WHERE conversation_id = 'agent-xxx'
-ORDER BY created_at ASC;
-```
+每条消息包含：
 
-### 查询待处理的文档
+- `role`
+- `content`
+- `timestamp`
 
-```sql
-SELECT id, domain, title, status
-FROM domain_documents
-WHERE status = 'pending'
-ORDER BY created_at ASC;
-```
+相关行为：
 
----
+- 按 `rag.memory-window` 保留最近若干轮 user/assistant 消息
+- 按 `rag.session-ttl-seconds` 过期
+- 按 `rag.memory-cleanup-interval-ms` 定时清理
 
-## 📝 注意事项
+## 哪些操作会影响存储
 
-1. **SQLite 限制**
-   - 单个数据库文件大小限制：~281 TB（理论值）
-   - 单个 TEXT 字段最大：1 GB
-   - 并发写入支持有限（建议单应用实例）
+### 上传文档
 
-2. **密码加密**
-   - 使用 BCrypt 加密算法
-   - 每次加密结果不同（加盐）
-   - 默认密码：`mark`
+- 解析文件
+- 分块
+- 生成 embedding
+- 写入 Qdrant
 
-3. **数据备份**
-   ```bash
-   # 备份数据库
-   cp knowledge.db knowledge.db.backup
+### 删除文档
 
-   # 恢复数据库
-   cp knowledge.db.backup knowledge.db
-   ```
+- 删除 Qdrant 中该 `documentId` 对应的所有 point
 
----
+### 清空会话
 
-## 🚀 性能优化建议
+- 只清空内存中的会话上下文
+- 不删除任何文档向量
 
-### 定期清理历史消息
+### 重启应用
 
-```sql
--- 删除 30 天前的消息
-DELETE FROM chat_messages
-WHERE created_at < datetime('now', '-30 days');
-```
+- Qdrant 中的数据保留
+- 内存会话全部丢失
 
-### 定期清理已完成的文档记录
+## 与旧版本的差异
 
-```sql
--- 删除 90 天前已完成的文档
-DELETE FROM domain_documents
-WHERE status = 'success'
-  AND completed_at < datetime('now', '-90 days');
-```
+当前项目已经没有以下概念：
 
-### VACUUM 优化数据库
+- `users`
+- `chat_messages`
+- `domain_documents`
+- `spring.jpa.hibernate.ddl-auto`
+- 默认登录账号
+- 手动建表 SQL
 
-```bash
-# 在 SQLite 中执行 VACUUM 命令回收空间
-sqlite3 knowledge.db "VACUUM;"
-```
-
----
-
-## 📚 相关文档
-
-- [README.md](../README.md) - 系统概述
-- [配置说明](../README.md#-配置说明) - 数据库配置
+如果你需要长期保存聊天历史，当前代码需要新增真正的持久化层；仓库里现在还没有这部分实现。

@@ -3,6 +3,7 @@ import {
   DatabaseOutlined,
   DeleteOutlined,
   LoadingOutlined,
+  MenuFoldOutlined,
   ReloadOutlined
 } from "@ant-design/icons";
 import {
@@ -26,6 +27,7 @@ interface DocumentSidebarProps {
   ragHealth: HealthState;
   documentHealth: HealthState;
   refreshingHealth: boolean;
+  onToggleCollapse: () => void;
   onRefreshDocuments: () => Promise<void>;
   onRefreshHealth: () => Promise<void>;
   onUpload: (file: File) => Promise<void>;
@@ -43,6 +45,13 @@ export function DocumentSidebar(props: DocumentSidebarProps) {
     }
   };
 
+  const refreshing = props.documentsLoading || props.refreshingHealth;
+
+  function refreshAll() {
+    void props.onRefreshDocuments();
+    void props.onRefreshHealth();
+  }
+
   return (
     <aside className="surface panel-side">
       <div className="panel-header">
@@ -57,16 +66,18 @@ export function DocumentSidebar(props: DocumentSidebarProps) {
             把 PDF 和 TXT 推进知识库，再用右侧对话流直接验证检索与生成效果。
           </Typography.Paragraph>
         </div>
-        <Button
-          icon={<ReloadOutlined />}
-          onClick={() => {
-            void props.onRefreshDocuments();
-            void props.onRefreshHealth();
-          }}
-          loading={props.documentsLoading || props.refreshingHealth}
-        >
-          刷新
-        </Button>
+        <div className="sidebar-header-actions">
+          <Button icon={<ReloadOutlined />} onClick={refreshAll} loading={refreshing}>
+            刷新
+          </Button>
+          <Button
+            type="text"
+            shape="circle"
+            icon={<MenuFoldOutlined />}
+            onClick={props.onToggleCollapse}
+            title="收起文档侧边栏"
+          />
+        </div>
       </div>
 
       <div className="status-row">

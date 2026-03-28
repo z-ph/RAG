@@ -43,9 +43,10 @@ export function ChatWorkspace(props: ChatWorkspaceProps) {
               value={props.maxResults}
               className="!w-[108px]"
               options={[
-                { label: "3 条", value: 3 },
-                { label: "5 条", value: 5 },
-                { label: "8 条", value: 8 }
+                { label: "16", value: 16 },
+                { label: "64", value: 64 },
+                { label: "256", value: 256 },
+                { label: "1024", value: 1024 }
               ]}
               onChange={props.onMaxResultsChange}
             />

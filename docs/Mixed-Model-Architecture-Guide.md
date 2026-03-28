@@ -48,8 +48,9 @@
    - `OllamaChatModel` - 本地聊天模型
    - `OpenAiChatModel` - 阿里云聊天模型（OpenAI兼容接口）
 
-2. **EmbeddingModel** - 嵌入模型（固定使用本地）
-   - `OllamaEmbeddingModel` - 本地向量嵌入模型
+2. **EmbeddingModel** - 嵌入模型（provider 可独立配置）
+   - `OllamaEmbeddingModel` - Ollama 向量嵌入模型
+   - `OpenAiEmbeddingModel` - OpenAI 兼容向量嵌入模型（如 vLLM / DashScope 兼容端点）
 
 3. **ModelRouterService** - 模型路由服务
    - 根据策略选择合适的模型
@@ -456,19 +457,23 @@ if (isYourNewType(userInput)) {
 ### 完整配置示例
 
 ```yaml
-# Ollama配置
-ollama:
-  base-url: http://localhost:11434
-  chat-model: qwen2.5:7b
-  embedding-model: qwen3-embedding:0.6b
+# LLM 配置
+llm:
+  chat-provider: vllm
+  embedding-provider: ollama
   timeout: 120s
-
-# 阿里云DashScope配置
-dashscope:
-  api-key: ${DASHSCOPE_API_KEY:your-api-key-here}
-  base-url: https://dashscope.aliyuncs.com/compatible-mode/v1
-  model: qwen-plus
-  timeout: 60s
+  ollama:
+    chat-base-url: http://localhost:11434
+    embedding-base-url: http://localhost:11434
+    chat-model: qwen2.5:7b
+    embedding-model: qwen3-embedding:0.6b
+  vllm:
+    chat-base-url: https://dashscope.aliyuncs.com/compatible-mode/v1
+    embedding-base-url: https://dashscope.aliyuncs.com/compatible-mode/v1
+    chat-model: qwen-plus
+    embedding-model: text-embedding-v3
+    chat-api-key: ${DASHSCOPE_API_KEY:your-api-key-here}
+    embedding-api-key: ${DASHSCOPE_API_KEY:your-api-key-here}
 
 # 模型路由配置
 model-router:
@@ -500,6 +505,8 @@ logging:
     com.mark.knowledge: DEBUG
     com.mark.knowledge.chat.service.ModelRouterService: DEBUG
 ```
+
+`llm.chat-provider` 和 `llm.embedding-provider` 是两个独立配置。每个 provider 自己维护 chat / embedding 各自的 `base-url`、`model` 和认证信息，不再有顶层覆盖层。`model-router` 只负责聊天模型路由，不会覆盖 embedding provider。
 
 ### 相关文档
 

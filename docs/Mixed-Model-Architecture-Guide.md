@@ -204,7 +204,8 @@ RAG_EMBEDDING_REQUEST_BATCH_SIZE=10
 
 - 同步 `/api/rag/ask` 会在 `thinking` 字段返回
 - 流式 `/api/rag/ask/stream` 会通过 `thinking_delta` 事件增量推送
-- 前端会把思考过程和最终答案分开渲染
+- 流式 `/api/rag/ask/stream` 会通过 `thinking_end` 事件标记思考阶段结束
+- 前端会把思考过程和最终答案分开渲染，思考区支持手动折叠，并会在思考结束后自动收起
 
 ## 启动后如何确认生效
 

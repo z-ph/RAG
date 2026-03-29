@@ -12,6 +12,7 @@
 - 上传 `PDF` / `TXT` 文档并自动清洗、分块、去重
 - 使用当前配置的 embedding provider 生成向量并写入 Qdrant
 - 同步问答和流式问答
+- 独立返回并展示模型思考内容，思考结束后前端自动折叠
 - 返回来源片段，支持会话取消和上下文清空
 - 聊天模型和向量模型可分别选择 `ollama` 或 `vllm`
 - 会话上下文使用内存滑动窗口，支持 TTL 自动清理
@@ -116,7 +117,7 @@ VLLM_RETURN_THINKING=true
 ```
 
 `vllm` 在当前代码里表示“OpenAI-compatible provider”，不要求一定是 vLLM，也可以接入兼容接口的云端服务。
-当 provider 把思考内容放在独立字段 `reasoning_content` 时，后端会读取到 `thinking` 字段，并在前端单独渲染。
+当 provider 把思考内容放在独立字段 `reasoning_content` 时，后端会读取到 `thinking` 字段；流式场景会额外发送 `thinking_delta` / `thinking_end` 事件，前端会单独渲染可折叠的思考区，并在思考结束后自动收起。
 
 ### 4. 配置后端
 
@@ -190,6 +191,8 @@ pnpm dev
 
 - `start`
 - `sources`
+- `thinking_delta`
+- `thinking_end`
 - `delta`
 - `complete`
 - `cancelled`

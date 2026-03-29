@@ -5,7 +5,8 @@ import type {
   RagRequest,
   SourceReference,
   StreamCancelledPayload,
-  StreamCompletePayload
+  StreamCompletePayload,
+  StreamThinkingEndPayload
 } from "../types";
 import { consumeSseStream } from "./sse";
 
@@ -119,6 +120,8 @@ export function clearConversation(conversationId: string) {
 interface StreamHandlers {
   onStart?: (payload: { conversationId?: string | null }) => void;
   onSources?: (payload: SourceReference[]) => void;
+  onThinkingDelta?: (payload: string) => void;
+  onThinkingEnd?: (payload: StreamThinkingEndPayload) => void;
   onDelta?: (payload: string) => void;
   onComplete?: (payload: StreamCompletePayload) => void;
   onCancelled?: (payload: StreamCancelledPayload) => void;
@@ -148,6 +151,16 @@ export async function streamRagAnswer(
 
     if (event === "sources") {
       handlers.onSources?.(parseJsonPayload<SourceReference[]>(data));
+      return;
+    }
+
+    if (event === "thinking_delta") {
+      handlers.onThinkingDelta?.(data);
+      return;
+    }
+
+    if (event === "thinking_end") {
+      handlers.onThinkingEnd?.(parseJsonPayload<StreamThinkingEndPayload>(data));
       return;
     }
 

@@ -23,6 +23,7 @@ llm:
     embedding-model: ${VLLM_EMBEDDING_MODEL:BAAI/bge-base-zh-v1.5}
     chat-api-key: ${VLLM_CHAT_API_KEY:}
     embedding-api-key: ${VLLM_EMBEDDING_API_KEY:}
+    return-thinking: ${VLLM_RETURN_THINKING:true}
 
 qdrant:
   host: ${QDRANT_HOST:localhost}

@@ -70,6 +70,9 @@ public class ChatConfig {
     @Value("${llm.vllm.embedding-api-key:}")
     private String vllmEmbeddingApiKey;
 
+    @Value("${llm.vllm.return-thinking:true}")
+    private Boolean vllmReturnThinking;
+
     @Bean
     public ChatModel chatModel() {
         Duration timeout = parseTimeout(llmTimeout);
@@ -132,11 +135,13 @@ public class ChatConfig {
     }
 
     private ChatModel createVllmChatModel(Duration timeout) {
-        log.info("初始化聊天模型: provider=vllm, baseUrl={}, model={}", vllmChatBaseUrl, vllmChatModelName);
+        log.info("初始化聊天模型: provider=vllm, baseUrl={}, model={}, returnThinking={}",
+            vllmChatBaseUrl, vllmChatModelName, vllmReturnThinking);
         var builder = OpenAiChatModel.builder()
                 .baseUrl(vllmChatBaseUrl)
                 .modelName(vllmChatModelName)
                 .temperature(0.7)
+                .returnThinking(Boolean.TRUE.equals(vllmReturnThinking))
                 .timeout(timeout);
         if (StringUtils.hasText(vllmChatApiKey)) {
             builder.apiKey(vllmChatApiKey);
@@ -145,11 +150,13 @@ public class ChatConfig {
     }
 
     private StreamingChatModel createVllmStreamingChatModel(Duration timeout) {
-        log.info("初始化流式聊天模型: provider=vllm, baseUrl={}, model={}", vllmChatBaseUrl, vllmChatModelName);
+        log.info("初始化流式聊天模型: provider=vllm, baseUrl={}, model={}, returnThinking={}",
+            vllmChatBaseUrl, vllmChatModelName, vllmReturnThinking);
         var builder = OpenAiStreamingChatModel.builder()
                 .baseUrl(vllmChatBaseUrl)
                 .modelName(vllmChatModelName)
                 .temperature(0.7)
+                .returnThinking(Boolean.TRUE.equals(vllmReturnThinking))
                 .timeout(timeout);
         if (StringUtils.hasText(vllmChatApiKey)) {
             builder.apiKey(vllmChatApiKey);

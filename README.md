@@ -1,15 +1,19 @@
 # 智能知识库系统
 
-基于 `Spring Boot 4`、`LangChain4j`、`Qdrant` 的 RAG 知识库系统。
+基于 `Spring Boot 4`、`LangChain4j`、`MySQL`、`Qdrant` 的 RAG 知识库系统。
 
 当前仓库由两部分组成：
 
-- 后端：`src/` 下的 Spring Boot API，负责文档解析、向量写入、检索增强问答和 SSE 流式输出
-- 前端：`frontend/` 下的 React + Vite 控制台，负责文档管理和对话界面
+- 后端：`src/` 下的 Spring Boot API，负责登录鉴权、注册码管理、文档解析、向量写入、检索增强问答和 SSE 流式输出
+- 前端：`frontend/` 下的 React + Vite 控制台，负责文档管理、注册码管理和对话界面
 
 ## 当前能力
 
 - 上传 `PDF` / `TXT` 文档并自动清洗、分块、去重
+- 文档上传、列表、删除接口采用登录鉴权；RAG 问答接口保持匿名可用
+- 启动时自动创建 MySQL 表，并自动初始化一个管理员账号
+- 管理员可创建一次性注册码，支持设置有效期、手动禁用和删除
+- 新用户只能使用有效注册码注册，注册码使用后立即失效
 - 使用当前配置的 embedding provider 生成向量并写入 Qdrant
 - 同步问答和流式问答
 - 独立返回并展示模型思考内容，思考结束后前端自动折叠
@@ -25,20 +29,18 @@ frontend (React + Vite)
         |
         v
 Spring Boot API
-  |- /api/documents/*
-  |- /api/rag/*
+  |- /api/auth/*        <- Session 登录、注册码管理
+  |- /api/documents/*   <- 需要登录
+  |- /api/rag/*         <- 匿名可访问
   |
-  |- ChatModel            <- llm.chat-provider
-  |- StreamingChatModel   <- llm.chat-provider
-  |- EmbeddingModel       <- llm.embedding-provider
-  |
-  |- Qdrant (持久化文档向量)
-  \- In-memory sessions (会话上下文)
+  |- MySQL              <- 用户、注册码，JPA 自动建表
+  |- Qdrant             <- 文档向量与 metadata
+  \- In-memory sessions <- RAG 会话上下文
 ```
 
 说明：
 
-- 当前实现没有旧版文档中提到的 `Agent`、`领域文档管理`、`SQLite/JPA`、`登录系统`、`model-router`
+- 文档模块通过 Session Cookie 鉴权，前端使用同源 `/api` 请求自动携带 Cookie
 - 后端默认不再提供旧的静态 HTML 页面；使用前端时请启动 `frontend/` 子项目
 
 ## 仓库结构
@@ -47,14 +49,10 @@ Spring Boot API
 .
 ├── src/
 │   ├── main/java/com/mark/knowledge/
-│   │   ├── KnowledgeApplication.java
+│   │   ├── auth/
 │   │   ├── chat/config/ChatConfig.java
 │   │   ├── config/QdrantInitializer.java
 │   │   └── rag/
-│   │       ├── app/
-│   │       ├── dto/
-│   │       ├── service/
-│   │       └── store/
 │   └── main/resources/application.yaml
 ├── frontend/
 │   ├── src/
@@ -74,13 +72,24 @@ Spring Boot API
 
 - Java 21+
 - Maven 3.9+
-- Node.js 20+ 与 `pnpm`（如果需要启动前端）
+- Node.js 20+ 与 `pnpm`
+- MySQL 8+
 - Qdrant
 - 至少一个聊天模型 provider 和一个 embedding provider
   - `ollama`
   - `vllm` 或其他 OpenAI-compatible endpoint
 
-### 2. 启动 Qdrant
+### 2. 启动 MySQL
+
+```bash
+docker run -d --name mysql-rag \
+  -p 3306:3306 \
+  -e MYSQL_ROOT_PASSWORD=123456 \
+  -e MYSQL_DATABASE=knowledge_rag \
+  mysql:8.4
+```
+
+### 3. 启动 Qdrant
 
 ```bash
 docker run -d --name qdrant -p 6333:6333 -p 6334:6334 qdrant/qdrant
@@ -88,10 +97,11 @@ docker run -d --name qdrant -p 6333:6333 -p 6334:6334 qdrant/qdrant
 
 端口说明：
 
-- `6333`：HTTP 管理接口，文档列表和删除逻辑会用到
-- `6334`：gRPC 接口，向量写入和检索会用到
+- `3306`：MySQL，JPA 自动建表和账号数据存储
+- `6333`：Qdrant HTTP 管理接口，文档列表和删除逻辑会用到
+- `6334`：Qdrant gRPC 接口，向量写入和检索会用到
 
-### 3. 选择模型 provider
+### 4. 选择模型 provider
 
 #### 方案 A：全部使用 Ollama
 
@@ -105,8 +115,6 @@ ollama pull bge-base-zh
 
 #### 方案 B：聊天走 OpenAI-compatible endpoint，向量仍走 Ollama
 
-保留本地 Ollama embedding，并配置：
-
 ```bash
 LLM_CHAT_PROVIDER=vllm
 LLM_EMBEDDING_PROVIDER=ollama
@@ -117,9 +125,8 @@ VLLM_RETURN_THINKING=true
 ```
 
 `vllm` 在当前代码里表示“OpenAI-compatible provider”，不要求一定是 vLLM，也可以接入兼容接口的云端服务。
-当 provider 把思考内容放在独立字段 `reasoning_content` 时，后端会读取到 `thinking` 字段；流式场景会额外发送 `thinking_delta` / `thinking_end` 事件，前端会单独渲染可折叠的思考区，并在思考结束后自动收起。
 
-### 4. 配置后端
+### 5. 配置后端
 
 应用启动时会自动读取根目录 `.env`。推荐以 `.env.example` 为模板创建自己的 `.env`，常用配置如下：
 
@@ -127,10 +134,13 @@ VLLM_RETURN_THINKING=true
 LLM_CHAT_PROVIDER=ollama
 LLM_EMBEDDING_PROVIDER=ollama
 
-OLLAMA_CHAT_BASE_URL=http://localhost:11434
-OLLAMA_EMBEDDING_BASE_URL=http://localhost:11434
-OLLAMA_CHAT_MODEL=qwen2.5:7b
-OLLAMA_EMBEDDING_MODEL=bge-base-zh
+MYSQL_URL=jdbc:mysql://localhost:3306/knowledge_rag?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Shanghai&characterEncoding=utf8
+MYSQL_USERNAME=root
+MYSQL_PASSWORD=123456
+SPRING_JPA_HIBERNATE_DDL_AUTO=update
+
+AUTH_BOOTSTRAP_ADMIN_USERNAME=admin
+AUTH_BOOTSTRAP_ADMIN_PASSWORD=ChangeMe123!
 
 QDRANT_HOST=localhost
 QDRANT_PORT=6334
@@ -140,17 +150,22 @@ QDRANT_VECTOR_SIZE=768
 RAG_EMBEDDING_REQUEST_BATCH_SIZE=10
 ```
 
-如果 embedding provider 是带输入条数上限的 OpenAI-compatible 接口，保留默认的 `RAG_EMBEDDING_REQUEST_BATCH_SIZE=10` 即可，文档入库时会自动分批请求 embedding。
+说明：
 
-### 5. 启动后端
+- `spring.jpa.hibernate.ddl-auto=update` 会在启动时自动创建或更新 `user_accounts`、`registration_codes` 等关系表
+- 第一次启动时如果系统里还没有管理员账号，会自动创建 `AUTH_BOOTSTRAP_ADMIN_USERNAME` / `AUTH_BOOTSTRAP_ADMIN_PASSWORD`
+- 建议首次登录后立即修改默认管理员密码对应的环境变量并重启服务
+- 如果 embedding provider 是带输入条数上限的 OpenAI-compatible 接口，保留默认的 `RAG_EMBEDDING_REQUEST_BATCH_SIZE=10` 即可
+
+### 6. 启动后端
 
 ```bash
-mvn spring-boot:run
+./mvnw spring-boot:run
 ```
 
 默认地址：`http://localhost:8080`
 
-### 6. 启动前端
+### 7. 启动前端
 
 ```bash
 cd frontend
@@ -162,11 +177,34 @@ pnpm dev
 
 本地开发时，Vite 会把 `/api` 代理到 `http://localhost:8080`。
 
+### 8. 初始使用流程
+
+1. 使用 `.env` 中的管理员账号登录文档控制台。
+2. 管理员在侧边栏创建注册码，可选设置备注和有效期。
+3. 新用户使用注册码注册并自动登录。
+4. 登录后即可上传、查看和删除知识库文档。
+5. RAG 问答接口和聊天界面无需登录。
+
 ## API 概览
 
 完整接口规范见 [docs/openapi.yaml](docs/openapi.yaml)。
 
+### 鉴权接口
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| `POST` | `/api/auth/login` | 登录并建立 Session |
+| `POST` | `/api/auth/register` | 使用一次性注册码注册并自动登录 |
+| `POST` | `/api/auth/logout` | 退出登录 |
+| `GET` | `/api/auth/me` | 查看当前登录状态 |
+| `GET` | `/api/auth/registration-codes` | 管理员查看注册码列表 |
+| `POST` | `/api/auth/registration-codes` | 管理员创建注册码 |
+| `PATCH` | `/api/auth/registration-codes/{id}/disable` | 管理员禁用注册码 |
+| `DELETE` | `/api/auth/registration-codes/{id}` | 管理员删除注册码 |
+
 ### 文档接口
+
+除 `/api/documents/health` 外，以下接口均要求已登录：
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
@@ -176,6 +214,8 @@ pnpm dev
 | `GET` | `/api/documents/health` | 文档服务健康检查 |
 
 ### RAG 接口
+
+以下接口不需要登录：
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
@@ -202,28 +242,40 @@ pnpm dev
 
 当前有效配置位于 [src/main/resources/application.yaml](src/main/resources/application.yaml)。
 
-### LLM 配置
+### MySQL / JPA 配置
 
 ```yaml
-llm:
-  chat-provider: ${LLM_CHAT_PROVIDER:ollama}
-  embedding-provider: ${LLM_EMBEDDING_PROVIDER:ollama}
-  timeout: ${LLM_TIMEOUT:120s}
-  ollama:
-    chat-base-url: ${OLLAMA_CHAT_BASE_URL:http://localhost:11434}
-    embedding-base-url: ${OLLAMA_EMBEDDING_BASE_URL:http://localhost:11434}
-    chat-model: ${OLLAMA_CHAT_MODEL:qwen2.5:7b}
-    embedding-model: ${OLLAMA_EMBEDDING_MODEL:bge-base-zh}
-    think: ${OLLAMA_THINK:false}
-  vllm:
-    chat-base-url: ${VLLM_CHAT_BASE_URL:http://localhost:8000/v1}
-    embedding-base-url: ${VLLM_EMBEDDING_BASE_URL:http://localhost:8000/v1}
-    chat-model: ${VLLM_CHAT_MODEL:Qwen/Qwen2.5-7B-Instruct}
-    embedding-model: ${VLLM_EMBEDDING_MODEL:BAAI/bge-base-zh-v1.5}
-    chat-api-key: ${VLLM_CHAT_API_KEY:}
-    embedding-api-key: ${VLLM_EMBEDDING_API_KEY:}
-    return-thinking: ${VLLM_RETURN_THINKING:true}
+spring:
+  datasource:
+    url: ${MYSQL_URL:jdbc:mysql://localhost:3306/knowledge_rag?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Shanghai&characterEncoding=utf8}
+    username: ${MYSQL_USERNAME:root}
+    password: ${MYSQL_PASSWORD:}
+  jpa:
+    hibernate:
+      ddl-auto: ${SPRING_JPA_HIBERNATE_DDL_AUTO:update}
 ```
+
+说明：
+
+- 用户和注册码数据存储在 MySQL
+- `ddl-auto=update` 会自动建表和更新表结构
+- 测试环境使用 `src/test/resources/application.yaml` 切换到 H2 内存数据库
+
+### 鉴权配置
+
+```yaml
+auth:
+  bootstrap-admin:
+    username: ${AUTH_BOOTSTRAP_ADMIN_USERNAME:admin}
+    password: ${AUTH_BOOTSTRAP_ADMIN_PASSWORD:ChangeMe123!}
+```
+
+说明：
+
+- 启动时若数据库内还没有管理员账号，会自动创建一个管理员
+- 注册码为一次性使用；使用后变为 `USED`
+- 管理员可将未使用注册码手动置为 `DISABLED`，也可直接删除
+- 到达 `expiresAt` 后注册码会视为 `EXPIRED`
 
 ### Qdrant 配置
 
@@ -268,19 +320,13 @@ rag:
   stream-timeout-ms: ${RAG_STREAM_TIMEOUT_MS:300000}
 ```
 
-注意：
-
-- `rag.embedding-request.batch-size` 控制单次 embedding 请求包含的文本块数量，适合规避 OpenAI-compatible 接口的单请求输入上限
-- `rag.embedding-store.batch-size` 只控制写入 Qdrant 的批次大小，和 embedding 请求批次无关
-
 ## 数据与存储
 
-当前实现没有关系型数据库。
+当前实现有三类数据存储：
 
-- 文档向量和文档元数据保存在 Qdrant
-- 会话上下文保存在内存 `ConcurrentHashMap`
-- 会话清空只影响内存上下文，不会删除 Qdrant 文档
-- 文档列表接口会扫描当前 collection 的 payload 并按 `documentId` 聚合
+- MySQL：保存 `user_accounts`、`registration_codes`
+- Qdrant：保存文档向量和文档 metadata
+- 内存 `ConcurrentHashMap`：保存 RAG 会话上下文
 
 每个文本片段写入 Qdrant 时会带上这些 metadata：
 
@@ -303,6 +349,9 @@ rag:
 
 当前界面能力与代码一致，包括：
 
+- 登录 / 登出
+- 使用注册码注册
+- 管理员创建、禁用、删除注册码
 - 上传文档
 - 刷新文档列表
 - 删除文档
@@ -316,13 +365,4 @@ rag:
 - [HELP.md](HELP.md)：快速运行说明
 - [docs/openapi.yaml](docs/openapi.yaml)：接口定义
 - [docs/Mixed-Model-Architecture-Guide.md](docs/Mixed-Model-Architecture-Guide.md)：provider 配置说明
-- [docs/Database-Schema.md](docs/Database-Schema.md)：当前存储结构说明
-
-## 已移除的旧说明
-
-以下内容不再属于当前代码实现：
-
-- 旧版静态页面：`/index.html`、`/upload.html`、`/chat.html`、`/agent-chat.html`、`/domain.html`、`/qdrant.html`
-- `Agent`/工具调用/金融计算/领域文档管理
-- `SQLite`、`JPA`、登录账号、默认用户
-- `model-router`、`PERCENTAGE`、`BUSINESS_TYPE`
+- [docs/Database-Schema.md](docs/Database-Schema.md)：MySQL、Qdrant 与内存存储结构说明

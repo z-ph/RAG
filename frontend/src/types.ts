@@ -34,6 +34,48 @@ export interface DocumentDeleteResponse {
   message: string;
 }
 
+export interface AuthUser {
+  username: string;
+  role: string;
+}
+
+export interface AuthStatusResponse {
+  authenticated: boolean;
+  user?: AuthUser | null;
+}
+
+export interface AuthSuccessResponse {
+  message: string;
+  user: AuthUser;
+}
+
+export interface RegistrationCode {
+  id: number;
+  code: string;
+  note?: string | null;
+  createdBy: string;
+  createdAt: string;
+  expiresAt?: string | null;
+  usedAt?: string | null;
+  usedBy?: string | null;
+  disabledAt?: string | null;
+  status: string;
+}
+
+export interface RegistrationCodeListResponse {
+  codes: RegistrationCode[];
+  total: number;
+}
+
+export interface RegistrationCodeCreateRequest {
+  note?: string | null;
+  expiresAt?: string | null;
+}
+
+export interface MessageResponse {
+  message: string;
+}
+
 export interface ErrorResponse {
   error: string;
   message: string;

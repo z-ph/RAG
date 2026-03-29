@@ -2,6 +2,7 @@ import { useState } from "react";
 import { App as AntdApp, Drawer, Grid } from "antd";
 import { ChatWorkspace } from "./components/ChatWorkspace";
 import { DocumentSidebar } from "./components/DocumentSidebar";
+import { useAuthSession } from "./hooks/useAuthSession";
 import { useDocumentLibrary } from "./hooks/useDocumentLibrary";
 import { useRagConversation } from "./hooks/useRagConversation";
 import { useServiceHealth } from "./hooks/useServiceHealth";
@@ -10,7 +11,12 @@ function App() {
   const { message } = AntdApp.useApp();
   const screens = Grid.useBreakpoint();
   const [documentDrawerOpen, setDocumentDrawerOpen] = useState(false);
-  const documentLibrary = useDocumentLibrary(message);
+  const authSession = useAuthSession(message);
+  const documentLibrary = useDocumentLibrary(
+    message,
+    authSession.authStatus.authenticated,
+    authSession.handleUnauthorized
+  );
   const serviceHealth = useServiceHealth();
   const conversation = useRagConversation(message);
   const documentDrawerWidth = screens.xl
@@ -57,6 +63,14 @@ function App() {
         }}
       >
         <DocumentSidebar
+          authenticated={authSession.authStatus.authenticated}
+          authLoading={authSession.authLoading}
+          authSubmitting={authSession.authSubmitting}
+          authUser={authSession.authStatus.user || null}
+          registrationCodes={authSession.registrationCodes}
+          registrationCodesLoading={authSession.registrationCodesLoading}
+          codeCreating={authSession.codeCreating}
+          codeMutatingId={authSession.codeMutatingId}
           documents={documentLibrary.documents}
           documentsLoading={documentLibrary.documentsLoading}
           uploading={documentLibrary.uploading}
@@ -67,6 +81,13 @@ function App() {
           onClose={() => setDocumentDrawerOpen(false)}
           onRefreshDocuments={documentLibrary.refreshDocuments}
           onRefreshHealth={serviceHealth.refreshHealth}
+          onLogin={authSession.handleLogin}
+          onRegister={authSession.handleRegister}
+          onLogout={authSession.handleLogout}
+          onRefreshRegistrationCodes={authSession.refreshRegistrationCodes}
+          onCreateRegistrationCode={authSession.handleCreateRegistrationCode}
+          onDisableRegistrationCode={authSession.handleDisableRegistrationCode}
+          onDeleteRegistrationCode={authSession.handleDeleteRegistrationCode}
           onUpload={documentLibrary.handleUpload}
           onDeleteDocument={documentLibrary.handleDeleteDocument}
         />

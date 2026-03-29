@@ -1,8 +1,14 @@
 import type {
+  AuthStatusResponse,
+  AuthSuccessResponse,
   DocumentDeleteResponse,
   DocumentListResponse,
   DocumentResponse,
+  MessageResponse,
   RagRequest,
+  RegistrationCodeCreateRequest,
+  RegistrationCodeListResponse,
+  RegistrationCode,
   SourceReference,
   StreamCancelledPayload,
   StreamCompletePayload,
@@ -12,8 +18,42 @@ import { consumeSseStream } from "./sse";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "/api";
 
+export class ApiError extends Error {
+  readonly status: number;
+
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+  }
+}
+
+async function parseError(response: Response, fallbackMessage: string) {
+  const text = await response.text();
+
+  if (!text) {
+    return new ApiError(fallbackMessage, response.status);
+  }
+
+  try {
+    const payload = JSON.parse(text) as { message?: string; error?: string };
+    return new ApiError(payload.message || payload.error || fallbackMessage, response.status);
+  } catch {
+    return new ApiError(text || fallbackMessage, response.status);
+  }
+}
+
+async function ensureOk(response: Response, fallbackMessage: string) {
+  if (response.ok) {
+    return;
+  }
+
+  throw await parseError(response, fallbackMessage);
+}
+
 async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${API_BASE_URL}${path}`, {
+    credentials: "include",
     ...init,
     headers: {
       "Content-Type": "application/json",
@@ -21,37 +61,73 @@ async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
     }
   });
 
-  if (!response.ok) {
-    const fallbackMessage = `请求失败: HTTP ${response.status}`;
-
-    try {
-      const payload = await response.json();
-      throw new Error(payload.message || payload.error || fallbackMessage);
-    } catch (error) {
-      if (error instanceof Error) {
-        throw error;
-      }
-
-      throw new Error(fallbackMessage);
-    }
-  }
-
+  await ensureOk(response, `请求失败: HTTP ${response.status}`);
   return response.json() as Promise<T>;
 }
 
 async function requestText(path: string, init?: RequestInit) {
-  const response = await fetch(`${API_BASE_URL}${path}`, init);
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    credentials: "include",
+    ...init
+  });
 
-  if (!response.ok) {
-    const text = await response.text();
-    throw new Error(text || `请求失败: HTTP ${response.status}`);
-  }
-
+  await ensureOk(response, `请求失败: HTTP ${response.status}`);
   return response.text();
 }
 
 function parseJsonPayload<T>(value: string): T {
   return JSON.parse(value) as T;
+}
+
+export function getAuthStatus() {
+  return requestJson<AuthStatusResponse>("/auth/me", {
+    method: "GET"
+  });
+}
+
+export function login(username: string, password: string) {
+  return requestJson<AuthSuccessResponse>("/auth/login", {
+    method: "POST",
+    body: JSON.stringify({ username, password })
+  });
+}
+
+export function register(username: string, password: string, registrationCode: string) {
+  return requestJson<AuthSuccessResponse>("/auth/register", {
+    method: "POST",
+    body: JSON.stringify({ username, password, registrationCode })
+  });
+}
+
+export function logout() {
+  return requestJson<MessageResponse>("/auth/logout", {
+    method: "POST"
+  });
+}
+
+export function listRegistrationCodes() {
+  return requestJson<RegistrationCodeListResponse>("/auth/registration-codes", {
+    method: "GET"
+  });
+}
+
+export function createRegistrationCode(request: RegistrationCodeCreateRequest) {
+  return requestJson<RegistrationCode>("/auth/registration-codes", {
+    method: "POST",
+    body: JSON.stringify(request)
+  });
+}
+
+export function disableRegistrationCode(id: number) {
+  return requestJson<RegistrationCode>(`/auth/registration-codes/${id}/disable`, {
+    method: "PATCH"
+  });
+}
+
+export function deleteRegistrationCode(id: number) {
+  return requestJson<MessageResponse>(`/auth/registration-codes/${id}`, {
+    method: "DELETE"
+  });
 }
 
 export function listDocuments() {
@@ -66,24 +142,11 @@ export async function uploadDocument(file: File) {
 
   const response = await fetch(`${API_BASE_URL}/documents/upload`, {
     method: "POST",
+    credentials: "include",
     body: formData
   });
 
-  if (!response.ok) {
-    const text = await response.text();
-
-    try {
-      const payload = JSON.parse(text);
-      throw new Error(payload.message || payload.error || "上传失败");
-    } catch (error) {
-      if (error instanceof Error) {
-        throw error;
-      }
-
-      throw new Error(text || "上传失败");
-    }
-  }
-
+  await ensureOk(response, "上传失败");
   return response.json() as Promise<DocumentResponse>;
 }
 
@@ -135,6 +198,7 @@ export async function streamRagAnswer(
 ) {
   const response = await fetch(`${API_BASE_URL}/rag/ask/stream`, {
     method: "POST",
+    credentials: "include",
     headers: {
       Accept: "text/event-stream",
       "Content-Type": "application/json"
@@ -142,6 +206,8 @@ export async function streamRagAnswer(
     body: JSON.stringify(request),
     signal
   });
+
+  await ensureOk(response, "生成失败");
 
   await consumeSseStream(response, ({ event, data }) => {
     if (event === "start") {

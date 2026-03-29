@@ -1,6 +1,18 @@
 spring:
   application:
     name: knowledge
+  datasource:
+    url: ${MYSQL_URL:jdbc:mysql://localhost:3306/knowledge_rag?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Shanghai&characterEncoding=utf8}
+    username: ${MYSQL_USERNAME:root}
+    password: ${MYSQL_PASSWORD:}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  jpa:
+    hibernate:
+      ddl-auto: ${SPRING_JPA_HIBERNATE_DDL_AUTO:update}
+    open-in-view: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.MySQLDialect
   servlet:
     multipart:
       max-file-size: ${SPRING_MULTIPART_MAX_FILE_SIZE:50MB}
@@ -52,6 +64,11 @@ rag:
   session-ttl-seconds: ${RAG_SESSION_TTL_SECONDS:1800}
   memory-cleanup-interval-ms: ${RAG_MEMORY_CLEANUP_INTERVAL_MS:300000}
   stream-timeout-ms: ${RAG_STREAM_TIMEOUT_MS:300000}
+
+auth:
+  bootstrap-admin:
+    username: ${AUTH_BOOTSTRAP_ADMIN_USERNAME:admin}
+    password: ${AUTH_BOOTSTRAP_ADMIN_PASSWORD:ChangeMe123!}
 
 logging:
   level:

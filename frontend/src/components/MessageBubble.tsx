@@ -6,6 +6,7 @@ import {
   LoadingOutlined
 } from "@ant-design/icons";
 import { useEffect, useRef, useState } from "react";
+import { MarkdownContent } from "./MarkdownContent";
 import type { ChatMessage } from "../types";
 
 function formatTime(iso: string) {
@@ -87,6 +88,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
     getElapsedSeconds(message.createdAt)
   );
   const [thinkingSeconds, setThinkingSeconds] = useState(0);
+  const [sourceOpen, setSourceOpen] = useState(false);
   const [thinkingOpen, setThinkingOpen] = useState(() => message.thinkingStatus === "streaming");
   const [copied, setCopied] = useState(false);
   const previousThinkingStatusRef = useRef(message.thinkingStatus);
@@ -111,6 +113,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
   const sourceLoadingClass = isAssistant
     ? "border-amber-500/[0.2] bg-amber-50 text-amber-700"
     : "border-white/[0.24] bg-white/[0.1] text-white/[0.9]";
+  const sourceStickyBarClass = isAssistant ? "bg-white/95" : "bg-accent-500/95";
   const scoreClass = isAssistant
     ? "bg-accent-500/[0.12] text-accent-500"
     : "bg-white/[0.14] text-white";
@@ -124,6 +127,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
   const thinkingLabelClass = isAssistant ? "text-amber-900" : "text-white";
   const thinkingHintClass = isAssistant ? "text-amber-700/80" : "text-white/72";
   const thinkingBodyClass = isAssistant ? "text-amber-950/90" : "text-white/[0.9]";
+  const thinkingStickyBarClass = isAssistant ? "bg-[#fff7eb]/95" : "bg-white/[0.12]";
   const thinkingTimerClass = isAssistant
     ? "bg-amber-500/[0.12] text-amber-800"
     : "bg-white/[0.12] text-white";
@@ -232,9 +236,12 @@ export function MessageBubble({ message }: MessageBubbleProps) {
             </div>
           ) : null}
           {message.sources.length > 0 ? (
-            <details className={`group mb-2 border-b pb-2 ${sourceDividerClass}`}>
+            <details
+              className={`group mb-2 border-b pb-2 ${sourceDividerClass}`}
+              onToggle={(event) => setSourceOpen(event.currentTarget.open)}
+            >
               <summary
-                className={`flex cursor-pointer list-none items-center justify-between gap-2 text-xs font-medium [&::-webkit-details-marker]:hidden ${sourceLabelClass}`}
+                className={`flex cursor-pointer list-none items-center justify-between gap-2 text-xs font-medium [&::-webkit-details-marker]:hidden ${sourceLabelClass} ${sourceOpen ? `sticky top-0 z-20 -mx-3 mb-2 px-3 py-2 backdrop-blur-sm shadow-[0_1px_0_rgba(19,34,56,0.08)] ${sourceStickyBarClass}` : ""}`}
               >
                 <span>来源片段 · {message.sources.length}</span>
                 <span
@@ -244,7 +251,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
                   ▾
                 </span>
               </summary>
-              <div className="mt-2 grid gap-2">
+              <div className="grid gap-2">
                 {message.sources.map((source, index) => (
                   <section
                     key={`${source.filename}-${index}`}
@@ -269,10 +276,10 @@ export function MessageBubble({ message }: MessageBubbleProps) {
             </details>
           ) : null}
           {hasThinking ? (
-            <section className={`mb-2 overflow-hidden rounded-[16px] border ${thinkingFrameClass}`}>
+            <section className={`mb-2 rounded-[16px] border ${thinkingFrameClass}`}>
               <button
                 type="button"
-                className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left"
+                className={`flex w-full items-center justify-between gap-3 px-3 py-2 text-left ${thinkingOpen ? `sticky top-0 z-20 rounded-t-[15px] border-b backdrop-blur-sm shadow-[0_1px_0_rgba(115,65,0,0.08)] ${thinkingDividerClass} ${thinkingStickyBarClass}` : "rounded-[15px]"}`}
                 onClick={() => setThinkingOpen((current) => !current)}
                 aria-expanded={thinkingOpen}
               >
@@ -298,20 +305,25 @@ export function MessageBubble({ message }: MessageBubbleProps) {
                 </span>
               </button>
               {thinkingOpen ? (
-                <div
-                  className={`border-t px-3 pb-3 pt-2 whitespace-pre-wrap text-[13px] leading-6 ${thinkingDividerClass} ${thinkingBodyClass}`}
-                >
-                  {message.thinking}
+                <div className={`px-3 pb-3 pt-2 ${thinkingBodyClass}`}>
+                  <MarkdownContent
+                    content={message.thinking}
+                    tone="thinking"
+                    className="text-[13px] leading-6"
+                  />
                   {message.thinkingStatus === "streaming" ? (
-                    <span className="ml-1 inline-block h-[16px] w-2 translate-y-[2px] animate-pulse rounded bg-amber-500/80" />
+                    <span className="mt-1 inline-block h-[16px] w-2 animate-pulse rounded bg-amber-500/80" />
                   ) : null}
                 </div>
               ) : null}
             </section>
           ) : null}
-          <div className="whitespace-pre-wrap text-sm leading-6">
+          <div className="text-sm leading-6">
             {message.content ? (
-              message.content
+              <MarkdownContent
+                content={message.content}
+                tone={isAssistant ? "assistant" : "user"}
+              />
             ) : showThinkingPlaceholder ? (
               <>
                 <span>正在思考</span>

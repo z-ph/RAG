@@ -1,5 +1,11 @@
-import { CheckOutlined, CopyOutlined, LoadingOutlined } from "@ant-design/icons";
-import { useEffect, useState } from "react";
+import {
+  BulbOutlined,
+  CaretRightFilled,
+  CheckOutlined,
+  CopyOutlined,
+  LoadingOutlined
+} from "@ant-design/icons";
+import { useEffect, useRef, useState } from "react";
 import type { ChatMessage } from "../types";
 
 function formatTime(iso: string) {
@@ -63,14 +69,27 @@ interface MessageBubbleProps {
 export function MessageBubble({ message }: MessageBubbleProps) {
   const isAssistant = message.role === "assistant";
   const showSourceLoading = isAssistant && message.status === "streaming" && message.sources.length === 0;
-  const showThinkingTimer =
-    isAssistant && message.status === "streaming" && message.sources.length > 0 && !message.content;
+  const hasThinking = isAssistant && Boolean(message.thinking.trim());
+  const showThinkingActivity =
+    isAssistant &&
+    message.status === "streaming" &&
+    message.sources.length > 0 &&
+    !message.content &&
+    message.thinkingStatus !== "complete";
+  const showThinkingPlaceholder = showThinkingActivity && !hasThinking;
+  const showAnswerCursor =
+    message.status === "streaming" &&
+    (Boolean(message.content)
+      || showThinkingPlaceholder
+      || (hasThinking && message.thinkingStatus === "complete" && !message.content));
   const shellMaxWidth = "min(var(--message-shell-max, 920px), calc(100% - 5rem))";
   const [sourceLoadingSeconds, setSourceLoadingSeconds] = useState(() =>
     getElapsedSeconds(message.createdAt)
   );
   const [thinkingSeconds, setThinkingSeconds] = useState(0);
+  const [thinkingOpen, setThinkingOpen] = useState(() => message.thinkingStatus === "streaming");
   const [copied, setCopied] = useState(false);
+  const previousThinkingStatusRef = useRef(message.thinkingStatus);
   const copyableContent = message.content.trim();
   const speakerName = isAssistant ? "Knowledge Copilot" : "You";
   const avatarLabel = isAssistant ? "AI" : "你";
@@ -98,6 +117,16 @@ export function MessageBubble({ message }: MessageBubbleProps) {
   const copyButtonClass = isAssistant
     ? "border-ink-950/10 bg-white/88 text-ink-700 hover:border-accent-500/[0.28] hover:text-accent-500"
     : "border-accent-500/[0.16] bg-accent-500/[0.08] text-accent-500 hover:border-accent-500/[0.3] hover:bg-accent-500/[0.12]";
+  const thinkingFrameClass = isAssistant
+    ? "border-amber-500/[0.18] bg-[#fff7eb]"
+    : "border-white/[0.18] bg-white/[0.08]";
+  const thinkingDividerClass = isAssistant ? "border-amber-700/[0.12]" : "border-white/[0.12]";
+  const thinkingLabelClass = isAssistant ? "text-amber-900" : "text-white";
+  const thinkingHintClass = isAssistant ? "text-amber-700/80" : "text-white/72";
+  const thinkingBodyClass = isAssistant ? "text-amber-950/90" : "text-white/[0.9]";
+  const thinkingTimerClass = isAssistant
+    ? "bg-amber-500/[0.12] text-amber-800"
+    : "bg-white/[0.12] text-white";
 
   useEffect(() => {
     setSourceLoadingSeconds(getElapsedSeconds(message.createdAt));
@@ -116,7 +145,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
   useEffect(() => {
     setThinkingSeconds(0);
 
-    if (!showThinkingTimer) {
+    if (!showThinkingActivity) {
       return;
     }
 
@@ -126,7 +155,20 @@ export function MessageBubble({ message }: MessageBubbleProps) {
     }, 1000);
 
     return () => window.clearInterval(timer);
-  }, [showThinkingTimer]);
+  }, [showThinkingActivity]);
+
+  useEffect(() => {
+    const previousThinkingStatus = previousThinkingStatusRef.current;
+    if (message.thinkingStatus !== previousThinkingStatus) {
+      if (message.thinkingStatus === "streaming") {
+        setThinkingOpen(true);
+      }
+      if (message.thinkingStatus === "complete" && hasThinking) {
+        setThinkingOpen(false);
+      }
+      previousThinkingStatusRef.current = message.thinkingStatus;
+    }
+  }, [hasThinking, message.thinkingStatus]);
 
   useEffect(() => {
     if (!copied) {
@@ -226,10 +268,51 @@ export function MessageBubble({ message }: MessageBubbleProps) {
               </div>
             </details>
           ) : null}
+          {hasThinking ? (
+            <section className={`mb-2 overflow-hidden rounded-[16px] border ${thinkingFrameClass}`}>
+              <button
+                type="button"
+                className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left"
+                onClick={() => setThinkingOpen((current) => !current)}
+                aria-expanded={thinkingOpen}
+              >
+                <span className={`inline-flex items-center gap-2 text-xs font-semibold ${thinkingLabelClass}`}>
+                  <BulbOutlined />
+                  <span>{message.thinkingStatus === "streaming" ? "思考中" : "思考过程"}</span>
+                  {message.thinkingStatus === "streaming" ? (
+                    <span className="inline-block h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
+                  ) : null}
+                  {showThinkingActivity ? (
+                    <span
+                      className={`inline-flex rounded-full px-2 py-0.5 text-[11px] tabular-nums ${thinkingTimerClass}`}
+                    >
+                      {formatDuration(thinkingSeconds)}
+                    </span>
+                  ) : null}
+                </span>
+                <span className={`inline-flex items-center gap-2 text-[11px] font-medium ${thinkingHintClass}`}>
+                  <span>{thinkingOpen ? "收起" : "展开"}</span>
+                  <CaretRightFilled
+                    className={`transition-transform ${thinkingOpen ? "rotate-90" : ""}`}
+                  />
+                </span>
+              </button>
+              {thinkingOpen ? (
+                <div
+                  className={`border-t px-3 pb-3 pt-2 whitespace-pre-wrap text-[13px] leading-6 ${thinkingDividerClass} ${thinkingBodyClass}`}
+                >
+                  {message.thinking}
+                  {message.thinkingStatus === "streaming" ? (
+                    <span className="ml-1 inline-block h-[16px] w-2 translate-y-[2px] animate-pulse rounded bg-amber-500/80" />
+                  ) : null}
+                </div>
+              ) : null}
+            </section>
+          ) : null}
           <div className="whitespace-pre-wrap text-sm leading-6">
             {message.content ? (
               message.content
-            ) : showThinkingTimer ? (
+            ) : showThinkingPlaceholder ? (
               <>
                 <span>正在思考</span>
                 <span className="ml-1 inline-block tabular-nums text-accent-500">
@@ -239,7 +322,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
             ) : (
               ""
             )}
-            {message.status === "streaming" && (showThinkingTimer || Boolean(message.content)) ? (
+            {showAnswerCursor ? (
               <span
                 className={`ml-1 inline-block h-[18px] w-2.5 translate-y-[3px] animate-pulse rounded ${isAssistant ? "bg-accent-500" : "bg-white/[0.92]"}`}
               />

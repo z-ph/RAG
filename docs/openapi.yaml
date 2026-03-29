@@ -219,6 +219,7 @@ paths:
         - `start`: 返回会话 ID。
         - `sources`: 返回检索命中的来源片段数组。
         - `thinking_delta`: 按增量返回独立的思考内容。
+        - `thinking_end`: 标记思考阶段结束，通常会在答案正文开始前触发。
         - `delta`: 按 token/文本片段增量返回答案。
         - `complete`: 结束事件，包含 `conversationId`、`cancelled` 以及最终 `content` / `thinking` 快照。
         - `cancelled`: 会话被新请求替换、超时或主动取消时触发。
@@ -254,6 +255,9 @@ paths:
 
                 event: thinking_delta
                 data: 先定位文档里关于材料要求和办理时限的段落。
+
+                event: thinking_end
+                data: {"conversationId":"stream-001","thinkingEnded":true,"reason":"answer_started"}
 
                 event: delta
                 data: 核心要求包括材料完整、

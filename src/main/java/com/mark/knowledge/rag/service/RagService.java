@@ -185,6 +185,7 @@ public class RagService {
             log.warn("SSE 连接超时: conversationId={}, requestId={}", conversationId, generation.requestId());
             generation.markCancelled();
             generation.cancelHandle();
+            emitThinkingEndIfNeeded(generation, "timeout");
             sendEvent(generation, "cancelled", Map.of("conversationId", conversationId, "reason", "timeout"));
             completeGeneration(generation);
         });
@@ -293,6 +294,7 @@ public class RagService {
 
         log.info("取消流式生成: conversationId={}, requestId={}, reason={}", conversationId, generation.requestId(), reason);
         generation.cancelHandle();
+        emitThinkingEndIfNeeded(generation, reason);
         sendEvent(generation, "cancelled", Map.of("conversationId", conversationId, "reason", reason));
         completeGeneration(generation);
         return true;
@@ -557,10 +559,28 @@ public class RagService {
         return payload;
     }
 
+    private Map<String, Object> buildThinkingEndPayload(String conversationId, String reason) {
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("conversationId", conversationId);
+        payload.put("thinkingEnded", true);
+        putIfHasLength(payload, "reason", reason);
+        return payload;
+    }
+
     private void putIfHasLength(Map<String, Object> payload, String key, String value) {
         if (StringUtils.hasLength(value)) {
             payload.put(key, value);
         }
+    }
+
+    private void emitThinkingEndIfNeeded(InFlightGeneration generation, String reason) {
+        if (generation == null || generation.isCompleted()) {
+            return;
+        }
+        if (!generation.hasThinking() || !generation.markThinkingEnded()) {
+            return;
+        }
+        sendEvent(generation, "thinking_end", buildThinkingEndPayload(generation.conversationId(), reason));
     }
 
     private void closeQuietly(QdrantEmbeddingStore embeddingStore) {
@@ -625,6 +645,10 @@ public class RagService {
                     finalThinking = response.aiMessage().thinking();
                 }
             }
+            if (StringUtils.hasLength(finalThinking)) {
+                generation.syncThinking(finalThinking);
+            }
+            emitThinkingEndIfNeeded(generation, "complete");
 
             if (!generation.isCancelled()) {
                 if (StringUtils.hasText(finalAnswer)) {
@@ -641,6 +665,7 @@ public class RagService {
         @Override
         public void onError(Throwable error) {
             if (generation.isCancelled()) {
+                emitThinkingEndIfNeeded(generation, "cancelled");
                 sendEvent(generation, "complete",
                     buildCompletePayload(conversationId, true, generation.answer(), generation.thinking()));
                 completeGeneration(generation);
@@ -648,6 +673,7 @@ public class RagService {
             }
 
             log.error("流式模型响应失败: conversationId={}, requestId={}", conversationId, generation.requestId(), error);
+            emitThinkingEndIfNeeded(generation, "error");
             sendEvent(generation, "error", Map.of("message", safeErrorMessage(error)));
             completeWithError(generation, error);
         }
@@ -656,6 +682,7 @@ public class RagService {
             if (!StringUtils.hasText(text) || generation.isCancelled() || generation.isCompleted()) {
                 return;
             }
+            emitThinkingEndIfNeeded(generation, "answer_started");
             generation.appendAnswer(text);
             sendEvent(generation, "delta", text);
         }
@@ -677,6 +704,7 @@ public class RagService {
         private final AtomicReference<StreamingHandle> handleRef = new AtomicReference<>();
         private final AtomicBoolean cancelled = new AtomicBoolean(false);
         private final AtomicBoolean completed = new AtomicBoolean(false);
+        private final AtomicBoolean thinkingEnded = new AtomicBoolean(false);
         private final StringBuilder answerBuilder = new StringBuilder();
         private final StringBuilder thinkingBuilder = new StringBuilder();
 
@@ -745,6 +773,10 @@ public class RagService {
             return completed.get();
         }
 
+        private boolean markThinkingEnded() {
+            return thinkingEnded.compareAndSet(false, true);
+        }
+
         private void appendAnswer(String text) {
             synchronized (answerBuilder) {
                 answerBuilder.append(text);
@@ -763,9 +795,22 @@ public class RagService {
             }
         }
 
+        private void syncThinking(String text) {
+            synchronized (thinkingBuilder) {
+                thinkingBuilder.setLength(0);
+                thinkingBuilder.append(text);
+            }
+        }
+
         private String thinking() {
             synchronized (thinkingBuilder) {
                 return thinkingBuilder.toString();
+            }
+        }
+
+        private boolean hasThinking() {
+            synchronized (thinkingBuilder) {
+                return thinkingBuilder.length() > 0;
             }
         }
     }

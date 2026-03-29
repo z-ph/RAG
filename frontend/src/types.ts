@@ -43,6 +43,8 @@ export interface ErrorResponse {
 export interface StreamCompletePayload {
   conversationId?: string | null;
   cancelled?: boolean;
+  content?: string | null;
+  thinking?: string | null;
 }
 
 export interface StreamCancelledPayload {
@@ -50,12 +52,22 @@ export interface StreamCancelledPayload {
   conversationId?: string | null;
 }
 
+export interface StreamThinkingEndPayload {
+  conversationId?: string | null;
+  thinkingEnded?: boolean;
+  reason?: string | null;
+}
+
 export type HealthState = "checking" | "ok" | "error";
+
+export type ThinkingStatus = "idle" | "streaming" | "complete";
 
 export interface ChatMessage {
   id: string;
   role: "assistant" | "user";
   content: string;
+  thinking: string;
+  thinkingStatus: ThinkingStatus;
   createdAt: string;
   status: "complete" | "streaming" | "error" | "cancelled";
   sources: SourceReference[];

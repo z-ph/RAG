@@ -4,12 +4,15 @@ import com.mark.knowledge.rag.dto.RagRequest;
 import com.mark.knowledge.rag.dto.RagResponse;
 import com.mark.knowledge.rag.dto.SourceReference;
 import com.mark.knowledge.rag.store.QdrantEmbeddingStoreFactory;
+import dev.langchain4j.data.message.UserMessage;
 import dev.langchain4j.data.segment.TextSegment;
 import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.model.chat.StreamingChatModel;
 import dev.langchain4j.model.chat.response.ChatResponse;
 import dev.langchain4j.model.chat.response.PartialResponse;
 import dev.langchain4j.model.chat.response.PartialResponseContext;
+import dev.langchain4j.model.chat.response.PartialThinking;
+import dev.langchain4j.model.chat.response.PartialThinkingContext;
 import dev.langchain4j.model.chat.response.StreamingChatResponseHandler;
 import dev.langchain4j.model.chat.response.StreamingHandle;
 import dev.langchain4j.model.embedding.EmbeddingModel;
@@ -27,6 +30,7 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -122,6 +126,7 @@ public class RagService {
                 conversationMemoryService.appendAssistantMessage(conversationId, EMPTY_MATCH_ANSWER);
                 return new RagResponse(
                     EMPTY_MATCH_ANSWER,
+                    null,
                     conversationId,
                     new ArrayList<>()
                 );
@@ -137,13 +142,18 @@ public class RagService {
 
             String prompt = buildPrompt(history, context, request.question());
             long answerStart = System.nanoTime();
-            String answer = chatModel.chat(prompt);
+            GeneratedAnswer generatedAnswer = generateAnswer(prompt);
             log.info("AI 基于知识库生成答案耗时: {} ms", elapsedMillis(answerStart));
 
             conversationMemoryService.appendUserMessage(conversationId, request.question());
-            conversationMemoryService.appendAssistantMessage(conversationId, answer);
+            conversationMemoryService.appendAssistantMessage(conversationId, generatedAnswer.answer());
 
-            return new RagResponse(answer, conversationId, toSourceReferences(matches));
+            return new RagResponse(
+                generatedAnswer.answer(),
+                generatedAnswer.thinking(),
+                conversationId,
+                toSourceReferences(matches)
+            );
         } catch (Exception e) {
             log.error("RAG 处理失败", e);
             throw new RuntimeException("问题处理失败: " + e.getMessage(), e);
@@ -243,7 +253,7 @@ public class RagService {
                 sendEvent(generation, "delta", EMPTY_MATCH_ANSWER);
                 conversationMemoryService.appendUserMessage(conversationId, request.question());
                 conversationMemoryService.appendAssistantMessage(conversationId, EMPTY_MATCH_ANSWER);
-                sendEvent(generation, "complete", Map.of("conversationId", conversationId, "cancelled", false));
+                sendEvent(generation, "complete", buildCompletePayload(conversationId, false, EMPTY_MATCH_ANSWER, null));
                 completeGeneration(generation);
                 return;
             }
@@ -502,6 +512,16 @@ public class RagService {
             .collect(Collectors.toList());
     }
 
+    private GeneratedAnswer generateAnswer(String prompt) {
+        ChatResponse response = chatModel.chat(UserMessage.from(prompt));
+        if (response == null || response.aiMessage() == null) {
+            return new GeneratedAnswer("", null);
+        }
+
+        String answer = response.aiMessage().text();
+        return new GeneratedAnswer(answer == null ? "" : answer, response.aiMessage().thinking());
+    }
+
     private String resolveConversationIdForStream(String conversationId) {
         String normalized = normalizeConversationId(conversationId);
         if (StringUtils.hasText(normalized)) {
@@ -522,6 +542,25 @@ public class RagService {
             return "未知错误";
         }
         return error.getMessage();
+    }
+
+    private Map<String, Object> buildCompletePayload(
+            String conversationId,
+            boolean cancelled,
+            String content,
+            String thinking) {
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("conversationId", conversationId);
+        payload.put("cancelled", cancelled);
+        putIfHasLength(payload, "content", content);
+        putIfHasLength(payload, "thinking", thinking);
+        return payload;
+    }
+
+    private void putIfHasLength(Map<String, Object> payload, String key, String value) {
+        if (StringUtils.hasLength(value)) {
+            payload.put(key, value);
+        }
     }
 
     private void closeQuietly(QdrantEmbeddingStore embeddingStore) {
@@ -561,14 +600,30 @@ public class RagService {
         }
 
         @Override
+        public void onPartialThinking(PartialThinking partialThinking, PartialThinkingContext context) {
+            if (context != null) {
+                generation.captureHandle(context.streamingHandle());
+            }
+            if (partialThinking != null) {
+                handlePartialThinking(partialThinking.text());
+            }
+        }
+
+        @Override
         public void onCompleteResponse(ChatResponse response) {
             if (generation.isCompleted()) {
                 return;
             }
 
             String finalAnswer = generation.answer();
-            if (response != null && response.aiMessage() != null && StringUtils.hasText(response.aiMessage().text())) {
-                finalAnswer = response.aiMessage().text();
+            String finalThinking = generation.thinking();
+            if (response != null && response.aiMessage() != null) {
+                if (StringUtils.hasLength(response.aiMessage().text())) {
+                    finalAnswer = response.aiMessage().text();
+                }
+                if (StringUtils.hasLength(response.aiMessage().thinking())) {
+                    finalThinking = response.aiMessage().thinking();
+                }
             }
 
             if (!generation.isCancelled()) {
@@ -576,9 +631,9 @@ public class RagService {
                     conversationMemoryService.appendUserMessage(conversationId, generation.question());
                     conversationMemoryService.appendAssistantMessage(conversationId, finalAnswer);
                 }
-                sendEvent(generation, "complete", Map.of("conversationId", conversationId, "cancelled", false));
+                sendEvent(generation, "complete", buildCompletePayload(conversationId, false, finalAnswer, finalThinking));
             } else {
-                sendEvent(generation, "complete", Map.of("conversationId", conversationId, "cancelled", true));
+                sendEvent(generation, "complete", buildCompletePayload(conversationId, true, finalAnswer, finalThinking));
             }
             completeGeneration(generation);
         }
@@ -586,7 +641,8 @@ public class RagService {
         @Override
         public void onError(Throwable error) {
             if (generation.isCancelled()) {
-                sendEvent(generation, "complete", Map.of("conversationId", conversationId, "cancelled", true));
+                sendEvent(generation, "complete",
+                    buildCompletePayload(conversationId, true, generation.answer(), generation.thinking()));
                 completeGeneration(generation);
                 return;
             }
@@ -603,6 +659,14 @@ public class RagService {
             generation.appendAnswer(text);
             sendEvent(generation, "delta", text);
         }
+
+        private void handlePartialThinking(String text) {
+            if (!StringUtils.hasText(text) || generation.isCancelled() || generation.isCompleted()) {
+                return;
+            }
+            generation.appendThinking(text);
+            sendEvent(generation, "thinking_delta", text);
+        }
     }
 
     private static final class InFlightGeneration {
@@ -614,6 +678,7 @@ public class RagService {
         private final AtomicBoolean cancelled = new AtomicBoolean(false);
         private final AtomicBoolean completed = new AtomicBoolean(false);
         private final StringBuilder answerBuilder = new StringBuilder();
+        private final StringBuilder thinkingBuilder = new StringBuilder();
 
         private InFlightGeneration(String requestId, String conversationId, String question, SseEmitter emitter) {
             this.requestId = requestId;
@@ -691,6 +756,24 @@ public class RagService {
                 return answerBuilder.toString();
             }
         }
+
+        private void appendThinking(String text) {
+            synchronized (thinkingBuilder) {
+                thinkingBuilder.append(text);
+            }
+        }
+
+        private String thinking() {
+            synchronized (thinkingBuilder) {
+                return thinkingBuilder.toString();
+            }
+        }
+    }
+
+    private record GeneratedAnswer(
+        String answer,
+        String thinking
+    ) {
     }
 
     private record HybridMatch(

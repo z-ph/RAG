@@ -7,6 +7,7 @@ import java.util.List;
  */
 public record RagResponse(
     String answer,
+    String thinking,
     String conversationId,
     List<SourceReference> sources
 ) {

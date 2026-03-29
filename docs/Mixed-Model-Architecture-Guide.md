@@ -185,7 +185,7 @@ RAG_EMBEDDING_REQUEST_BATCH_SIZE=10
 
 这个批次只影响 embedding 请求，不影响后续写入 Qdrant 的 `rag.embedding-store.batch-size`。
 
-### 5. `ollama.think` 只对 Ollama chat 生效
+### 5. `ollama.think` 只对 Ollama chat 生效，`vllm` 使用独立 reasoning 字段
 
 当前代码会把 `llm.ollama.think` 传给：
 
@@ -193,6 +193,18 @@ RAG_EMBEDDING_REQUEST_BATCH_SIZE=10
 - `OllamaStreamingChatModel`
 
 对 `vllm` provider 无效。
+
+`vllm` / OpenAI-compatible chat 现在单独使用：
+
+- `llm.vllm.return-thinking`，默认 `true`
+
+当上游响应把思考内容放在独立字段时：
+
+- 当前实现按 `reasoning_content` 读取
+
+- 同步 `/api/rag/ask` 会在 `thinking` 字段返回
+- 流式 `/api/rag/ask/stream` 会通过 `thinking_delta` 事件增量推送
+- 前端会把思考过程和最终答案分开渲染
 
 ## 启动后如何确认生效
 
@@ -207,8 +219,8 @@ RAG_EMBEDDING_REQUEST_BATCH_SIZE=10
 或：
 
 ```text
-初始化聊天模型: provider=vllm, baseUrl=http://localhost:8000/v1, model=Qwen/Qwen2.5-7B-Instruct
-初始化流式聊天模型: provider=vllm, baseUrl=http://localhost:8000/v1, model=Qwen/Qwen2.5-7B-Instruct
+初始化聊天模型: provider=vllm, baseUrl=http://localhost:8000/v1, model=Qwen/Qwen2.5-7B-Instruct, returnThinking=true
+初始化流式聊天模型: provider=vllm, baseUrl=http://localhost:8000/v1, model=Qwen/Qwen2.5-7B-Instruct, returnThinking=true
 初始化嵌入模型: provider=vllm, baseUrl=http://localhost:8000/v1, model=BAAI/bge-base-zh-v1.5
 ```
 

@@ -112,9 +112,11 @@ LLM_EMBEDDING_PROVIDER=ollama
 VLLM_CHAT_BASE_URL=http://localhost:8000/v1
 VLLM_CHAT_MODEL=Qwen/Qwen2.5-7B-Instruct
 VLLM_CHAT_API_KEY=
+VLLM_RETURN_THINKING=true
 ```
 
 `vllm` 在当前代码里表示“OpenAI-compatible provider”，不要求一定是 vLLM，也可以接入兼容接口的云端服务。
+当 provider 把思考内容放在独立字段 `reasoning_content` 时，后端会读取到 `thinking` 字段，并在前端单独渲染。
 
 ### 4. 配置后端
 
@@ -217,6 +219,7 @@ llm:
     embedding-model: ${VLLM_EMBEDDING_MODEL:BAAI/bge-base-zh-v1.5}
     chat-api-key: ${VLLM_CHAT_API_KEY:}
     embedding-api-key: ${VLLM_EMBEDDING_API_KEY:}
+    return-thinking: ${VLLM_RETURN_THINKING:true}
 ```
 
 ### Qdrant 配置

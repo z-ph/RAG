@@ -185,6 +185,7 @@ paths:
                 $ref: '#/components/schemas/RagResponse'
               example:
                 answer: 根据信访办理制度，受理流程一般包括登记、初审、分流、办理和反馈五个阶段。
+                thinking: 先从命中的制度条款里提取流程步骤，再按用户要求做简洁归纳。
                 conversationId: case-001
                 sources:
                   - filename: petition-policy.txt
@@ -217,8 +218,9 @@ paths:
         典型事件顺序：
         - `start`: 返回会话 ID。
         - `sources`: 返回检索命中的来源片段数组。
+        - `thinking_delta`: 按增量返回独立的思考内容。
         - `delta`: 按 token/文本片段增量返回答案。
-        - `complete`: 结束事件，包含 `conversationId` 与 `cancelled`。
+        - `complete`: 结束事件，包含 `conversationId`、`cancelled` 以及最终 `content` / `thinking` 快照。
         - `cancelled`: 会话被新请求替换、超时或主动取消时触发。
         - `error`: 处理失败时推送错误信息。
 
@@ -250,6 +252,9 @@ paths:
                 event: sources
                 data: [{"filename":"guide.txt","excerpt":"【标题：办理指南】...","relevanceScore":0.88}]
 
+                event: thinking_delta
+                data: 先定位文档里关于材料要求和办理时限的段落。
+
                 event: delta
                 data: 核心要求包括材料完整、
 
@@ -257,7 +262,7 @@ paths:
                 data: 事实清晰、时限明确。
 
                 event: complete
-                data: {"conversationId":"stream-001","cancelled":false}
+                data: {"conversationId":"stream-001","cancelled":false,"content":"核心要求包括材料完整、事实清晰、时限明确。","thinking":"先定位文档里关于材料要求和办理时限的段落。"}
         '400':
           description: 请求无效，例如问题为空
           content:
@@ -374,6 +379,10 @@ components:
         answer:
           type: string
           description: 最终答案
+        thinking:
+          type: string
+          nullable: true
+          description: 模型独立返回的思考内容；仅在 provider 提供该字段时返回
         conversationId:
           type: string
           nullable: true

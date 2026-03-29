@@ -29,7 +29,7 @@ export default defineConfig(({ mode }) => {
       host: "0.0.0.0",
       port: 5174,
       proxy: {
-        "/api": {
+        [process.env.VITE_API_BASE_URL || "/api"]: {
           target: process.env.VITE_PROXY_TARGET || "http://localhost:8080",
           changeOrigin: true
         }

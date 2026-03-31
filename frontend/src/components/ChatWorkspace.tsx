@@ -1,9 +1,9 @@
 import {
   ClearOutlined,
   DatabaseOutlined,
-  MessageOutlined,
   SendOutlined,
-  PauseCircleFilled
+  PauseCircleFilled,
+  UserOutlined
 } from "@ant-design/icons";
 import { Button, Input, Select } from "antd";
 import { MessageBubble } from "./MessageBubble";
@@ -14,7 +14,10 @@ interface ChatWorkspaceProps {
   prompt: string;
   maxResults: number;
   streaming: boolean;
+  authenticated: boolean;
+  authUser: { username: string; role: string } | null;
   onOpenDocuments: () => void;
+  onOpenAuth: () => void;
   onPromptChange: (value: string) => void;
   onMaxResultsChange: (value: number) => void;
   onSend: (question?: string) => Promise<void>;
@@ -51,6 +54,19 @@ export function ChatWorkspace(props: ChatWorkspaceProps) {
               onClick={() => void props.onClearConversation()}
             >
               清空对话
+            </Button>
+            <Button
+              className={`!rounded-full !px-4 !shadow-none ${
+                props.authenticated
+                  ? "!border-volcano-200 !bg-volcano-50/80 !text-volcano-700 hover:!border-volcano-300 hover:!text-volcano-800"
+                  : "!border-ink-950/10 !bg-white/[0.72] !text-ink-700 hover:!border-accent-500/[0.25] hover:!text-accent-500"
+              }`}
+              icon={<UserOutlined />}
+              onClick={props.onOpenAuth}
+            >
+              {props.authenticated && props.authUser
+                ? `${props.authUser.username} (${props.authUser.role === "ADMIN" ? "管理" : "成员"})`
+                : "用户登录"}
             </Button>
           </div>
 

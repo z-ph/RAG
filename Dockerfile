@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1
 FROM docker.1ms.run/node:20-alpine AS frontend-builder
 WORKDIR /workspace/frontend
 
@@ -10,10 +11,14 @@ RUN pnpm build
 FROM docker.1ms.run/maven:3.9.9-eclipse-temurin-21 AS backend-builder
 WORKDIR /workspace
 
+# 1. 复制 pom.xml，利用缓存挂载的 Maven 仓库
 COPY pom.xml ./
 COPY src ./src
 COPY --from=frontend-builder /workspace/frontend/dist ./src/main/resources/static
-RUN mvn -B -DskipTests package && \
+
+# 2. 编译时使用缓存挂载（依赖只下载一次）
+RUN --mount=type=cache,target=/root/.m2 \
+    mvn -B -DskipTests package && \
     find target -maxdepth 1 -type f -name '*.jar' ! -name '*.jar.original' -exec cp {} /workspace/app.jar \;
 
 # Use MySQL image as base (Oracle Linux based)
@@ -84,6 +89,7 @@ ENV TZ=Asia/Shanghai \
     JAVA_OPTS="" \
     MYSQL_DATABASE=knowledge_rag \
     MYSQL_USER=knowledge \
+    MYSQL_USERNAME=knowledge \
     MYSQL_PASSWORD=ChangeMe123! \
     MYSQL_ROOT_PASSWORD=ChangeMe123! \
     MYSQL_ROOT_HOST=% \

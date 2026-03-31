@@ -2,24 +2,24 @@ import { useState } from "react";
 import { App as AntdApp, Drawer, Grid } from "antd";
 import { ChatWorkspace } from "./components/ChatWorkspace";
 import { DocumentSidebar } from "./components/DocumentSidebar";
+import { AuthPanel } from "./components/AuthPanel";
 import { useAuthSession } from "./hooks/useAuthSession";
 import { useDocumentLibrary } from "./hooks/useDocumentLibrary";
 import { useRagConversation } from "./hooks/useRagConversation";
-import { useServiceHealth } from "./hooks/useServiceHealth";
 
 function App() {
   const { message } = AntdApp.useApp();
   const screens = Grid.useBreakpoint();
   const [documentDrawerOpen, setDocumentDrawerOpen] = useState(false);
+  const [authDrawerOpen, setAuthDrawerOpen] = useState(false);
   const authSession = useAuthSession(message);
   const documentLibrary = useDocumentLibrary(
     message,
     authSession.authStatus.authenticated,
     authSession.handleUnauthorized
   );
-  const serviceHealth = useServiceHealth();
   const conversation = useRagConversation(message);
-  const documentDrawerWidth = screens.xl
+  const drawerWidth = screens.xl
     ? "32vw"
     : screens.lg
       ? "38vw"
@@ -39,7 +39,10 @@ function App() {
           prompt={conversation.prompt}
           maxResults={conversation.maxResults}
           streaming={conversation.streaming}
+          authenticated={authSession.authStatus.authenticated}
+          authUser={authSession.authStatus.user || null}
           onOpenDocuments={() => setDocumentDrawerOpen(true)}
+          onOpenAuth={() => setAuthDrawerOpen(true)}
           onPromptChange={conversation.setPrompt}
           onMaxResultsChange={conversation.setMaxResults}
           onSend={conversation.handleSend}
@@ -52,7 +55,7 @@ function App() {
         open={documentDrawerOpen}
         onClose={() => setDocumentDrawerOpen(false)}
         placement="left"
-        width={documentDrawerWidth}
+        width={drawerWidth}
         closable={false}
         title={null}
         classNames={{
@@ -63,6 +66,33 @@ function App() {
         }}
       >
         <DocumentSidebar
+          documents={documentLibrary.documents}
+          documentsLoading={documentLibrary.documentsLoading}
+          uploading={documentLibrary.uploading}
+          deletingId={documentLibrary.deletingId}
+          authenticated={authSession.authStatus.authenticated}
+          onClose={() => setDocumentDrawerOpen(false)}
+          onRefreshDocuments={documentLibrary.refreshDocuments}
+          onUpload={documentLibrary.handleUpload}
+          onDeleteDocument={documentLibrary.handleDeleteDocument}
+        />
+      </Drawer>
+
+      <Drawer
+        open={authDrawerOpen}
+        onClose={() => setAuthDrawerOpen(false)}
+        placement="right"
+        width={drawerWidth}
+        closable={false}
+        title={null}
+        classNames={{
+          mask: "!backdrop-blur-[3px]",
+          wrapper: "!shadow-none",
+          section: "!bg-[#fffaf4]",
+          body: "!h-full !p-0"
+        }}
+      >
+        <AuthPanel
           authenticated={authSession.authStatus.authenticated}
           authLoading={authSession.authLoading}
           authSubmitting={authSession.authSubmitting}
@@ -71,16 +101,7 @@ function App() {
           registrationCodesLoading={authSession.registrationCodesLoading}
           codeCreating={authSession.codeCreating}
           codeMutatingId={authSession.codeMutatingId}
-          documents={documentLibrary.documents}
-          documentsLoading={documentLibrary.documentsLoading}
-          uploading={documentLibrary.uploading}
-          deletingId={documentLibrary.deletingId}
-          ragHealth={serviceHealth.ragHealth}
-          documentHealth={serviceHealth.documentHealth}
-          refreshingHealth={serviceHealth.refreshingHealth}
-          onClose={() => setDocumentDrawerOpen(false)}
-          onRefreshDocuments={documentLibrary.refreshDocuments}
-          onRefreshHealth={serviceHealth.refreshHealth}
+          onClose={() => setAuthDrawerOpen(false)}
           onLogin={authSession.handleLogin}
           onRegister={authSession.handleRegister}
           onLogout={authSession.handleLogout}
@@ -88,8 +109,6 @@ function App() {
           onCreateRegistrationCode={authSession.handleCreateRegistrationCode}
           onDisableRegistrationCode={authSession.handleDisableRegistrationCode}
           onDeleteRegistrationCode={authSession.handleDeleteRegistrationCode}
-          onUpload={documentLibrary.handleUpload}
-          onDeleteDocument={documentLibrary.handleDeleteDocument}
         />
       </Drawer>
     </main>

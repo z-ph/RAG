@@ -41,7 +41,8 @@ Spring Boot API
 说明：
 
 - 文档模块通过 Session Cookie 鉴权，前端使用同源 `/api` 请求自动携带 Cookie
-- 后端默认不再提供旧的静态 HTML 页面；使用前端时请启动 `frontend/` 子项目
+- 本地开发仍推荐单独启动 `frontend/` 子项目
+- Docker 镜像会在构建阶段打包前端产物，并由 Spring Boot 同源托管
 
 ## 仓库结构
 
@@ -60,13 +61,42 @@ Spring Boot API
 │   └── README.md
 ├── docs/
 │   ├── openapi.yaml
+│   ├── Docker-Deployment.md
 │   ├── Mixed-Model-Architecture-Guide.md
 │   └── Database-Schema.md
 ├── .env.example
 └── HELP.md
 ```
 
-## 快速开始
+## Docker 部署
+
+仓库现在提供了一个单镜像方案：
+
+- `frontend` 在构建阶段执行 `pnpm build`
+- 打包产物会复制到 Spring Boot 的 `static/`
+- 最终镜像内同时运行 `Spring Boot + MySQL`
+- `Qdrant` 仍作为独立依赖运行，仓库已提供 `docker-compose.yml`
+
+推荐直接使用仓库根目录的 compose：
+
+```bash
+docker compose up --build -d
+```
+
+启动后访问：
+
+- 应用：`http://localhost:8080`
+- Qdrant HTTP：`http://localhost:6333`
+- Qdrant gRPC：`localhost:6334`
+
+补充说明：
+
+- compose 默认把 `Qdrant` 作为独立容器启动
+- 如果模型服务运行在宿主机，compose 默认使用 `host.docker.internal`
+- Linux 环境下 compose 已包含 `extra_hosts: host.docker.internal:host-gateway`
+- 如果只想看详细镜像说明和 `docker build` / `docker run` 示例，见 [docs/Docker-Deployment.md](docs/Docker-Deployment.md)
+
+## 本地开发
 
 ### 1. 前置要求
 
@@ -259,6 +289,7 @@ spring:
 
 - 用户和注册码数据存储在 MySQL
 - `ddl-auto=update` 会自动建表和更新表结构
+- Docker 单镜像启动时，`MYSQL_URL` 会由容器启动脚本自动指向容器内 MySQL
 - 测试环境使用 `src/test/resources/application.yaml` 切换到 H2 内存数据库
 
 ### 鉴权配置
@@ -364,5 +395,6 @@ rag:
 
 - [HELP.md](HELP.md)：快速运行说明
 - [docs/openapi.yaml](docs/openapi.yaml)：接口定义
+- [docs/Docker-Deployment.md](docs/Docker-Deployment.md)：Docker 单镜像部署说明
 - [docs/Mixed-Model-Architecture-Guide.md](docs/Mixed-Model-Architecture-Guide.md)：provider 配置说明
 - [docs/Database-Schema.md](docs/Database-Schema.md)：MySQL、Qdrant 与内存存储结构说明

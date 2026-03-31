@@ -1,0 +1,10 @@
+.git
+.gitattributes
+.mvn
+target
+uploads
+log.txt
+.env
+frontend/node_modules
+frontend/dist
+front-vue

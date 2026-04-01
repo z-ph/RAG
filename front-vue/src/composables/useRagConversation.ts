@@ -84,6 +84,19 @@ export function useRagConversation(messageApi: MessageApi) {
               sources: payload
             }));
           },
+          onThinkingDelta(payload) {
+            updateMessage(assistantId, (item) => ({
+              ...item,
+              thinking: item.thinking + payload,
+              thinkingStatus: "streaming"
+            }));
+          },
+          onThinkingEnd(payload) {
+            updateMessage(assistantId, (item) => ({
+              ...item,
+              thinkingStatus: payload.thinkingEnded ? "complete" : item.thinkingStatus
+            }));
+          },
           onDelta(payload) {
             updateMessage(assistantId, (item) => ({
               ...item,
@@ -97,6 +110,10 @@ export function useRagConversation(messageApi: MessageApi) {
 
             updateMessage(assistantId, (item) => ({
               ...item,
+              content: payload.content ?? item.content,
+              thinking: payload.thinking ?? item.thinking,
+              thinkingStatus:
+                payload.thinking || item.thinking ? "complete" : item.thinkingStatus,
               status: payload.cancelled ? "cancelled" : "complete"
             }));
           },
@@ -108,6 +125,7 @@ export function useRagConversation(messageApi: MessageApi) {
             updateMessage(assistantId, (item) => ({
               ...item,
               status: "cancelled",
+              thinkingStatus: item.thinking ? "complete" : item.thinkingStatus,
               content: item.content || payload.reason || "本次回答已取消。"
             }));
           },
@@ -115,6 +133,7 @@ export function useRagConversation(messageApi: MessageApi) {
             updateMessage(assistantId, (item) => ({
               ...item,
               status: "error",
+              thinkingStatus: item.thinking ? "complete" : item.thinkingStatus,
               content: item.content || errorText
             }));
           }
@@ -124,6 +143,10 @@ export function useRagConversation(messageApi: MessageApi) {
 
       updateMessage(assistantId, (item) => ({
         ...item,
+        thinkingStatus:
+          item.thinking && item.thinkingStatus !== "complete"
+            ? "complete"
+            : item.thinkingStatus,
         status: item.status === "streaming" ? "complete" : item.status
       }));
     } catch (error) {
@@ -131,6 +154,7 @@ export function useRagConversation(messageApi: MessageApi) {
         updateMessage(assistantId, (item) => ({
           ...item,
           status: "cancelled",
+          thinkingStatus: item.thinking ? "complete" : item.thinkingStatus,
           content: item.content || "本次回答已取消。"
         }));
       } else {
@@ -138,6 +162,7 @@ export function useRagConversation(messageApi: MessageApi) {
         updateMessage(assistantId, (item) => ({
           ...item,
           status: "error",
+          thinkingStatus: item.thinking ? "complete" : item.thinkingStatus,
           content: item.content || errorText
         }));
         messageApi.error(errorText);

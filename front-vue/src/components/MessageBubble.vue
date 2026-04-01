@@ -43,10 +43,12 @@
           v-if="message.sources.length > 0"
           class="group mb-2 border-b pb-2"
           :class="sourceDividerClass"
+          :open="sourceOpen"
+          @toggle="onSourceToggle"
         >
           <summary
             class="flex cursor-pointer list-none items-center justify-between gap-2 text-xs font-medium [&::-webkit-details-marker]:hidden"
-            :class="sourceLabelClass"
+            :class="[sourceLabelClass, sourceOpen && isSticky ? `sticky top-0 z-20 -mx-3 mb-2 px-3 py-2 backdrop-blur-sm shadow-[0_1px_0_rgba(19,34,56,0.08)] ${sourceStickyBarClass}` : '']"
           >
             <span>来源片段 · {{ message.sources.length }}</span>
             <span
@@ -82,19 +84,52 @@
           </div>
         </details>
 
-        <div class="whitespace-pre-wrap text-sm leading-6">
-          <template v-if="message.content">
-            {{ message.content }}
-          </template>
-          <template v-else-if="showThinkingTimer">
+        <!-- Thinking section -->
+        <section v-if="hasThinking" class="mb-2 rounded-[16px] border" :class="thinkingFrameClass">
+          <button
+            type="button"
+            class="flex w-full items-center justify-between gap-3 px-3 py-2 text-left"
+            :class="[thinkingOpen ? `sticky top-0 z-20 rounded-t-[15px] border-b backdrop-blur-sm shadow-[0_1px_0_rgba(115,65,0,0.08)] ${thinkingDividerClass} ${thinkingStickyBarClass}` : 'rounded-[15px]']"
+            @click="thinkingOpen = !thinkingOpen"
+            aria-expanded="thinkingOpen"
+          >
+            <span class="inline-flex items-center gap-2 text-xs font-semibold" :class="thinkingLabelClass">
+              <BulbOutlined />
+              <span>{{ message.thinkingStatus === 'streaming' ? '思考中' : '思考过程' }}</span>
+              <span v-if="message.thinkingStatus === 'streaming'" class="inline-block h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
+              <span v-if="showThinkingActivity" class="inline-flex rounded-full px-2 py-0.5 text-[11px] tabular-nums" :class="thinkingTimerClass">
+                {{ formatDuration(thinkingSeconds) }}
+              </span>
+            </span>
+            <span class="inline-flex items-center gap-2 text-[11px] font-medium" :class="thinkingHintClass">
+              <span>{{ thinkingOpen ? '收起' : '展开' }}</span>
+              <CaretRightFilled :class="{ 'rotate-90': thinkingOpen }" class="transition-transform" />
+            </span>
+          </button>
+          <div v-if="thinkingOpen" class="px-3 pb-3 pt-2" :class="thinkingBodyClass">
+            <MarkdownContent
+              :content="message.thinking"
+              tone="thinking"
+              class="text-[13px] leading-6"
+            />
+            <span v-if="message.thinkingStatus === 'streaming'" class="mt-1 inline-block h-[16px] w-2 animate-pulse rounded bg-amber-500/80" />
+          </div>
+        </section>
+
+        <div class="text-sm leading-6">
+          <MarkdownContent
+            v-if="message.content"
+            :content="message.content"
+            :tone="isAssistant ? 'assistant' : 'user'"
+          />
+          <template v-else-if="showThinkingPlaceholder">
             <span>正在思考</span>
             <span class="ml-1 inline-block tabular-nums text-accent-500">
               {{ formatDuration(thinkingSeconds) }}
             </span>
           </template>
-          <template v-else />
           <span
-            v-if="message.status === 'streaming' && (showThinkingTimer || Boolean(message.content))"
+            v-if="showAnswerCursor"
             class="ml-1 inline-block h-[18px] w-2.5 translate-y-[3px] animate-pulse rounded"
             :class="isAssistant ? 'bg-accent-500' : 'bg-white/[0.92]'"
           />
@@ -119,9 +154,16 @@
 </template>
 
 <script setup lang="ts">
-import { CheckOutlined, CopyOutlined, LoadingOutlined } from "@ant-design/icons-vue";
+import {
+  BulbOutlined,
+  CaretRightFilled,
+  CheckOutlined,
+  CopyOutlined,
+  LoadingOutlined
+} from "@ant-design/icons-vue";
 import { computed, onBeforeUnmount, ref, watch } from "vue";
 import type { ChatMessage } from "../types";
+import MarkdownContent from "./MarkdownContent.vue";
 
 const props = defineProps<{
   message: ChatMessage;
@@ -182,18 +224,34 @@ async function copyText(text: string) {
 }
 
 const isAssistant = computed(() => props.message.role === "assistant");
+const hasThinking = computed(() => isAssistant.value && Boolean(props.message.thinking.trim()));
 const showSourceLoading = computed(
   () =>
     isAssistant.value &&
     props.message.status === "streaming" &&
     props.message.sources.length === 0
 );
-const showThinkingTimer = computed(
+const showThinkingPlaceholder = computed(
   () =>
     isAssistant.value &&
     props.message.status === "streaming" &&
     props.message.sources.length > 0 &&
     !props.message.content
+);
+const showThinkingActivity = computed(
+  () =>
+    isAssistant.value &&
+    props.message.status === "streaming" &&
+    props.message.sources.length > 0 &&
+    !props.message.content &&
+    props.message.thinkingStatus !== "complete"
+);
+const showAnswerCursor = computed(
+  () =>
+    props.message.status === "streaming" &&
+    (Boolean(props.message.content) ||
+      showThinkingPlaceholder.value ||
+      (hasThinking.value && props.message.thinkingStatus === "complete" && !props.message.content))
 );
 const shellMaxWidth = "min(var(--message-shell-max, 920px), calc(100% - 5rem))";
 const copyableContent = computed(() => props.message.content.trim());
@@ -233,6 +291,7 @@ const sourceLoadingClass = computed(() =>
     ? "border-amber-500/[0.2] bg-amber-50 text-amber-700"
     : "border-white/[0.24] bg-white/[0.1] text-white/[0.9]"
 );
+const sourceStickyBarClass = computed(() => (isAssistant.value ? "bg-white/95" : "bg-accent-500/95"));
 const scoreClass = computed(() =>
   isAssistant.value
     ? "bg-accent-500/[0.12] text-accent-500"
@@ -243,9 +302,37 @@ const copyButtonClass = computed(() =>
     ? "border-ink-950/10 bg-white/88 text-ink-700 hover:border-accent-500/[0.28] hover:text-accent-500"
     : "border-accent-500/[0.16] bg-accent-500/[0.08] text-accent-500 hover:border-accent-500/[0.3] hover:bg-accent-500/[0.12]"
 );
+
+// Thinking styles
+const thinkingFrameClass = computed(() =>
+  isAssistant.value ? "border-amber-500/[0.18] bg-[#fff7eb]" : "border-white/[0.18] bg-white/[0.08]"
+);
+const thinkingDividerClass = computed(() =>
+  isAssistant.value ? "border-amber-700/[0.12]" : "border-white/[0.12]"
+);
+const thinkingLabelClass = computed(() =>
+  isAssistant.value ? "text-amber-900" : "text-white"
+);
+const thinkingHintClass = computed(() =>
+  isAssistant.value ? "text-amber-700/80" : "text-white/72"
+);
+const thinkingBodyClass = computed(() =>
+  isAssistant.value ? "text-amber-950/90" : "text-white/[0.9]"
+);
+const thinkingStickyBarClass = computed(() =>
+  isAssistant.value ? "bg-[#fff7eb]/95" : "bg-white/[0.12]"
+);
+const thinkingTimerClass = computed(() =>
+  isAssistant.value ? "bg-amber-500/[0.12] text-amber-800" : "bg-white/[0.12] text-white"
+);
+
 const sourceLoadingSeconds = ref(getElapsedSeconds(props.message.createdAt));
 const thinkingSeconds = ref(0);
 const copied = ref(false);
+const sourceOpen = ref(false);
+const thinkingOpen = ref(props.message.thinkingStatus === "streaming");
+const isSticky = ref(false);
+
 let sourceLoadingTimer: number | null = null;
 let thinkingTimer: number | null = null;
 let copiedTimer: number | null = null;
@@ -271,6 +358,12 @@ function clearCopiedTimer() {
   }
 }
 
+function onSourceToggle(event: Event) {
+  const details = event.target as HTMLDetailsElement;
+  sourceOpen.value = details.open;
+  isSticky.value = details.open;
+}
+
 watch(
   () => [props.message.createdAt, showSourceLoading.value],
   () => {
@@ -289,12 +382,12 @@ watch(
 );
 
 watch(
-  () => showThinkingTimer.value,
+  () => showThinkingActivity.value,
   () => {
     thinkingSeconds.value = 0;
     clearThinkingTimer();
 
-    if (!showThinkingTimer.value) {
+    if (!showThinkingActivity.value) {
       return;
     }
 
@@ -304,6 +397,19 @@ watch(
     }, 1000);
   },
   { immediate: true }
+);
+
+// Watch thinkingStatus to auto open/close
+watch(
+  () => props.message.thinkingStatus,
+  (newStatus, oldStatus) => {
+    if (newStatus === "streaming") {
+      thinkingOpen.value = true;
+    }
+    if (newStatus === "complete" && hasThinking.value) {
+      thinkingOpen.value = false;
+    }
+  }
 );
 
 watch(copied, (next) => {

@@ -6,15 +6,56 @@ import type {
   SourceReference,
   StreamCancelledPayload,
   StreamCompletePayload,
+  StreamThinkingEndPayload,
   UploadCompleteEvent,
-  UploadProgressEvent
+  UploadProgressEvent,
+  AuthStatusResponse,
+  AuthSuccessResponse,
+  RegistrationCode,
+  RegistrationCodeListResponse,
+  RegistrationCodeCreateRequest,
+  MessageResponse
 } from "../types";
 import { consumeSseStream } from "./sse";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "/api";
 
+export class ApiError extends Error {
+  readonly status: number;
+
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+  }
+}
+
+async function parseError(response: Response, fallbackMessage: string) {
+  const text = await response.text();
+
+  if (!text) {
+    return new ApiError(fallbackMessage, response.status);
+  }
+
+  try {
+    const payload = JSON.parse(text) as { message?: string; error?: string };
+    return new ApiError(payload.message || payload.error || fallbackMessage, response.status);
+  } catch {
+    return new ApiError(text || fallbackMessage, response.status);
+  }
+}
+
+async function ensureOk(response: Response, fallbackMessage: string) {
+  if (response.ok) {
+    return;
+  }
+
+  throw await parseError(response, fallbackMessage);
+}
+
 async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${API_BASE_URL}${path}`, {
+    credentials: "include",
     ...init,
     headers: {
       "Content-Type": "application/json",
@@ -22,32 +63,17 @@ async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
     }
   });
 
-  if (!response.ok) {
-    const fallbackMessage = `请求失败: HTTP ${response.status}`;
-
-    try {
-      const payload = await response.json();
-      throw new Error(payload.message || payload.error || fallbackMessage);
-    } catch (error) {
-      if (error instanceof Error) {
-        throw error;
-      }
-
-      throw new Error(fallbackMessage);
-    }
-  }
-
+  await ensureOk(response, `请求失败: HTTP ${response.status}`);
   return response.json() as Promise<T>;
 }
 
 async function requestText(path: string, init?: RequestInit) {
-  const response = await fetch(`${API_BASE_URL}${path}`, init);
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    credentials: "include",
+    ...init
+  });
 
-  if (!response.ok) {
-    const text = await response.text();
-    throw new Error(text || `请求失败: HTTP ${response.status}`);
-  }
-
+  await ensureOk(response, `请求失败: HTTP ${response.status}`);
   return response.text();
 }
 
@@ -55,6 +81,59 @@ function parseJsonPayload<T>(value: string): T {
   return JSON.parse(value) as T;
 }
 
+// Auth API
+export function getAuthStatus() {
+  return requestJson<AuthStatusResponse>("/auth/me", {
+    method: "GET"
+  });
+}
+
+export function login(username: string, password: string) {
+  return requestJson<AuthSuccessResponse>("/auth/login", {
+    method: "POST",
+    body: JSON.stringify({ username, password })
+  });
+}
+
+export function register(username: string, password: string, registrationCode: string) {
+  return requestJson<AuthSuccessResponse>("/auth/register", {
+    method: "POST",
+    body: JSON.stringify({ username, password, registrationCode })
+  });
+}
+
+export function logout() {
+  return requestJson<MessageResponse>("/auth/logout", {
+    method: "POST"
+  });
+}
+
+export function listRegistrationCodes() {
+  return requestJson<RegistrationCodeListResponse>("/auth/registration-codes", {
+    method: "GET"
+  });
+}
+
+export function createRegistrationCode(request: RegistrationCodeCreateRequest) {
+  return requestJson<RegistrationCode>("/auth/registration-codes", {
+    method: "POST",
+    body: JSON.stringify(request)
+  });
+}
+
+export function disableRegistrationCode(id: number) {
+  return requestJson<RegistrationCode>(`/auth/registration-codes/${id}/disable`, {
+    method: "PATCH"
+  });
+}
+
+export function deleteRegistrationCode(id: number) {
+  return requestJson<MessageResponse>(`/auth/registration-codes/${id}`, {
+    method: "DELETE"
+  });
+}
+
+// Document API
 export function listDocuments() {
   return requestJson<DocumentListResponse>("/documents", {
     method: "GET"
@@ -67,64 +146,15 @@ export async function uploadDocument(file: File) {
 
   const response = await fetch(`${API_BASE_URL}/documents/upload`, {
     method: "POST",
+    credentials: "include",
     body: formData
   });
 
   if (!response.ok) {
-    const text = await response.text();
-
-    try {
-      const payload = JSON.parse(text);
-      throw new Error(payload.message || payload.error || "上传失败");
-    } catch (error) {
-      if (error instanceof Error) {
-        throw error;
-      }
-
-      throw new Error(text || "上传失败");
-    }
+    throw await parseError(response, "上传失败");
   }
 
   return response.json() as Promise<DocumentResponse>;
-}
-
-export function deleteDocument(documentId: string) {
-  return requestJson<DocumentDeleteResponse>(`/documents/${documentId}`, {
-    method: "DELETE"
-  });
-}
-
-export function getDocumentHealth() {
-  return requestText("/documents/health", {
-    method: "GET"
-  });
-}
-
-export function getRagHealth() {
-  return requestText("/rag/health", {
-    method: "GET"
-  });
-}
-
-export function cancelConversation(conversationId: string) {
-  return requestText(`/rag/conversations/${conversationId}/cancel`, {
-    method: "POST"
-  });
-}
-
-export function clearConversation(conversationId: string) {
-  return requestText(`/rag/conversations/${conversationId}`, {
-    method: "DELETE"
-  });
-}
-
-interface StreamHandlers {
-  onStart?: (payload: { conversationId?: string | null }) => void;
-  onSources?: (payload: SourceReference[]) => void;
-  onDelta?: (payload: string) => void;
-  onComplete?: (payload: StreamCompletePayload) => void;
-  onCancelled?: (payload: StreamCancelledPayload) => void;
-  onError?: (message: string) => void;
 }
 
 export async function uploadDocumentStream(
@@ -141,6 +171,7 @@ export async function uploadDocumentStream(
 
   const response = await fetch(`${API_BASE_URL}/documents/upload/stream`, {
     method: "POST",
+    credentials: "include",
     body: formData,
     signal
   });
@@ -177,6 +208,47 @@ export async function uploadDocumentStream(
   });
 }
 
+export function deleteDocument(documentId: string) {
+  return requestJson<DocumentDeleteResponse>(`/documents/${documentId}`, {
+    method: "DELETE"
+  });
+}
+
+export function getDocumentHealth() {
+  return requestText("/documents/health", {
+    method: "GET"
+  });
+}
+
+export function getRagHealth() {
+  return requestText("/rag/health", {
+    method: "GET"
+  });
+}
+
+export function cancelConversation(conversationId: string) {
+  return requestText(`/rag/conversations/${conversationId}/cancel`, {
+    method: "POST"
+  });
+}
+
+export function clearConversation(conversationId: string) {
+  return requestText(`/rag/conversations/${conversationId}`, {
+    method: "DELETE"
+  });
+}
+
+interface StreamHandlers {
+  onStart?: (payload: { conversationId?: string | null }) => void;
+  onSources?: (payload: SourceReference[]) => void;
+  onThinkingDelta?: (payload: string) => void;
+  onThinkingEnd?: (payload: StreamThinkingEndPayload) => void;
+  onDelta?: (payload: string) => void;
+  onComplete?: (payload: StreamCompletePayload) => void;
+  onCancelled?: (payload: StreamCancelledPayload) => void;
+  onError?: (message: string) => void;
+}
+
 export async function streamRagAnswer(
   request: RagRequest,
   handlers: StreamHandlers,
@@ -184,6 +256,7 @@ export async function streamRagAnswer(
 ) {
   const response = await fetch(`${API_BASE_URL}/rag/ask/stream`, {
     method: "POST",
+    credentials: "include",
     headers: {
       Accept: "text/event-stream",
       "Content-Type": "application/json"
@@ -200,6 +273,16 @@ export async function streamRagAnswer(
 
     if (event === "sources") {
       handlers.onSources?.(parseJsonPayload<SourceReference[]>(data));
+      return;
+    }
+
+    if (event === "thinking_delta") {
+      handlers.onThinkingDelta?.(data);
+      return;
+    }
+
+    if (event === "thinking_end") {
+      handlers.onThinkingEnd?.(parseJsonPayload<StreamThinkingEndPayload>(data));
       return;
     }
 

@@ -43,11 +43,19 @@ export interface ErrorResponse {
 export interface StreamCompletePayload {
   conversationId?: string | null;
   cancelled?: boolean;
+  content?: string | null;
+  thinking?: string | null;
 }
 
 export interface StreamCancelledPayload {
   reason?: string;
   conversationId?: string | null;
+}
+
+export interface StreamThinkingEndPayload {
+  conversationId?: string | null;
+  thinkingEnded?: boolean;
+  reason?: string | null;
 }
 
 export type UploadProgressStage =
@@ -80,12 +88,58 @@ export interface UploadCompleteEvent extends UploadProgressEvent {
 
 export type HealthState = "checking" | "ok" | "error";
 
+export type ThinkingStatus = "idle" | "streaming" | "complete";
 
 export interface ChatMessage {
   id: string;
   role: "assistant" | "user";
   content: string;
+  thinking: string;
+  thinkingStatus: ThinkingStatus;
   createdAt: string;
   status: "complete" | "streaming" | "error" | "cancelled";
   sources: SourceReference[];
+}
+
+// Auth types
+export interface AuthUser {
+  username: string;
+  role: string;
+}
+
+export interface AuthStatusResponse {
+  authenticated: boolean;
+  user?: AuthUser | null;
+}
+
+export interface AuthSuccessResponse {
+  message: string;
+  user: AuthUser;
+}
+
+export interface RegistrationCode {
+  id: number;
+  code: string;
+  note?: string | null;
+  createdBy: string;
+  createdAt: string;
+  expiresAt?: string | null;
+  usedAt?: string | null;
+  usedBy?: string | null;
+  disabledAt?: string | null;
+  status: string;
+}
+
+export interface RegistrationCodeListResponse {
+  codes: RegistrationCode[];
+  total: number;
+}
+
+export interface RegistrationCodeCreateRequest {
+  note?: string | null;
+  expiresAt?: string | null;
+}
+
+export interface MessageResponse {
+  message: string;
 }

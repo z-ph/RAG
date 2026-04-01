@@ -10,7 +10,10 @@
             :prompt="prompt"
             :max-results="maxResults"
             :streaming="streaming"
+            :authenticated="authStatus.authenticated"
+            :auth-user="authStatus.user || null"
             @open-documents="documentDrawerOpen = true"
+            @open-auth="authDrawerOpen = true"
             @update:prompt="setPrompt"
             @update:max-results="setMaxResults"
             @send="handleSend"
@@ -19,6 +22,7 @@
           />
         </div>
 
+        <!-- Document Drawer -->
         <a-drawer
           v-model:open="documentDrawerOpen"
           placement="left"
@@ -32,15 +36,45 @@
             :documents="documents"
             :documents-loading="documentsLoading"
             :uploading="uploading"
+            :upload-progress="uploadProgress"
             :deleting-id="deletingId"
             :rag-health="ragHealth"
             :document-health="documentHealth"
             :refreshing-health="refreshingHealth"
+            :authenticated="authStatus.authenticated"
             @close="documentDrawerOpen = false"
             @refresh-documents="handleRefreshDocuments"
             @refresh-health="handleRefreshHealth"
             @upload="handleUpload"
+            @cancel-upload="cancelUpload"
             @delete-document="handleDeleteDocument"
+          />
+        </a-drawer>
+
+        <!-- Auth Drawer -->
+        <a-drawer
+          v-model:open="authDrawerOpen"
+          placement="right"
+          :width="authDrawerWidth"
+          :closable="false"
+          :title="null"
+          :body-style="{ padding: 0, height: '100%' }"
+          :mask-style="{ backdropFilter: 'blur(3px)' }"
+        >
+          <AuthPanel
+            :auth-status="authStatus"
+            :auth-submitting="authSubmitting"
+            :registration-codes="registrationCodes"
+            :registration-codes-loading="registrationCodesLoading"
+            :code-creating="codeCreating"
+            :code-mutating-id="codeMutatingId"
+            @close="authDrawerOpen = false"
+            @login="handleLogin"
+            @register="handleRegister"
+            @logout="handleLogout"
+            @create-code="handleCreateRegistrationCode"
+            @disable-code="handleDisableRegistrationCode"
+            @delete-code="handleDeleteRegistrationCode"
           />
         </a-drawer>
       </main>
@@ -54,9 +88,11 @@ import { message } from "ant-design-vue";
 import zhCN from "ant-design-vue/es/locale/zh_CN";
 import ChatWorkspace from "./components/ChatWorkspace.vue";
 import DocumentSidebar from "./components/DocumentSidebar.vue";
+import AuthPanel from "./components/AuthPanel.vue";
 import { useDocumentLibrary } from "./composables/useDocumentLibrary";
 import { useRagConversation } from "./composables/useRagConversation";
 import { useServiceHealth } from "./composables/useServiceHealth";
+import { useAuthSession } from "./composables/useAuthSession";
 import { useViewportWidth } from "./composables/useViewportWidth";
 
 const theme = {
@@ -71,15 +107,55 @@ const theme = {
 };
 
 const documentDrawerOpen = ref(false);
+const authDrawerOpen = ref(false);
+const { width } = useViewportWidth();
+
+const documentDrawerWidth = computed(() => {
+  if (width.value >= 1200) return "32vw";
+  if (width.value >= 992) return "38vw";
+  if (width.value >= 768) return "46vw";
+  return "100vw";
+});
+
+const authDrawerWidth = computed(() => {
+  if (width.value >= 768) return "420px";
+  return "100vw";
+});
+
+// Auth session
+const {
+  authStatus,
+  authSubmitting,
+  registrationCodes,
+  registrationCodesLoading,
+  codeCreating,
+  codeMutatingId,
+  refreshSession,
+  refreshRegistrationCodes,
+  handleLogin,
+  handleRegister,
+  handleLogout,
+  handleCreateRegistrationCode,
+  handleDisableRegistrationCode,
+  handleDeleteRegistrationCode
+} = useAuthSession(message);
+
+// Document library
 const {
   documents,
   documentsLoading,
   uploading,
+  uploadProgress,
   deletingId,
   refreshDocuments,
-  handleUpload: uploadDocument,
-  handleDeleteDocument: deleteDocument
-} = useDocumentLibrary(message);
+  handleUpload,
+  cancelUpload,
+  handleDeleteDocument
+} = useDocumentLibrary(message, authStatus.authenticated, async () => {
+  await refreshSession(false);
+});
+
+// RAG conversation
 const {
   messages,
   prompt,
@@ -87,59 +163,25 @@ const {
   maxResults,
   setMaxResults,
   streaming,
-  handleSend: sendQuestion,
-  handleCancel: cancelQuestion,
-  handleClearConversation: clearConversation
+  handleSend,
+  handleCancel,
+  handleClearConversation
 } = useRagConversation(message);
+
+// Service health
 const {
   ragHealth,
   documentHealth,
   refreshingHealth,
   refreshHealth
 } = useServiceHealth();
-const { width } = useViewportWidth();
 
-const documentDrawerWidth = computed(() => {
-  if (width.value >= 1200) {
-    return "32vw";
-  }
-
-  if (width.value >= 992) {
-    return "38vw";
-  }
-
-  if (width.value >= 768) {
-    return "46vw";
-  }
-
-  return "100vw";
-});
-
-function handleSend() {
-  void sendQuestion();
-}
-
-function handleCancel() {
-  void cancelQuestion();
-}
-
-function handleClearConversation() {
-  void clearConversation();
-}
-
+// Handler wrappers
 function handleRefreshDocuments() {
   void refreshDocuments();
 }
 
 function handleRefreshHealth() {
   void refreshHealth();
-}
-
-function handleUpload(file: File) {
-  void uploadDocument(file);
-}
-
-function handleDeleteDocument(documentId: string) {
-  void deleteDocument(documentId);
 }
 </script>

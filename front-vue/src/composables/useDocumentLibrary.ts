@@ -1,5 +1,5 @@
-import { onMounted, ref } from "vue";
-import { deleteDocument, listDocuments, uploadDocumentStream } from "../lib/api";
+import { onMounted, ref, watch } from "vue";
+import { ApiError, deleteDocument, listDocuments, uploadDocumentStream } from "../lib/api";
 import type { DocumentListItem, UploadProgressEvent } from "../types";
 
 interface MessageApi {
@@ -7,25 +7,60 @@ interface MessageApi {
   success: (content: string) => void;
 }
 
-export function useDocumentLibrary(messageApi: MessageApi) {
+export function useDocumentLibrary(
+  messageApi: MessageApi,
+  authenticated: boolean,
+  onUnauthorized: () => Promise<void> | void
+) {
   const documents = ref<DocumentListItem[]>([]);
-  const documentsLoading = ref(true);
+  const documentsLoading = ref(false);
   const uploading = ref(false);
   const uploadProgress = ref<UploadProgressEvent | null>(null);
   const deletingId = ref<string | null>(null);
   let abortController: AbortController | null = null;
 
   onMounted(() => {
-    void refreshDocuments();
+    if (authenticated) {
+      void refreshDocuments();
+    }
+  });
+
+  // Watch for auth changes
+  watch(() => authenticated, (newAuth) => {
+    if (!newAuth) {
+      documents.value = [];
+      documentsLoading.value = false;
+      uploading.value = false;
+      uploadProgress.value = null;
+      deletingId.value = null;
+      // Cancel any ongoing upload
+      if (abortController) {
+        abortController.abort();
+        abortController = null;
+      }
+    } else {
+      void refreshDocuments();
+    }
   });
 
   async function refreshDocuments() {
+    if (!authenticated) {
+      documents.value = [];
+      return;
+    }
+
     documentsLoading.value = true;
 
     try {
       const response = await listDocuments();
       documents.value = response.documents;
     } catch (error) {
+      if (error instanceof ApiError && error.status === 401) {
+        documents.value = [];
+        await onUnauthorized();
+        return;
+      }
+
       messageApi.error(error instanceof Error ? error.message : "加载文档失败");
     } finally {
       documentsLoading.value = false;
@@ -33,6 +68,10 @@ export function useDocumentLibrary(messageApi: MessageApi) {
   }
 
   async function handleUpload(file: File) {
+    if (!authenticated) {
+      return;
+    }
+
     // Cancel any previous upload
     if (abortController) {
       abortController.abort();
@@ -69,6 +108,12 @@ export function useDocumentLibrary(messageApi: MessageApi) {
         abortController.signal
       );
     } catch (error) {
+      if (error instanceof ApiError && error.status === 401) {
+        documents.value = [];
+        await onUnauthorized();
+        return;
+      }
+
       if (error instanceof Error && error.name !== "AbortError") {
         messageApi.error(error instanceof Error ? error.message : "上传失败");
       }
@@ -87,6 +132,10 @@ export function useDocumentLibrary(messageApi: MessageApi) {
   }
 
   async function handleDeleteDocument(documentId: string) {
+    if (!authenticated) {
+      return;
+    }
+
     deletingId.value = documentId;
 
     try {
@@ -94,6 +143,12 @@ export function useDocumentLibrary(messageApi: MessageApi) {
       messageApi.success(`${response.message}，删除 ${response.deletedSegments} 段`);
       await refreshDocuments();
     } catch (error) {
+      if (error instanceof ApiError && error.status === 401) {
+        documents.value = [];
+        await onUnauthorized();
+        return;
+      }
+
       messageApi.error(error instanceof Error ? error.message : "删除失败");
     } finally {
       deletingId.value = null;

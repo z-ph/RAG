@@ -18,27 +18,56 @@
       </a-button>
     </div>
 
-    <div class="mt-4 flex flex-wrap items-center gap-2">
+    <div v-if="authenticated" class="mt-4 flex flex-wrap items-center gap-2">
       <a-upload
         accept=".pdf,.txt"
         :multiple="false"
         :show-upload-list="false"
         :before-upload="handleBeforeUpload"
       >
-        <a-button type="primary" :loading="props.uploading">
+        <a-button type="primary" :loading="props.uploading" :disabled="props.uploading">
           <template #icon>
             <LoadingOutlined v-if="props.uploading" />
             <CloudUploadOutlined v-else />
           </template>
-          上传文档
+          {{ props.uploading ? '上传中...' : '上传文档' }}
         </a-button>
       </a-upload>
-      <a-button :loading="refreshing" @click="refreshAll">
+      <a-button :loading="refreshing" :disabled="props.uploading" @click="refreshAll">
         <template #icon>
           <ReloadOutlined />
         </template>
         刷新
       </a-button>
+    </div>
+
+    <!-- Upload progress -->
+    <div v-if="props.uploading && props.uploadProgress" class="mt-4 rounded-[16px] bg-white/[0.72] px-4 py-3 shadow-[inset_0_0_0_1px_rgba(19,34,56,0.08)]">
+      <div class="flex items-center justify-between gap-2">
+        <span class="text-sm font-medium text-ink-900">
+          {{ props.uploadProgress.message }}
+        </span>
+        <a-button
+          type="text"
+          size="small"
+          danger
+          @click="emit('cancel-upload')"
+        >
+          <template #icon>
+            <StopOutlined />
+          </template>
+          取消
+        </a-button>
+      </div>
+      <a-progress
+        :percent="props.uploadProgress.percent"
+        status="active"
+        :stroke-color="{ from: '#108ee9', to: '#87d068' }"
+        class="mt-2"
+      />
+      <p v-if="props.uploadProgress.total > 0 && props.uploadProgress.current > 0" class="mt-1 text-xs text-ink-500">
+        {{ props.uploadProgress.current }} / {{ props.uploadProgress.total }}
+      </p>
     </div>
 
     <div class="my-[18px] flex flex-wrap items-center gap-3">
@@ -70,7 +99,7 @@
         <a-spin />
       </div>
       <div v-else-if="props.documents.length === 0" class="grid min-h-[180px] place-items-center">
-        <a-empty description="还没有文档，先上传一份试试" :image="Empty.PRESENTED_IMAGE_SIMPLE" />
+        <a-empty :description="authenticated ? '还没有文档，先上传一份试试' : '暂无文档'" :image="Empty.PRESENTED_IMAGE_SIMPLE" />
       </div>
       <div v-else class="flex min-h-0 flex-1 flex-col overflow-auto pr-1">
         <article
@@ -87,6 +116,7 @@
               {{ item.segmentCount }} 段
             </span>
             <a-button
+              v-if="authenticated"
               type="text"
               class="!px-0 !text-rose-500 hover:!text-rose-600"
               :loading="props.deletingId === item.documentId"
@@ -112,20 +142,23 @@ import {
   DatabaseOutlined,
   DeleteOutlined,
   LoadingOutlined,
-  ReloadOutlined
+  ReloadOutlined,
+  StopOutlined
 } from "@ant-design/icons-vue";
 import { Empty, type UploadProps } from "ant-design-vue";
-import type { DocumentListItem, HealthState } from "../types";
+import type { DocumentListItem, HealthState, UploadProgressEvent } from "../types";
 import HealthBadge from "./HealthBadge.vue";
 
 const props = defineProps<{
   documents: DocumentListItem[];
   documentsLoading: boolean;
   uploading: boolean;
+  uploadProgress: UploadProgressEvent | null;
   deletingId: string | null;
   ragHealth: HealthState;
   documentHealth: HealthState;
   refreshingHealth: boolean;
+  authenticated: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -133,6 +166,7 @@ const emit = defineEmits<{
   (event: "refresh-documents"): void;
   (event: "refresh-health"): void;
   (event: "upload", file: File): void;
+  (event: "cancel-upload"): void;
   (event: "delete-document", documentId: string): void;
 }>();
 

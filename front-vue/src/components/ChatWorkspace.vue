@@ -31,6 +31,23 @@
             </template>
             清空对话
           </a-button>
+          <!-- User button -->
+          <a-button
+            :class="[
+              '!rounded-full !px-4 !shadow-none',
+              props.authenticated
+                ? '!border-volcano-200 !bg-volcano-50/80 !text-volcano-700 hover:!border-volcano-300 hover:!text-volcano-800'
+                : '!border-ink-950/10 !bg-white/[0.72] !text-ink-700 hover:!border-accent-500/[0.25] hover:!text-accent-500'
+            ]"
+            @click="emit('open-auth')"
+          >
+            <template #icon>
+              <UserOutlined />
+            </template>
+            {{ props.authenticated && props.authUser
+              ? `${props.authUser.username} (${props.authUser.role === 'ADMIN' ? '管理' : '成员'})`
+              : '用户登录' }}
+          </a-button>
         </div>
       </div>
 
@@ -71,7 +88,8 @@ import {
   DatabaseOutlined,
   MessageOutlined,
   PauseCircleFilled,
-  SendOutlined
+  SendOutlined,
+  UserOutlined
 } from "@ant-design/icons-vue";
 import type { ChatMessage } from "../types";
 import MessageBubble from "./MessageBubble.vue";
@@ -81,10 +99,13 @@ const props = defineProps<{
   prompt: string;
   maxResults: number;
   streaming: boolean;
+  authenticated: boolean;
+  authUser: { username: string; role: string } | null;
 }>();
 
 const emit = defineEmits<{
   (event: "open-documents"): void;
+  (event: "open-auth"): void;
   (event: "update:prompt", value: string): void;
   (event: "update:maxResults", value: number): void;
   (event: "send"): void;

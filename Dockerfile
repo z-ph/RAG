@@ -43,7 +43,7 @@ RUN microdnf install -y epel-release && \
         python3-pip \
         procps-ng \
         procps && \
-    pip3 install supervisor && \
+    pip3 install -i https://pypi.tuna.tsinghua.edu.cn/simple supervisor && \
     microdnf clean all
 
 WORKDIR /app

@@ -110,7 +110,8 @@ public class DocumentController {
      */
     @PostMapping(value = "/upload/stream", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public SseEmitter uploadDocumentStream(@RequestParam("file") MultipartFile file) {
-        SseEmitter emitter = new SseEmitter(300_000L); // 5 分钟超时
+        // 1小时超时，足以处理大文件
+        SseEmitter emitter = new SseEmitter(3_600_000L);
 
         sseExecutor.execute(() -> {
             String filename = file.getOriginalFilename();

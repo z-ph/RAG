@@ -1,4 +1,5 @@
-# syntax=docker/dockerfile:1
+# Dockerfile without BuildKit syntax directive for compatibility in China
+
 FROM docker.1ms.run/node:20-alpine AS frontend-builder
 WORKDIR /workspace/frontend
 
@@ -8,17 +9,25 @@ RUN corepack enable && pnpm install --frozen-lockfile
 COPY frontend/ ./
 RUN pnpm build
 
+# 使用单独的依赖下载阶段，利用 Docker 层缓存
+FROM docker.1ms.run/maven:3.9.9-eclipse-temurin-21 AS deps-downloader
+WORKDIR /workspace
+COPY pom.xml ./
+# 预下载所有依赖（包括插件），不编译代码
+RUN mvn dependency:go-offline -B && \
+    mvn dependency:resolve-plugins -B
+
 FROM docker.1ms.run/maven:3.9.9-eclipse-temurin-21 AS backend-builder
 WORKDIR /workspace
 
-# 1. 复制 pom.xml，利用缓存挂载的 Maven 仓库
+# 从 deps-downloader 阶段复制已下载的依赖（利用层缓存）
+COPY --from=deps-downloader /root/.m2 /root/.m2
 COPY pom.xml ./
 COPY src ./src
 COPY --from=frontend-builder /workspace/frontend/dist ./src/main/resources/static
 
-# 2. 编译时使用缓存挂载（依赖只下载一次）
-RUN --mount=type=cache,target=/root/.m2 \
-    mvn -B -DskipTests package && \
+# 编译时依赖已存在，无需重新下载
+RUN mvn -B -DskipTests package && \
     find target -maxdepth 1 -type f -name '*.jar' ! -name '*.jar.original' -exec cp {} /workspace/app.jar \;
 
 # Use MySQL image as base (Oracle Linux based)

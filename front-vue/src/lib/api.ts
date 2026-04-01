@@ -5,7 +5,9 @@ import type {
   RagRequest,
   SourceReference,
   StreamCancelledPayload,
-  StreamCompletePayload
+  StreamCompletePayload,
+  UploadCompleteEvent,
+  UploadProgressEvent
 } from "../types";
 import { consumeSseStream } from "./sse";
 
@@ -123,6 +125,56 @@ interface StreamHandlers {
   onComplete?: (payload: StreamCompletePayload) => void;
   onCancelled?: (payload: StreamCancelledPayload) => void;
   onError?: (message: string) => void;
+}
+
+export async function uploadDocumentStream(
+  file: File,
+  handlers: {
+    onProgress?: (event: UploadProgressEvent) => void;
+    onComplete?: (event: UploadCompleteEvent) => void;
+    onError?: (message: string) => void;
+  },
+  signal?: AbortSignal
+): Promise<void> {
+  const formData = new FormData();
+  formData.append("file", file);
+
+  const response = await fetch(`${API_BASE_URL}/documents/upload/stream`, {
+    method: "POST",
+    body: formData,
+    signal
+  });
+
+  await consumeSseStream(response, ({ event, data }) => {
+    if (event === "progress") {
+      try {
+        const payload = parseJsonPayload<UploadProgressEvent>(data);
+        handlers.onProgress?.(payload);
+      } catch {
+        // ignore parse error
+      }
+      return;
+    }
+
+    if (event === "complete") {
+      try {
+        const payload = parseJsonPayload<UploadCompleteEvent>(data);
+        handlers.onComplete?.(payload);
+      } catch {
+        // ignore parse error
+      }
+      return;
+    }
+
+    if (event === "error") {
+      try {
+        const payload = parseJsonPayload<{ message?: string; error?: string }>(data);
+        handlers.onError?.(payload.message || payload.error || "上传失败");
+      } catch {
+        handlers.onError?.(data || "上传失败");
+      }
+    }
+  });
 }
 
 export async function streamRagAnswer(

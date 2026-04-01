@@ -201,87 +201,36 @@ export async function uploadDocumentStream(
     signal
   });
 
-  if (!response.ok) {
-    throw await parseError(response, "上传失败");
-  }
-
-  if (!response.body) {
-    throw new Error("响应体为空");
-  }
-
-  const reader = response.body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = "";
-
-  try {
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split("\n\n");
-      buffer = lines.pop() || "";
-
-      for (const line of lines) {
-        const trimmed = line.trim();
-        if (!trimmed || !trimmed.startsWith("event: ")) continue;
-
-        const eventMatch = trimmed.match(/event: (\w+)/);
-        const dataMatch = trimmed.match(/data: (.+)/s);
-
-        if (!eventMatch || !dataMatch) continue;
-
-        const eventName = eventMatch[1];
-        const data = dataMatch[1];
-
-        if (eventName === "progress") {
-          try {
-            const event = JSON.parse(data) as UploadProgressEvent;
-            handlers.onProgress?.(event);
-          } catch {
-            // ignore parse error
-          }
-        } else if (eventName === "complete") {
-          try {
-            const event = JSON.parse(data) as UploadCompleteEvent;
-            handlers.onComplete?.(event);
-            return;
-          } catch {
-            // ignore parse error
-          }
-        } else if (eventName === "error") {
-          try {
-            const event = JSON.parse(data) as { message?: string; error?: string };
-            handlers.onError?.(event.message || event.error || "上传失败");
-            return;
-          } catch {
-            handlers.onError?.(data || "上传失败");
-            return;
-          }
-        }
+  await consumeSseStream(response, ({ event, data }) => {
+    if (event === "progress") {
+      try {
+        const payload = parseJsonPayload<UploadProgressEvent>(data);
+        handlers.onProgress?.(payload);
+      } catch {
+        // ignore parse error
       }
+      return;
     }
 
-    // Process any remaining data
-    if (buffer.trim()) {
-      const trimmed = buffer.trim();
-      if (trimmed.startsWith("event: ")) {
-        const eventMatch = trimmed.match(/event: (\w+)/);
-        const dataMatch = trimmed.match(/data: (.+)/s);
+    if (event === "complete") {
+      try {
+        const payload = parseJsonPayload<UploadCompleteEvent>(data);
+        handlers.onComplete?.(payload);
+      } catch {
+        // ignore parse error
+      }
+      return;
+    }
 
-        if (eventMatch && dataMatch && eventMatch[1] === "error") {
-          try {
-            const event = JSON.parse(dataMatch[1]) as { message?: string };
-            handlers.onError?.(event.message || "上传失败");
-          } catch {
-            handlers.onError?.("上传失败");
-          }
-        }
+    if (event === "error") {
+      try {
+        const payload = parseJsonPayload<{ message?: string; error?: string }>(data);
+        handlers.onError?.(payload.message || payload.error || "上传失败");
+      } catch {
+        handlers.onError?.(data || "上传失败");
       }
     }
-  } finally {
-    reader.releaseLock();
-  }
+  });
 }
 
 interface StreamHandlers {

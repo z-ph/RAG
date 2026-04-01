@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
-import { ApiError, deleteDocument, listDocuments, uploadDocument } from "../lib/api";
-import type { DocumentListItem } from "../types";
+import { useEffect, useRef, useState } from "react";
+import { ApiError, deleteDocument, listDocuments, uploadDocumentStream } from "../lib/api";
+import type { DocumentListItem, UploadProgressEvent } from "../types";
 
 interface MessageApi {
   error: (content: string) => void;
@@ -15,14 +15,22 @@ export function useDocumentLibrary(
   const [documents, setDocuments] = useState<DocumentListItem[]>([]);
   const [documentsLoading, setDocumentsLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<UploadProgressEvent | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     if (!authenticated) {
       setDocuments([]);
       setDocumentsLoading(false);
       setUploading(false);
+      setUploadProgress(null);
       setDeletingId(null);
+      // Cancel any ongoing upload
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+        abortControllerRef.current = null;
+      }
       return;
     }
 
@@ -58,12 +66,41 @@ export function useDocumentLibrary(
       return;
     }
 
+    // Cancel any previous upload
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    abortControllerRef.current = new AbortController();
+
     setUploading(true);
+    setUploadProgress(null);
 
     try {
-      const response = await uploadDocument(file);
-      messageApi.success(`${response.filename || file.name} 已入库，切分 ${response.segmentCount} 段`);
-      await refreshDocuments();
+      await uploadDocumentStream(
+        file,
+        {
+          onProgress: (event) => {
+            setUploadProgress(event);
+          },
+          onComplete: (event) => {
+            setUploadProgress(event);
+            messageApi.success(
+              `${event.filename || file.name} 已入库，切分 ${event.segmentCount} 段`
+            );
+            setTimeout(() => {
+              setUploading(false);
+              setUploadProgress(null);
+              void refreshDocuments();
+            }, 1000);
+          },
+          onError: (errorMessage) => {
+            messageApi.error(errorMessage);
+            setUploading(false);
+            setUploadProgress(null);
+          }
+        },
+        abortControllerRef.current.signal
+      );
     } catch (error) {
       if (error instanceof ApiError && error.status === 401) {
         setDocuments([]);
@@ -71,10 +108,21 @@ export function useDocumentLibrary(
         return;
       }
 
-      messageApi.error(error instanceof Error ? error.message : "上传失败");
-    } finally {
+      if (error instanceof Error && error.name !== "AbortError") {
+        messageApi.error(error instanceof Error ? error.message : "上传失败");
+      }
       setUploading(false);
+      setUploadProgress(null);
     }
+  }
+
+  function cancelUpload() {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+    setUploading(false);
+    setUploadProgress(null);
   }
 
   async function handleDeleteDocument(documentId: string) {
@@ -105,9 +153,11 @@ export function useDocumentLibrary(
     documents,
     documentsLoading,
     uploading,
+    uploadProgress,
     deletingId,
     refreshDocuments,
     handleUpload,
+    cancelUpload,
     handleDeleteDocument
   };
 }

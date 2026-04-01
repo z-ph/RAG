@@ -70,11 +70,13 @@ function App() {
           documentsLoading={documentLibrary.documentsLoading}
           uploading={documentLibrary.uploading}
           deletingId={documentLibrary.deletingId}
+          uploadProgress={documentLibrary.uploadProgress}
           authenticated={authSession.authStatus.authenticated}
           onClose={() => setDocumentDrawerOpen(false)}
           onRefreshDocuments={documentLibrary.refreshDocuments}
           onUpload={documentLibrary.handleUpload}
           onDeleteDocument={documentLibrary.handleDeleteDocument}
+          onCancelUpload={documentLibrary.cancelUpload}
         />
       </Drawer>
 

@@ -12,7 +12,9 @@ import type {
   SourceReference,
   StreamCancelledPayload,
   StreamCompletePayload,
-  StreamThinkingEndPayload
+  StreamThinkingEndPayload,
+  UploadProgressEvent,
+  UploadCompleteEvent
 } from "../types";
 import { consumeSseStream } from "./sse";
 
@@ -178,6 +180,108 @@ export function clearConversation(conversationId: string) {
   return requestText(`/rag/conversations/${conversationId}`, {
     method: "DELETE"
   });
+}
+
+export async function uploadDocumentStream(
+  file: File,
+  handlers: {
+    onProgress?: (event: UploadProgressEvent) => void;
+    onComplete?: (event: UploadCompleteEvent) => void;
+    onError?: (message: string) => void;
+  },
+  signal?: AbortSignal
+): Promise<void> {
+  const formData = new FormData();
+  formData.append("file", file);
+
+  const response = await fetch(`${API_BASE_URL}/documents/upload/stream`, {
+    method: "POST",
+    credentials: "include",
+    body: formData,
+    signal
+  });
+
+  if (!response.ok) {
+    throw await parseError(response, "上传失败");
+  }
+
+  if (!response.body) {
+    throw new Error("响应体为空");
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split("\n\n");
+      buffer = lines.pop() || "";
+
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed || !trimmed.startsWith("event: ")) continue;
+
+        const eventMatch = trimmed.match(/event: (\w+)/);
+        const dataMatch = trimmed.match(/data: (.+)/s);
+
+        if (!eventMatch || !dataMatch) continue;
+
+        const eventName = eventMatch[1];
+        const data = dataMatch[1];
+
+        if (eventName === "progress") {
+          try {
+            const event = JSON.parse(data) as UploadProgressEvent;
+            handlers.onProgress?.(event);
+          } catch {
+            // ignore parse error
+          }
+        } else if (eventName === "complete") {
+          try {
+            const event = JSON.parse(data) as UploadCompleteEvent;
+            handlers.onComplete?.(event);
+            return;
+          } catch {
+            // ignore parse error
+          }
+        } else if (eventName === "error") {
+          try {
+            const event = JSON.parse(data) as { message?: string; error?: string };
+            handlers.onError?.(event.message || event.error || "上传失败");
+            return;
+          } catch {
+            handlers.onError?.(data || "上传失败");
+            return;
+          }
+        }
+      }
+    }
+
+    // Process any remaining data
+    if (buffer.trim()) {
+      const trimmed = buffer.trim();
+      if (trimmed.startsWith("event: ")) {
+        const eventMatch = trimmed.match(/event: (\w+)/);
+        const dataMatch = trimmed.match(/data: (.+)/s);
+
+        if (eventMatch && dataMatch && eventMatch[1] === "error") {
+          try {
+            const event = JSON.parse(dataMatch[1]) as { message?: string };
+            handlers.onError?.(event.message || "上传失败");
+          } catch {
+            handlers.onError?.("上传失败");
+          }
+        }
+      }
+    }
+  } finally {
+    reader.releaseLock();
+  }
 }
 
 interface StreamHandlers {

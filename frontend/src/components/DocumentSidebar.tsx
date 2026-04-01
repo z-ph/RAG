@@ -3,26 +3,30 @@ import {
   CloudUploadOutlined,
   DeleteOutlined,
   LoadingOutlined,
-  ReloadOutlined
+  ReloadOutlined,
+  StopOutlined
 } from "@ant-design/icons";
 import {
   Button,
   Empty,
+  Progress,
   Spin,
   Upload,
   type UploadProps
 } from "antd";
-import type { DocumentListItem } from "../types";
+import type { DocumentListItem, UploadProgressEvent } from "../types";
 
 interface DocumentSidebarProps {
   documents: DocumentListItem[];
   documentsLoading: boolean;
   uploading: boolean;
+  uploadProgress: UploadProgressEvent | null;
   deletingId: string | null;
   authenticated: boolean;
   onClose: () => void;
   onRefreshDocuments: () => Promise<void>;
   onUpload: (file: File) => Promise<void>;
+  onCancelUpload: () => void;
   onDeleteDocument: (documentId: string) => Promise<void>;
 }
 
@@ -65,17 +69,50 @@ export function DocumentSidebar(props: DocumentSidebarProps) {
               type="primary"
               icon={props.uploading ? <LoadingOutlined /> : <CloudUploadOutlined />}
               loading={props.uploading}
+              disabled={props.uploading}
             >
-              上传文档
+              {props.uploading ? "上传中..." : "上传文档"}
             </Button>
           </Upload>
           <Button
             icon={<ReloadOutlined />}
             onClick={() => void props.onRefreshDocuments()}
             loading={props.documentsLoading}
+            disabled={props.uploading}
           >
             刷新
           </Button>
+        </div>
+      )}
+
+      {props.uploading && props.uploadProgress && (
+        <div className="mt-4 rounded-[16px] bg-white/[0.72] px-4 py-3 shadow-[inset_0_0_0_1px_rgba(19,34,56,0.08)]">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-sm font-medium text-ink-900">
+              {props.uploadProgress.message}
+            </span>
+            <Button
+              type="text"
+              size="small"
+              danger
+              icon={<StopOutlined />}
+              onClick={props.onCancelUpload}
+              title="取消上传"
+            >
+              取消
+            </Button>
+          </div>
+          <Progress
+            percent={props.uploadProgress.percent}
+            status="active"
+            strokeColor={{ from: "#108ee9", to: "#87d068" }}
+            className="mt-2"
+          />
+          {props.uploadProgress.total > 0 && props.uploadProgress.current > 0 && (
+            <p className="mt-1 text-xs text-ink-500">
+              {props.uploadProgress.current} / {props.uploadProgress.total}
+            </p>
+          )}
         </div>
       )}
 

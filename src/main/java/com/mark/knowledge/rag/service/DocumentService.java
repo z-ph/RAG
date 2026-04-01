@@ -1,5 +1,6 @@
 package com.mark.knowledge.rag.service;
 
+import com.mark.knowledge.rag.dto.DocumentProgressEvent;
 import dev.langchain4j.data.document.Metadata;
 import dev.langchain4j.data.segment.TextSegment;
 import org.apache.pdfbox.Loader;
@@ -89,13 +90,17 @@ public class DocumentService {
     private int keywordCount;
 
     /**
-     * 处理输入流中的文档
+     * 处理输入流中的文档（带进度回调）
      *
      * @param inputStream 文档输入流
      * @param filename 文件名（含扩展名）
+     * @param callback 进度回调，可为 null
      * @return 处理后的文档（包含文本块）
      */
-    public ProcessedDocument processDocument(InputStream inputStream, String filename) {
+    public ProcessedDocument processDocument(
+            InputStream inputStream,
+            String filename,
+            DocumentProgressCallback callback) {
         long startTime = System.currentTimeMillis();
         ChunkSettings chunkSettings = resolveChunkSettings();
 
@@ -106,6 +111,10 @@ public class DocumentService {
         log.info("  目标分块大小: {}", chunkSettings.targetSize());
         log.info("  重叠大小: {}", chunkOverlap);
         log.info("==========================================");
+
+        if (callback != null) {
+            callback.onProgress(DocumentProgressEvent.start(filename));
+        }
 
         String documentId = UUID.randomUUID().toString();
 
@@ -129,6 +138,10 @@ public class DocumentService {
                 throw new IllegalArgumentException("文档内容为空");
             }
 
+            if (callback != null) {
+                callback.onProgress(DocumentProgressEvent.parseComplete(filename, rawContent.length()));
+            }
+
             log.info("🧹 [步骤2/4] 清洗文本并提取元数据...");
             long cleanStart = System.currentTimeMillis();
             String cleanedContent = cleanText(rawContent);
@@ -147,9 +160,18 @@ public class DocumentService {
 
             log.info("✂️  [步骤3/4] 切分文本块并做增强...");
             long splitStart = System.currentTimeMillis();
+
+            if (callback != null) {
+                callback.onProgress(DocumentProgressEvent.segmentStart(0));
+            }
+
             ChunkBuildResult chunkBuildResult = splitText(profile, filename, documentId, chunkSettings);
             List<TextSegment> segments = chunkBuildResult.segments();
             long splitTime = System.currentTimeMillis() - splitStart;
+
+            if (callback != null) {
+                callback.onProgress(DocumentProgressEvent.segmentComplete(segments.size()));
+            }
 
             log.info("✓ 文档已切分为 {} 个文本块，耗时: {} ms", segments.size(), splitTime);
             log.info("  过滤短文本: {} 个", chunkBuildResult.filteredShortCount());
@@ -180,6 +202,17 @@ public class DocumentService {
             log.error("==========================================");
             throw new RuntimeException("文档处理失败: " + e.getMessage(), e);
         }
+    }
+
+    /**
+     * 处理输入流中的文档（无回调，兼容旧代码）
+     *
+     * @param inputStream 文档输入流
+     * @param filename 文件名（含扩展名）
+     * @return 处理后的文档（包含文本块）
+     */
+    public ProcessedDocument processDocument(InputStream inputStream, String filename) {
+        return processDocument(inputStream, filename, null);
     }
 
     private ChunkBuildResult splitText(

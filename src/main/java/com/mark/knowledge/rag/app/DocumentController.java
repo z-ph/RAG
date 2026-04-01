@@ -2,9 +2,12 @@ package com.mark.knowledge.rag.app;
 
 
 import com.mark.knowledge.rag.dto.DocumentDeleteResponse;
+import com.mark.knowledge.rag.dto.DocumentProgressEvent;
 import com.mark.knowledge.rag.dto.DocumentResponse;
 import com.mark.knowledge.rag.dto.ErrorResponse;
+import com.mark.knowledge.rag.dto.ProgressStage;
 import com.mark.knowledge.rag.service.DocumentAdminService;
+import com.mark.knowledge.rag.service.DocumentProgressCallback;
 import com.mark.knowledge.rag.service.DocumentService;
 import com.mark.knowledge.rag.service.EmbeddingService;
 import org.slf4j.Logger;
@@ -14,9 +17,12 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.io.InputStream;
 import java.util.Locale;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 /**
  * 文档上传和管理控制器
@@ -32,6 +38,7 @@ public class DocumentController {
     private final DocumentService documentService;
     private final EmbeddingService embeddingService;
     private final DocumentAdminService documentAdminService;
+    private final ExecutorService sseExecutor = Executors.newCachedThreadPool();
 
     public DocumentController(
             DocumentService documentService,
@@ -96,10 +103,109 @@ public class DocumentController {
     }
 
     /**
-     * 查看已上传文档列表
+     * 上传并处理文档（SSE 流式进度）
      *
-     * @return 文档列表
+     * @param file 文档文件
+     * @return SSE Emitter
      */
+    @PostMapping(value = "/upload/stream", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public SseEmitter uploadDocumentStream(@RequestParam("file") MultipartFile file) {
+        SseEmitter emitter = new SseEmitter(300_000L); // 5 分钟超时
+
+        sseExecutor.execute(() -> {
+            String filename = file.getOriginalFilename();
+            log.info("收到 SSE 文档上传请求: {}", filename);
+
+            try {
+                if (file.isEmpty()) {
+                    emitter.send(SseEmitter.event()
+                        .name("error")
+                        .data("{\"message\": \"文件为空\", \"error\": \"无效文件\"}"));
+                    emitter.complete();
+                    return;
+                }
+
+                if (filename == null || filename.isBlank()) {
+                    emitter.send(SseEmitter.event()
+                        .name("error")
+                        .data("{\"message\": \"文件名缺失\", \"error\": \"无效文件\"}"));
+                    emitter.complete();
+                    return;
+                }
+
+                String lowerFilename = filename.toLowerCase(Locale.ROOT);
+                if (!lowerFilename.endsWith(".pdf") && !lowerFilename.endsWith(".txt")) {
+                    emitter.send(SseEmitter.event()
+                        .name("error")
+                        .data("{\"message\": \"仅支持 PDF 和 TXT 文件\", \"error\": \"不支持的文件类型\"}"));
+                    emitter.complete();
+                    return;
+                }
+
+                // 进度回调
+                DocumentProgressCallback callback = event -> {
+                    try {
+                        String json = String.format(
+                            "{\"stage\": \"%s\", \"message\": \"%s\", \"current\": %d, \"total\": %d, \"percent\": %d, \"documentId\": %s, \"filename\": %s}",
+                            event.stage().name(),
+                            event.message().replace("\"", "\\\""),
+                            event.current(),
+                            event.total(),
+                            event.percent(),
+                            event.documentId() != null ? "\"" + event.documentId() + "\"" : "null",
+                            event.filename() != null ? "\"" + event.filename() + "\"" : "null"
+                        );
+                        emitter.send(SseEmitter.event()
+                            .name("progress")
+                            .data(json));
+                    } catch (Exception e) {
+                        log.warn("发送进度事件失败", e);
+                    }
+                };
+
+                DocumentService.ProcessedDocument processed;
+                try (InputStream inputStream = file.getInputStream()) {
+                    processed = documentService.processDocument(inputStream, filename, callback);
+                }
+
+                int embeddingCount = embeddingService.storeSegments(processed.segments(), callback);
+
+                // 发送完成事件
+                String completeJson = String.format(
+                    "{\"stage\": \"%s\", \"message\": \"文档处理完成\", \"current\": 100, \"total\": 100, \"percent\": 100, \"documentId\": \"%s\", \"filename\": \"%s\", \"segmentCount\": %d}",
+                    ProgressStage.COMPLETE.name(),
+                    processed.documentId(),
+                    filename,
+                    embeddingCount
+                );
+                emitter.send(SseEmitter.event()
+                    .name("complete")
+                    .data(completeJson));
+
+                log.info("SSE 文档处理成功: {} ({} 个片段)", filename, embeddingCount);
+                emitter.complete();
+
+            } catch (Exception e) {
+                log.error("SSE 文档处理失败", e);
+                try {
+                    String errorJson = String.format(
+                        "{\"stage\": \"%s\", \"message\": \"%s\", \"error\": \"%s\"}",
+                        ProgressStage.ERROR.name(),
+                        e.getMessage().replace("\"", "\\\""),
+                        e.getClass().getSimpleName()
+                    );
+                    emitter.send(SseEmitter.event()
+                        .name("error")
+                        .data(errorJson));
+                } catch (Exception ex) {
+                    log.error("发送错误事件失败", ex);
+                }
+                emitter.completeWithError(e);
+            }
+        });
+
+        return emitter;
+    }
     @GetMapping
     public ResponseEntity<?> listDocuments() {
         try {

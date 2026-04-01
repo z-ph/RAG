@@ -1,5 +1,7 @@
 package com.mark.knowledge.rag.service;
 
+import com.mark.knowledge.rag.dto.DocumentProgressEvent;
+import com.mark.knowledge.rag.store.QdrantEmbeddingStoreFactory;
 import dev.langchain4j.data.embedding.Embedding;
 import dev.langchain4j.data.segment.TextSegment;
 import dev.langchain4j.model.embedding.EmbeddingModel;
@@ -15,8 +17,6 @@ import org.springframework.stereotype.Service;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
-
-import com.mark.knowledge.rag.store.QdrantEmbeddingStoreFactory;
 
 /**
  * 嵌入服务 - 使用当前配置的嵌入模型生成和管理嵌入向量
@@ -61,17 +61,23 @@ public class EmbeddingService {
     }
 
     /**
-     * 为文本块生成并存储嵌入向量
-     *
-     * 处理流程：
-     * 1. 使用当前配置的模型生成嵌入向量
-     * 2. 批量存储到Qdrant（批次大小可配置）
-     * 3. 记录进度和性能指标
+     * 为文本块生成并存储嵌入向量（无回调，兼容旧代码）
      *
      * @param segments 文本块列表
      * @return 成功创建的嵌入向量数量
      */
     public int storeSegments(List<TextSegment> segments) {
+        return storeSegments(segments, null);
+    }
+
+    /**
+     * 为文本块生成并存储嵌入向量（带进度回调）
+     *
+     * @param segments 文本块列表
+     * @param callback 进度回调，可为 null
+     * @return 成功创建的嵌入向量数量
+     */
+    public int storeSegments(List<TextSegment> segments, DocumentProgressCallback callback) {
         long startTime = System.currentTimeMillis();
 
         if (segments == null || segments.isEmpty()) {
@@ -83,6 +89,10 @@ public class EmbeddingService {
         log.info("  待处理文本块总数: {}", segments.size());
         log.info("==========================================");
 
+        if (callback != null) {
+            callback.onProgress(DocumentProgressEvent.embeddingGenerateStart(segments.size()));
+        }
+
         try {
             // 步骤1：生成嵌入向量
             log.info("🔢 [步骤1/2] 为 {} 个文本块生成嵌入向量...", segments.size());
@@ -90,15 +100,23 @@ public class EmbeddingService {
             int requestBatchSize = Math.max(1, embeddingRequestBatchSize);
             log.info("  Embedding请求批次大小: {}", requestBatchSize);
 
-            List<Embedding> embeddings = generateEmbeddings(segments, requestBatchSize);
+            List<Embedding> embeddings = generateEmbeddings(segments, requestBatchSize, callback);
 
             long embedTime = System.currentTimeMillis() - embedStart;
             log.info("✓ 嵌入向量生成成功，耗时: {} ms", embedTime);
             log.info("  向量维度: {}", embeddings.getFirst().dimension());
 
+            if (callback != null) {
+                callback.onProgress(DocumentProgressEvent.embeddingGenerateComplete(segments.size()));
+            }
+
             // 步骤2：存储嵌入向量
             log.info("💾 [步骤2/2] 存储嵌入向量到Qdrant...");
             long storeStart = System.currentTimeMillis();
+
+            if (callback != null) {
+                callback.onProgress(DocumentProgressEvent.embeddingStoreStart(segments.size()));
+            }
 
             int batchSize = Math.max(1, embeddingStoreBatchSize);
             int retryCount = Math.max(0, embeddingStoreMaxRetries);
@@ -130,6 +148,10 @@ public class EmbeddingService {
                     );
                     totalStored += batchCount;
 
+                    if (callback != null && segments.size() > batchSize) {
+                        callback.onProgress(DocumentProgressEvent.embeddingStoreProgress(totalStored, segments.size()));
+                    }
+
                     double progress = (endIndex * 100.0) / segments.size();
                     log.info("  进度: {}/{} 文本块 ({}%) 已存储",
                              endIndex, segments.size(), String.format("%.1f", progress));
@@ -140,6 +162,10 @@ public class EmbeddingService {
 
             long storeTime = System.currentTimeMillis() - storeStart;
             log.info("✓ 所有嵌入向量存储成功，耗时: {} ms", storeTime);
+
+            if (callback != null) {
+                callback.onProgress(DocumentProgressEvent.embeddingStoreComplete(totalStored));
+            }
 
             long totalTime = System.currentTimeMillis() - startTime;
             log.info("==========================================");
@@ -166,7 +192,10 @@ public class EmbeddingService {
         }
     }
 
-    private List<Embedding> generateEmbeddings(List<TextSegment> segments, int requestBatchSize) {
+    private List<Embedding> generateEmbeddings(
+            List<TextSegment> segments,
+            int requestBatchSize,
+            DocumentProgressCallback callback) {
         List<Embedding> embeddings = new ArrayList<>(segments.size());
 
         for (int i = 0; i < segments.size(); i += requestBatchSize) {
@@ -191,6 +220,10 @@ public class EmbeddingService {
 
             embeddings.addAll(embeddingBatch);
 
+            if (callback != null && segments.size() > requestBatchSize) {
+                callback.onProgress(DocumentProgressEvent.embeddingGenerateProgress(endIndex, segments.size()));
+            }
+
             if (segments.size() > requestBatchSize) {
                 double progress = (endIndex * 100.0) / segments.size();
                 log.info("  Embedding进度: {}/{} 文本块 ({}%) 已生成",
@@ -200,6 +233,8 @@ public class EmbeddingService {
 
         return embeddings;
     }
+
+    // 保留旧的 storeSegments 方法用于兼容...（已被新方法替代，此处删除旧方法）
 
     private QdrantEmbeddingStore writeBatchWithRetry(
             QdrantEmbeddingStore activeStore,

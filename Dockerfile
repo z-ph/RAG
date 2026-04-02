@@ -46,19 +46,7 @@ RUN mkdir -p /app/scripts
 
 COPY --from=backend-builder /workspace/app.jar /app/app.jar
 COPY docker/wait-for-mysql.sh /app/scripts/wait-for-mysql.sh
-
-# Create startup script
-RUN cat > /app/scripts/start.sh << 'SCRIPT_EOF'
-#!/bin/sh
-set -eu
-
-# Wait for MySQL first
-/app/scripts/wait-for-mysql.sh
-
-# Start application
-echo "Starting Spring Boot application..."
-exec java ${JAVA_OPTS} -jar /app/app.jar
-SCRIPT_EOF
+COPY docker/start.sh /app/scripts/start.sh
 
 # Make scripts executable
 RUN chmod +x /app/scripts/*.sh && \

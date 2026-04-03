@@ -1,6 +1,6 @@
 services:
   mysql:
-    image: docker.m.daocloud.io/mysql:8.0
+    image: docker.m.daocloud.io/mysql
     restart: unless-stopped
     environment:
       TZ: ${TZ:-Asia/Shanghai}

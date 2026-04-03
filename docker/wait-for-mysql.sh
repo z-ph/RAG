@@ -28,7 +28,7 @@ while ! mysqladmin ping -h "${MYSQL_HOST}" -P "${MYSQL_PORT}" -u "${MYSQL_USERNA
 done
 
 echo "MySQL is alive, waiting for database to be ready..."
-sleep 3
+sleep 10
 
 # Then wait for actual database connectivity with a query
 attempts=0

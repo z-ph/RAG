@@ -10,14 +10,14 @@ COPY frontend/ ./
 RUN pnpm build
 
 # 使用单独的依赖下载阶段，利用 Docker 层缓存
-FROM docker.1ms.run/maven:3.9.9-eclipse-temurin-21 AS deps-downloader
+FROM docker.m.daocloud.io/maven:3.9.9-eclipse-temurin-21 AS deps-downloader
 WORKDIR /workspace
 COPY pom.xml ./
 # 预下载所有依赖（包括插件），不编译代码
 RUN mvn dependency:go-offline -B && \
     mvn dependency:resolve-plugins -B
 
-FROM docker.1ms.run/maven:3.9.9-eclipse-temurin-21 AS backend-builder
+FROM docker.m.daocloud.io/maven:3.9.9-eclipse-temurin-21 AS backend-builder
 WORKDIR /workspace
 
 # 从 deps-downloader 阶段复制已下载的依赖（利用层缓存）

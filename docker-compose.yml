@@ -30,6 +30,7 @@ services:
       TZ: ${TZ:-Asia/Shanghai}
       JAVA_OPTS: ${JAVA_OPTS:-}
       # MySQL connection - use service name
+      MYSQL_URL: jdbc:mysql://mysql:3306/${MYSQL_DATABASE:-knowledge_rag}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Shanghai&characterEncoding=utf8
       MYSQL_HOST: mysql
       MYSQL_PORT: 3306
       MYSQL_DATABASE: ${MYSQL_DATABASE:-knowledge_rag}

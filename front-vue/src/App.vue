@@ -53,6 +53,25 @@
           />
         </a-drawer>
 
+        <!-- Document Detail Drawer -->
+        <a-drawer
+          :open="!!viewingDocument"
+          placement="left"
+          :width="documentDrawerWidth"
+          :closable="false"
+          :title="null"
+          :body-style="{ padding: 0, height: '100%' }"
+          :mask-style="{ backdropFilter: 'blur(3px)' }"
+          @close="handleCloseDocumentDetail"
+        >
+          <DocumentDetail
+            :detail="viewingDocument"
+            :loading="viewingLoading"
+            @close="handleCloseDocumentDetail"
+            @download="handleDownloadDocument"
+          />
+        </a-drawer>
+
         <!-- Auth Drawer -->
         <a-drawer
           v-model:open="authDrawerOpen"
@@ -90,6 +109,7 @@ import { message } from "ant-design-vue";
 import zhCN from "ant-design-vue/es/locale/zh_CN";
 import ChatWorkspace from "./components/ChatWorkspace.vue";
 import DocumentSidebar from "./components/DocumentSidebar.vue";
+import DocumentDetail from "./components/DocumentDetail.vue";
 import AuthPanel from "./components/AuthPanel.vue";
 import { useDocumentLibrary } from "./composables/useDocumentLibrary";
 import { useRagConversation } from "./composables/useRagConversation";
@@ -154,7 +174,10 @@ const {
   cancelUpload,
   handleDeleteDocument,
   handleViewDocument,
-  handleDownloadDocument
+  handleDownloadDocument,
+  viewingDocument,
+  viewingLoading,
+  handleCloseDocumentDetail
 } = useDocumentLibrary(message, authStatus.authenticated, async () => {
   await refreshSession(false);
 });

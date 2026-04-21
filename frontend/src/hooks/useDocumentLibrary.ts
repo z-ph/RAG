@@ -17,6 +17,8 @@ export function useDocumentLibrary(
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<UploadProgressEvent | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [viewingDocument, setViewingDocument] = useState<PublicDocumentDetailResponse | null>(null);
+  const [viewingLoading, setViewingLoading] = useState(false);
   const abortControllerRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
@@ -149,13 +151,20 @@ export function useDocumentLibrary(
     }
   }
 
-  async function handleViewDocument(documentId: string): Promise<PublicDocumentDetailResponse | null> {
+  async function handleViewDocument(documentId: string) {
+    setViewingLoading(true);
     try {
-      return await getPublicDocumentDetail(documentId);
+      const detail = await getPublicDocumentDetail(documentId);
+      setViewingDocument(detail);
     } catch (error) {
       messageApi.error(error instanceof Error ? error.message : "获取文档详情失败");
-      return null;
+    } finally {
+      setViewingLoading(false);
     }
+  }
+
+  function handleCloseDocumentDetail() {
+    setViewingDocument(null);
   }
 
   function handleDownloadDocument(documentId: string) {
@@ -173,6 +182,9 @@ export function useDocumentLibrary(
     cancelUpload,
     handleDeleteDocument,
     handleViewDocument,
-    handleDownloadDocument
+    handleDownloadDocument,
+    viewingDocument,
+    viewingLoading,
+    handleCloseDocumentDetail
   };
 }

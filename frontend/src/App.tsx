@@ -2,6 +2,7 @@ import { useState } from "react";
 import { App as AntdApp, Drawer, Grid } from "antd";
 import { ChatWorkspace } from "./components/ChatWorkspace";
 import { DocumentSidebar } from "./components/DocumentSidebar";
+import { DocumentDetail } from "./components/DocumentDetail";
 import { AuthPanel } from "./components/AuthPanel";
 import { useAuthSession } from "./hooks/useAuthSession";
 import { useDocumentLibrary } from "./hooks/useDocumentLibrary";
@@ -79,6 +80,28 @@ function App() {
           onCancelUpload={documentLibrary.cancelUpload}
           onViewDocument={documentLibrary.handleViewDocument}
           onDownloadDocument={documentLibrary.handleDownloadDocument}
+        />
+      </Drawer>
+
+      <Drawer
+        open={!!documentLibrary.viewingDocument}
+        onClose={documentLibrary.handleCloseDocumentDetail}
+        placement="left"
+        width={drawerWidth}
+        closable={false}
+        title={null}
+        classNames={{
+          mask: "!backdrop-blur-[3px]",
+          wrapper: "!shadow-none",
+          section: "!bg-[#fffaf4]",
+          body: "!h-full !p-0"
+        }}
+      >
+        <DocumentDetail
+          detail={documentLibrary.viewingDocument}
+          loading={documentLibrary.viewingLoading}
+          onClose={documentLibrary.handleCloseDocumentDetail}
+          onDownload={documentLibrary.handleDownloadDocument}
         />
       </Drawer>
 

@@ -201,7 +201,7 @@ public class DocumentAdminService {
     }
 
     private String extractTextContent(Map<String, Object> payload) {
-        for (String key : List.of("text_content", "text")) {
+        for (String key : List.of("text_segment", "text_content", "text")) {
             String value = asString(payload.get(key));
             if (value != null && !value.isBlank()) {
                 return value;

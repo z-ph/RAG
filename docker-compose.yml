@@ -42,7 +42,7 @@ services:
       # LLM configuration
       LLM_CHAT_PROVIDER: ${LLM_CHAT_PROVIDER:-ollama}
       LLM_EMBEDDING_PROVIDER: ${LLM_EMBEDDING_PROVIDER:-ollama}
-      LLM_TIMEOUT: ${LLM_TIMEOUT:-120s}
+      LLM_TIMEOUT: ${LLM_TIMEOUT:-300s}
       OLLAMA_CHAT_BASE_URL: ${OLLAMA_CHAT_BASE_URL:-http://host.docker.internal:11434}
       OLLAMA_EMBEDDING_BASE_URL: ${OLLAMA_EMBEDDING_BASE_URL:-http://host.docker.internal:11434}
       OLLAMA_CHAT_MODEL: ${OLLAMA_CHAT_MODEL:-qwen2.5:7b}

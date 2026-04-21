@@ -50,10 +50,10 @@ export function DocumentSidebar(props: DocumentSidebarProps) {
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
           <p className="text-xs font-bold uppercase tracking-[0.12em] text-ink-500">
-            文档控制台
+            文档集合
           </p>
           <h2 className="mt-1 text-lg font-semibold text-ink-950">
-            管理知识库文档
+            浏览和下载知识库文档
           </h2>
         </div>
         <Button
@@ -62,7 +62,7 @@ export function DocumentSidebar(props: DocumentSidebarProps) {
           className="!text-ink-500 hover:!bg-white/[0.8] hover:!text-ink-950"
           icon={<CloseOutlined />}
           onClick={props.onClose}
-          title="关闭文档控制台"
+          title="关闭文档集合"
         />
       </div>
 

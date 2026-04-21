@@ -4,6 +4,7 @@ package com.mark.knowledge.rag.app;
 import com.mark.knowledge.rag.dto.DocumentDeleteResponse;
 import com.mark.knowledge.rag.dto.DocumentProgressEvent;
 import com.mark.knowledge.rag.dto.DocumentResponse;
+import com.mark.knowledge.rag.dto.DownloadUrlResponse;
 import com.mark.knowledge.rag.dto.ErrorResponse;
 import com.mark.knowledge.rag.dto.ProgressStage;
 import com.mark.knowledge.rag.dto.PublicDocumentDetailResponse;
@@ -253,6 +254,36 @@ public class DocumentController {
         }
     }
 
+    /**
+     * 获取临时下载链接（返回 JSON 响应）
+     */
+    @GetMapping("/public/{documentId}/download-url")
+    public ResponseEntity<?> getDownloadUrl(@PathVariable String documentId) {
+        try {
+            PublicDocumentDetailResponse detail = documentAdminService.getPublicDocumentDetail(documentId);
+            if (detail == null) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(new ErrorResponse("未找到文档", "文档不存在"));
+            }
+
+            Path filePath = fileStorageService.getFilePath(documentId, detail.filename());
+            if (filePath == null) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(new ErrorResponse("文件不存在", "原始文件未找到"));
+            }
+
+            String downloadUrl = "/api/documents/public/" + documentId + "/download";
+            return ResponseEntity.ok(new DownloadUrlResponse(downloadUrl, detail.filename()));
+        } catch (Exception e) {
+            log.error("获取下载链接失败：{}", documentId, e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(new ErrorResponse("获取链接失败", e.getMessage()));
+        }
+    }
+
+    /**
+     * 执行文件下载
+     */
     @GetMapping("/public/{documentId}/download")
     public ResponseEntity<?> downloadFile(@PathVariable String documentId) {
         try {

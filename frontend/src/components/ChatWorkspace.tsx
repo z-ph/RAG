@@ -35,7 +35,7 @@ export function ChatWorkspace(props: ChatWorkspaceProps) {
               icon={<DatabaseOutlined />}
               onClick={props.onOpenDocuments}
             >
-              文档控制台
+              文档集合
             </Button>
             <Select
               value={props.maxResults}

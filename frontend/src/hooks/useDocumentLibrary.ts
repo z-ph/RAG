@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { ApiError, deleteDocument, getDocumentDownloadUrl, getPublicDocumentDetail, listDocuments, uploadDocumentStream } from "../lib/api";
+import { API_BASE_URL, ApiError, deleteDocument, getDocumentDownloadLink, getPublicDocumentDetail, listDocuments, listPublicDocuments, uploadDocumentStream } from "../lib/api";
 import type { DocumentListItem, PublicDocumentDetailResponse, UploadProgressEvent } from "../types";
 
 interface MessageApi {
@@ -22,34 +22,20 @@ export function useDocumentLibrary(
   const abortControllerRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
-    if (!authenticated) {
-      setDocuments([]);
-      setDocumentsLoading(false);
-      setUploading(false);
-      setUploadProgress(null);
-      setDeletingId(null);
-      // Cancel any ongoing upload
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-        abortControllerRef.current = null;
-      }
-      return;
-    }
-
     void refreshDocuments();
   }, [authenticated]);
 
   async function refreshDocuments() {
-    if (!authenticated) {
-      setDocuments([]);
-      return;
-    }
-
     setDocumentsLoading(true);
 
     try {
-      const response = await listDocuments();
-      setDocuments(response.documents);
+      if (authenticated) {
+        const response = await listDocuments();
+        setDocuments(response.documents);
+      } else {
+        const response = await listPublicDocuments();
+        setDocuments(response.documents);
+      }
     } catch (error) {
       if (error instanceof ApiError && error.status === 401) {
         setDocuments([]);
@@ -167,8 +153,18 @@ export function useDocumentLibrary(
     setViewingDocument(null);
   }
 
-  function handleDownloadDocument(documentId: string) {
-    window.open(getDocumentDownloadUrl(documentId), "_blank");
+  async function handleDownloadDocument(documentId: string) {
+    try {
+      const response = await getDocumentDownloadLink(documentId);
+      const link = document.createElement("a");
+      link.href = `${API_BASE_URL}${response.downloadUrl}`;
+      link.download = response.filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (error) {
+      messageApi.error(error instanceof Error ? error.message : "获取下载链接失败");
+    }
   }
 
   return {

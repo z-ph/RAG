@@ -24,7 +24,6 @@ public class QdrantEmbeddingStoreFactory {
                 .host(qdrantHost)
                 .port(qdrantPort)
                 .collectionName(collectionName)
-                .textPayloadKey("text_content")
                 .build();
     }
 

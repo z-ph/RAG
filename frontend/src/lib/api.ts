@@ -22,6 +22,8 @@ import { consumeSseStream } from "./sse";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "/api";
 
+export { API_BASE_URL };
+
 export class ApiError extends Error {
   readonly status: number;
 
@@ -180,6 +182,17 @@ export function getPublicDocumentDetail(documentId: string) {
 
 export function getDocumentDownloadUrl(documentId: string) {
   return `${API_BASE_URL}/documents/public/${documentId}/download`;
+}
+
+export interface DownloadUrlResponse {
+  downloadUrl: string;
+  filename: string;
+}
+
+export function getDocumentDownloadLink(documentId: string) {
+  return requestJson<DownloadUrlResponse>(`/documents/public/${documentId}/download-url`, {
+    method: "GET"
+  });
 }
 
 export function getRagHealth() {

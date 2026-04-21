@@ -3,6 +3,10 @@ package com.mark.knowledge.rag.service;
 import com.mark.knowledge.rag.dto.DocumentDeleteResponse;
 import com.mark.knowledge.rag.dto.DocumentListItemResponse;
 import com.mark.knowledge.rag.dto.DocumentListResponse;
+import com.mark.knowledge.rag.dto.PublicDocumentDetailResponse;
+import com.mark.knowledge.rag.dto.PublicDocumentListItem;
+import com.mark.knowledge.rag.dto.PublicDocumentListResponse;
+import com.mark.knowledge.rag.dto.PublicDocumentSegment;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -44,7 +48,7 @@ public class DocumentAdminService {
     }
 
     public DocumentListResponse listDocuments() {
-        List<QdrantPoint> points = scrollAllPoints();
+        List<QdrantPoint> points = scrollAllPoints("documentId", "filename", "metadata");
         Map<String, DocumentAggregate> documents = new LinkedHashMap<>();
 
         for (QdrantPoint point : points) {
@@ -79,7 +83,7 @@ public class DocumentAdminService {
     }
 
     public DocumentDeleteResponse deleteByDocumentId(String documentId) {
-        List<Object> pointIds = scrollAllPoints().stream()
+        List<Object> pointIds = scrollAllPoints("documentId", "filename", "metadata").stream()
             .filter(point -> documentId.equals(extractDocumentId(point.payload())))
             .map(QdrantPoint::id)
             .filter(Objects::nonNull)
@@ -102,14 +106,148 @@ public class DocumentAdminService {
         return new DocumentDeleteResponse(documentId, pointIds.size(), "文档删除成功");
     }
 
-    private List<QdrantPoint> scrollAllPoints() {
+    public PublicDocumentListResponse listPublicDocuments() {
+        List<QdrantPoint> points = scrollAllPoints("documentId", "filename", "title", "category", "documentTime", "keywords");
+        Map<String, DocumentAggregate> documents = new LinkedHashMap<>();
+
+        for (QdrantPoint point : points) {
+            String documentId = extractDocumentId(point.payload());
+            if (documentId == null || documentId.isBlank()) {
+                continue;
+            }
+            String filename = extractFilename(point.payload());
+            DocumentAggregate aggregate = documents.computeIfAbsent(
+                documentId,
+                ignored -> new DocumentAggregate(documentId, filename)
+            );
+            aggregate.increment();
+            if ((aggregate.filename == null || aggregate.filename.isBlank())
+                    && filename != null && !filename.isBlank()) {
+                aggregate.filename = filename;
+            }
+            if (aggregate.title == null && point.payload().get("title") != null) {
+                aggregate.title = String.valueOf(point.payload().get("title"));
+            }
+            if (aggregate.category == null && point.payload().get("category") != null) {
+                aggregate.category = String.valueOf(point.payload().get("category"));
+            }
+            if (aggregate.documentTime == null && point.payload().get("documentTime") != null) {
+                aggregate.documentTime = String.valueOf(point.payload().get("documentTime"));
+            }
+            if (aggregate.keywords == null && point.payload().get("keywords") != null) {
+                aggregate.keywords = String.valueOf(point.payload().get("keywords"));
+            }
+        }
+
+        List<PublicDocumentListItem> items = documents.values().stream()
+            .map(item -> new PublicDocumentListItem(
+                item.documentId,
+                item.filenameOrFallback(),
+                item.title != null ? item.title : "",
+                item.category != null ? item.category : "",
+                item.documentTime != null ? item.documentTime : "",
+                item.keywords != null ? item.keywords : "",
+                item.segmentCount
+            ))
+            .toList();
+
+        return new PublicDocumentListResponse(items, items.size());
+    }
+
+    public PublicDocumentDetailResponse getPublicDocumentDetail(String documentId) {
+        List<QdrantPoint> points = scrollAllWithFullPayload();
+
+        List<QdrantPoint> docPoints = points.stream()
+            .filter(p -> documentId.equals(extractDocumentId(p.payload())))
+            .toList();
+
+        if (docPoints.isEmpty()) {
+            return null;
+        }
+
+        QdrantPoint first = docPoints.getFirst();
+        String filename = extractFilename(first.payload());
+        String title = asString(first.payload().get("title"));
+        String category = asString(first.payload().get("category"));
+        String documentTime = asString(first.payload().get("documentTime"));
+        String keywords = asString(first.payload().get("keywords"));
+
+        List<PublicDocumentSegment> segments = docPoints.stream()
+            .map(p -> {
+                String idx = asString(p.payload().get("chunkIndex"));
+                String text = extractTextContent(p.payload());
+                return new PublicDocumentSegment(
+                    idx != null ? Integer.parseInt(idx) : 0,
+                    text
+                );
+            })
+            .filter(s -> s.text() != null && !s.text().isBlank())
+            .sorted(Comparator.comparingInt(PublicDocumentSegment::chunkIndex))
+            .toList();
+
+        return new PublicDocumentDetailResponse(
+            documentId,
+            filename != null ? filename : "",
+            title != null ? title : "",
+            category != null ? category : "",
+            documentTime != null ? documentTime : "",
+            keywords != null ? keywords : "",
+            docPoints.size(),
+            segments
+        );
+    }
+
+    private String extractTextContent(Map<String, Object> payload) {
+        for (String key : List.of("text_content", "text", "")) {
+            String value = asString(payload.get(key));
+            if (value != null && !value.isBlank()) {
+                return value;
+            }
+        }
+        return null;
+    }
+
+    private List<QdrantPoint> scrollAllPoints(String... payloadFields) {
         List<QdrantPoint> points = new ArrayList<>();
         Object nextOffset = null;
 
         do {
             Map<String, Object> requestBody = new LinkedHashMap<>();
             requestBody.put("limit", SCROLL_PAGE_SIZE);
-            requestBody.put("with_payload", List.of("documentId", "filename", "metadata"));
+            requestBody.put("with_payload", List.of(payloadFields));
+            requestBody.put("with_vector", false);
+            if (nextOffset != null) {
+                requestBody.put("offset", nextOffset);
+            }
+
+            Map<String, Object> response = webClient.post()
+                .uri("/collections/" + collectionName + "/points/scroll")
+                .contentType(MediaType.APPLICATION_JSON)
+                .accept(MediaType.APPLICATION_JSON)
+                .bodyValue(requestBody)
+                .retrieve()
+                .bodyToMono(new ParameterizedTypeReference<Map<String, Object>>() {})
+                .block();
+
+            Map<String, Object> result = asMap(response != null ? response.get("result") : null);
+            List<Map<String, Object>> pointMaps = asListOfMaps(result.get("points"));
+            for (Map<String, Object> pointMap : pointMaps) {
+                points.add(new QdrantPoint(pointMap.get("id"), asMap(pointMap.get("payload"))));
+            }
+            nextOffset = result.get("next_page_offset");
+        } while (nextOffset != null);
+
+        return points;
+    }
+
+    private List<QdrantPoint> scrollAllWithFullPayload() {
+        List<QdrantPoint> points = new ArrayList<>();
+        Object nextOffset = null;
+
+        do {
+            Map<String, Object> requestBody = new LinkedHashMap<>();
+            requestBody.put("limit", SCROLL_PAGE_SIZE);
+            requestBody.put("with_payload", true);
             requestBody.put("with_vector", false);
             if (nextOffset != null) {
                 requestBody.put("offset", nextOffset);
@@ -205,6 +343,10 @@ public class DocumentAdminService {
         private final String documentId;
         private String filename;
         private int segmentCount;
+        String title;
+        String category;
+        String documentTime;
+        String keywords;
 
         private DocumentAggregate(String documentId, String filename) {
             this.documentId = documentId;

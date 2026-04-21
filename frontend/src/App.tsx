@@ -148,13 +148,15 @@ function App() {
               <Button
                 type="primary"
                 icon={<DownloadOutlined />}
-                href={documentLibrary.downloadLinkInfo!.downloadUrl}
+                onClick={() => {
+                  window.location.href = documentLibrary.downloadLinkInfo!.downloadUrl;
+                }}
               >
                 下载
               </Button>
             </Space.Compact>
             <p className="mt-2 text-xs text-ink-500">
-              点击"下载"按钮将直接下载文件
+              点击"下载"按钮将触发文件下载（部分浏览器可能不支持）
             </p>
           </div>
         )}

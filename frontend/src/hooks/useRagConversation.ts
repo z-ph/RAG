@@ -192,7 +192,8 @@ export function useRagConversation(messageApi: MessageApi) {
         await clearConversation(conversationId);
       }
 
-      setConversationId(null);
+      // 清空会话时生成新的会话 ID
+      setConversationId(`web-${crypto.randomUUID()}`);
       setMessages([]);
       messageApi.success("会话上下文已清空");
     } catch (error) {

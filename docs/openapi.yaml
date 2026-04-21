@@ -1,12 +1,13 @@
 openapi: 3.0.3
 info:
   title: Knowledge RAG API
-  version: 1.1.0
+  version: 1.2.0
   description: |
-    基于当前代码实现整理的接口规范，覆盖登录鉴权、注册码管理、文档上传管理与 RAG 问答接口。
+    基于当前代码实现整理的接口规范，覆盖登录鉴权、注册码管理、文档上传管理、公开文档浏览与 RAG 问答接口。
 
     说明：
     - 文档管理接口使用 Session Cookie 鉴权，登录成功后服务端会写入 `JSESSIONID`。
+    - 公开文档接口（`/api/documents/public/**`）无需鉴权，所有限流保护。
     - RAG 问答接口保持匿名可访问。
     - `/api/auth/register` 只能使用管理员创建的一次性注册码注册。
 servers:
@@ -17,6 +18,8 @@ tags:
     description: 登录、注册、当前会话与注册码管理
   - name: Documents
     description: 文档上传、列表查询、删除和健康检查
+  - name: Public Documents
+    description: 公开文档浏览与下载（无需鉴权）
   - name: RAG
     description: 同步问答、流式问答、会话控制和健康检查
 paths:
@@ -332,6 +335,105 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '500':
           description: 删除失败
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/documents/public:
+    get:
+      tags:
+        - Public Documents
+      summary: 获取公开文档列表
+      operationId: listPublicDocuments
+      description: 返回所有文档的元数据列表，无需鉴权。受 IP 限流保护（30 次/分钟）。
+      responses:
+        '200':
+          description: 文档列表
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublicDocumentListResponse'
+        '429':
+          description: 请求过于频繁
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: 查询失败
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/documents/public/{documentId}:
+    get:
+      tags:
+        - Public Documents
+      summary: 获取公开文档详情
+      operationId: getPublicDocumentDetail
+      description: 返回文档元数据及全部文本段落，无需鉴权。受 IP 限流保护（30 次/分钟）。
+      parameters:
+        - $ref: '#/components/parameters/DocumentId'
+      responses:
+        '200':
+          description: 文档详情
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublicDocumentDetailResponse'
+        '404':
+          description: 文档不存在
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: 请求过于频繁
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: 查询失败
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/documents/public/{documentId}/download:
+    get:
+      tags:
+        - Public Documents
+      summary: 下载文档原文件
+      operationId: downloadPublicDocument
+      description: 下载文档原始文件（PDF 或 TXT），无需鉴权。受 IP 限流保护（10 次/分钟）。
+      parameters:
+        - $ref: '#/components/parameters/DocumentId'
+      responses:
+        '200':
+          description: 文件二进制流
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+            text/plain:
+              schema:
+                type: string
+                format: binary
+        '404':
+          description: 文档或文件不存在
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: 请求过于频繁
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: 下载失败
           content:
             application/json:
               schema:
@@ -766,12 +868,99 @@ components:
       properties:
         documentId:
           type: string
+        filename:
+          type: string
+          nullable: true
         deletedSegments:
           type: integer
           format: int32
           minimum: 0
         message:
           type: string
+    PublicDocumentSegment:
+      type: object
+      required:
+        - chunkIndex
+        - text
+      properties:
+        chunkIndex:
+          type: integer
+          format: int32
+        text:
+          type: string
+    PublicDocumentListItem:
+      type: object
+      required:
+        - documentId
+        - filename
+        - title
+        - category
+        - documentTime
+        - keywords
+        - segmentCount
+      properties:
+        documentId:
+          type: string
+        filename:
+          type: string
+        title:
+          type: string
+        category:
+          type: string
+        documentTime:
+          type: string
+        keywords:
+          type: string
+        segmentCount:
+          type: integer
+          format: int32
+          minimum: 0
+    PublicDocumentListResponse:
+      type: object
+      required:
+        - documents
+        - total
+      properties:
+        documents:
+          type: array
+          items:
+            $ref: '#/components/schemas/PublicDocumentListItem'
+        total:
+          type: integer
+          format: int32
+          minimum: 0
+    PublicDocumentDetailResponse:
+      type: object
+      required:
+        - documentId
+        - filename
+        - title
+        - category
+        - documentTime
+        - keywords
+        - segmentCount
+        - segments
+      properties:
+        documentId:
+          type: string
+        filename:
+          type: string
+        title:
+          type: string
+        category:
+          type: string
+        documentTime:
+          type: string
+        keywords:
+          type: string
+        segmentCount:
+          type: integer
+          format: int32
+          minimum: 0
+        segments:
+          type: array
+          items:
+            $ref: '#/components/schemas/PublicDocumentSegment'
     ErrorResponse:
       type: object
       required:

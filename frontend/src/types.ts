@@ -30,8 +30,40 @@ export interface DocumentListResponse {
 
 export interface DocumentDeleteResponse {
   documentId: string;
+  filename?: string | null;
   deletedSegments: number;
   message: string;
+}
+
+export interface PublicDocumentSegment {
+  chunkIndex: number;
+  text: string;
+}
+
+export interface PublicDocumentListItem {
+  documentId: string;
+  filename: string;
+  title: string;
+  category: string;
+  documentTime: string;
+  keywords: string;
+  segmentCount: number;
+}
+
+export interface PublicDocumentListResponse {
+  documents: PublicDocumentListItem[];
+  total: number;
+}
+
+export interface PublicDocumentDetailResponse {
+  documentId: string;
+  filename: string;
+  title: string;
+  category: string;
+  documentTime: string;
+  keywords: string;
+  segmentCount: number;
+  segments: PublicDocumentSegment[];
 }
 
 export interface AuthUser {

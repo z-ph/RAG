@@ -65,6 +65,9 @@ rag:
   memory-cleanup-interval-ms: ${RAG_MEMORY_CLEANUP_INTERVAL_MS:300000}
   stream-timeout-ms: ${RAG_STREAM_TIMEOUT_MS:300000}
 
+upload:
+  storage-path: ${UPLOAD_STORAGE_PATH:/app/uploads}
+
 auth:
   bootstrap-admin:
     username: ${AUTH_BOOTSTRAP_ADMIN_USERNAME:admin}

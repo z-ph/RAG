@@ -5,6 +5,7 @@ import { DocumentSidebar } from "./components/DocumentSidebar";
 import { DocumentDetail } from "./components/DocumentDetail";
 import { AuthPanel } from "./components/AuthPanel";
 import { CopyOutlined, DownloadOutlined, LinkOutlined } from "@ant-design/icons";
+import { API_BASE_URL } from "./lib/api";
 import { useAuthSession } from "./hooks/useAuthSession";
 import { useDocumentLibrary } from "./hooks/useDocumentLibrary";
 import { useRagConversation } from "./hooks/useRagConversation";
@@ -130,13 +131,15 @@ function App() {
             <Space.Compact className="w-full">
               <Input
                 readOnly
-                value={documentLibrary.downloadLinkInfo.downloadUrl}
+                value={documentLibrary.downloadLinkInfo!.downloadUrl.replace(API_BASE_URL, "")}
                 className="bg-ink-50"
               />
               <Button
                 icon={<CopyOutlined />}
                 onClick={() => {
-                  navigator.clipboard.writeText(documentLibrary.downloadLinkInfo!.downloadUrl);
+                  navigator.clipboard.writeText(
+                    window.location.origin + documentLibrary.downloadLinkInfo!.downloadUrl.replace(API_BASE_URL, "")
+                  );
                   message.success("链接已复制到剪贴板");
                 }}
               >
@@ -145,14 +148,13 @@ function App() {
               <Button
                 type="primary"
                 icon={<DownloadOutlined />}
-                href={documentLibrary.downloadLinkInfo.downloadUrl}
-                target="_blank"
+                href={documentLibrary.downloadLinkInfo!.downloadUrl}
               >
                 下载
               </Button>
             </Space.Compact>
             <p className="mt-2 text-xs text-ink-500">
-              点击"下载"按钮将在新标签页打开下载链接
+              点击"下载"按钮将直接下载文件
             </p>
           </div>
         )}

@@ -158,17 +158,8 @@ export function useDocumentLibrary(
       const response = await getDocumentDownloadLink(documentId);
       const downloadUrl = `${API_BASE_URL}${response.downloadUrl}`;
 
-      // 使用 fetch 下载文件，避免跨域下载问题
-      const blob = await fetch(downloadUrl).then(res => res.blob());
-      const blobUrl = window.URL.createObjectURL(blob);
-
-      const link = document.createElement("a");
-      link.href = blobUrl;
-      link.download = response.filename;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(blobUrl);
+      // 直接跳转下载链接，由浏览器原生处理下载，避免内存问题
+      window.location.href = downloadUrl;
     } catch (error) {
       messageApi.error(error instanceof Error ? error.message : "下载失败");
     }

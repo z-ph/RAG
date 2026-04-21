@@ -6,6 +6,7 @@ import com.mark.knowledge.rag.dto.DocumentProgressEvent;
 import com.mark.knowledge.rag.dto.DocumentResponse;
 import com.mark.knowledge.rag.dto.ErrorResponse;
 import com.mark.knowledge.rag.dto.ProgressStage;
+import com.mark.knowledge.rag.dto.PublicDocumentDetailResponse;
 import com.mark.knowledge.rag.service.DocumentAdminService;
 import com.mark.knowledge.rag.service.DocumentProgressCallback;
 import com.mark.knowledge.rag.service.DocumentService;
@@ -21,6 +22,9 @@ import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.io.InputStream;
+import java.net.URLEncoder;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Locale;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -222,6 +226,65 @@ public class DocumentController {
 
         return emitter;
     }
+    @GetMapping("/public")
+    public ResponseEntity<?> listPublicDocuments() {
+        try {
+            return ResponseEntity.ok(documentAdminService.listPublicDocuments());
+        } catch (Exception e) {
+            log.error("获取公开文档列表失败", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(new ErrorResponse("查询失败", e.getMessage()));
+        }
+    }
+
+    @GetMapping("/public/{documentId}")
+    public ResponseEntity<?> getPublicDocumentDetail(@PathVariable String documentId) {
+        try {
+            PublicDocumentDetailResponse detail = documentAdminService.getPublicDocumentDetail(documentId);
+            if (detail == null) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(new ErrorResponse("未找到文档", "文档不存在"));
+            }
+            return ResponseEntity.ok(detail);
+        } catch (Exception e) {
+            log.error("获取公开文档详情失败: {}", documentId, e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(new ErrorResponse("查询失败", e.getMessage()));
+        }
+    }
+
+    @GetMapping("/public/{documentId}/download")
+    public ResponseEntity<?> downloadFile(@PathVariable String documentId) {
+        try {
+            PublicDocumentDetailResponse detail = documentAdminService.getPublicDocumentDetail(documentId);
+            if (detail == null) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(new ErrorResponse("未找到文档", "文档不存在"));
+            }
+
+            Path filePath = fileStorageService.getFilePath(documentId, detail.filename());
+            if (filePath == null) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(new ErrorResponse("文件不存在", "原始文件未找到"));
+            }
+
+            String contentType = detail.filename().toLowerCase(Locale.ROOT).endsWith(".pdf")
+                ? MediaType.APPLICATION_PDF_VALUE
+                : MediaType.TEXT_PLAIN_VALUE;
+
+            return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType(contentType))
+                .header("Content-Disposition",
+                    "attachment; filename=\"" + URLEncoder.encode(detail.filename(), "UTF-8") + "\"")
+                .header("Content-Length", String.valueOf(Files.size(filePath)))
+                .body(filePath.toFile());
+        } catch (Exception e) {
+            log.error("文件下载失败: {}", documentId, e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(new ErrorResponse("下载失败", e.getMessage()));
+        }
+    }
+
     @GetMapping
     public ResponseEntity<?> listDocuments() {
         try {
@@ -246,6 +309,13 @@ public class DocumentController {
             if (response.deletedSegments() == 0) {
                 return ResponseEntity.status(HttpStatus.NOT_FOUND)
                     .body(new ErrorResponse("未找到文档", "未找到 documentId=" + documentId + " 对应的知识文档"));
+            }
+            if (response.filename() != null) {
+                try {
+                    fileStorageService.deleteFile(documentId, response.filename());
+                } catch (Exception e) {
+                    log.warn("删除文件失败（非关键）: {}", documentId, e);
+                }
             }
             return ResponseEntity.ok(response);
         } catch (Exception e) {

@@ -5,6 +5,7 @@ package com.mark.knowledge.rag.dto;
  */
 public record DocumentDeleteResponse(
     String documentId,
+    String filename,
     int deletedSegments,
     String message
 ) {

@@ -83,15 +83,22 @@ public class DocumentAdminService {
     }
 
     public DocumentDeleteResponse deleteByDocumentId(String documentId) {
-        List<Object> pointIds = scrollAllPoints("documentId", "filename", "metadata").stream()
+        List<QdrantPoint> allPoints = scrollAllPoints("documentId", "filename");
+        List<Object> pointIds = allPoints.stream()
             .filter(point -> documentId.equals(extractDocumentId(point.payload())))
             .map(QdrantPoint::id)
             .filter(Objects::nonNull)
             .toList();
 
         if (pointIds.isEmpty()) {
-            return new DocumentDeleteResponse(documentId, 0, "未找到对应文档");
+            return new DocumentDeleteResponse(documentId, null, 0, "未找到对应文档");
         }
+
+        String filename = allPoints.stream()
+            .filter(p -> documentId.equals(extractDocumentId(p.payload())))
+            .findFirst()
+            .map(p -> extractFilename(p.payload()))
+            .orElse(null);
 
         Map<String, Object> requestBody = Map.of("points", pointIds);
         webClient.post()
@@ -103,7 +110,7 @@ public class DocumentAdminService {
             .block();
 
         log.info("已删除文档: {} ({} 个片段)", documentId, pointIds.size());
-        return new DocumentDeleteResponse(documentId, pointIds.size(), "文档删除成功");
+        return new DocumentDeleteResponse(documentId, filename, pointIds.size(), "文档删除成功");
     }
 
     public PublicDocumentListResponse listPublicDocuments() {

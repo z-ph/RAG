@@ -42,6 +42,7 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                 .requestMatchers("/api/rag/**").permitAll()
                 .requestMatchers("/api/documents/health").permitAll()
+                .requestMatchers("/api/documents/public/**").permitAll()
                 .requestMatchers("/api/auth/login", "/api/auth/register", "/api/auth/logout", "/api/auth/me").permitAll()
                 .requestMatchers("/api/auth/registration-codes/**").hasRole("ADMIN")
                 .requestMatchers("/api/documents/**").authenticated()

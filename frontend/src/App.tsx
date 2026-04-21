@@ -146,7 +146,7 @@ function App() {
                 type="primary"
                 icon={<DownloadOutlined />}
                 onClick={() => {
-                  window.location.href = documentLibrary.downloadLinkInfo!.downloadUrl;
+                  window.open(documentLibrary.downloadLinkInfo!.downloadUrl, "_blank");
                 }}
               >
                 下载

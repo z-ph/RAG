@@ -169,7 +169,8 @@ public class ChatConfig {
         var builder = OpenAiEmbeddingModel.builder()
                 .baseUrl(vllmEmbeddingBaseUrl)
                 .modelName(vllmEmbeddingModelName)
-                .timeout(timeout);
+                .timeout(timeout)
+                .encodingFormat("float");
         if (StringUtils.hasText(vllmEmbeddingApiKey)) {
             builder.apiKey(vllmEmbeddingApiKey);
         }

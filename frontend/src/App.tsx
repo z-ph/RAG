@@ -5,7 +5,6 @@ import { DocumentSidebar } from "./components/DocumentSidebar";
 import { DocumentDetail } from "./components/DocumentDetail";
 import { AuthPanel } from "./components/AuthPanel";
 import { CopyOutlined, DownloadOutlined, LinkOutlined } from "@ant-design/icons";
-import { API_BASE_URL } from "./lib/api";
 import { useAuthSession } from "./hooks/useAuthSession";
 import { useDocumentLibrary } from "./hooks/useDocumentLibrary";
 import { useRagConversation } from "./hooks/useRagConversation";
@@ -131,15 +130,13 @@ function App() {
             <Space.Compact className="w-full">
               <Input
                 readOnly
-                value={documentLibrary.downloadLinkInfo!.downloadUrl.replace(API_BASE_URL, "")}
+                value={documentLibrary.downloadLinkInfo!.downloadUrl}
                 className="bg-ink-50"
               />
               <Button
                 icon={<CopyOutlined />}
                 onClick={() => {
-                  navigator.clipboard.writeText(
-                    window.location.origin + documentLibrary.downloadLinkInfo!.downloadUrl.replace(API_BASE_URL, "")
-                  );
+                  navigator.clipboard.writeText(documentLibrary.downloadLinkInfo!.downloadUrl);
                   message.success("链接已复制到剪贴板");
                 }}
               >

@@ -12,7 +12,7 @@ interface DocumentDetailProps {
   detail: PublicDocumentDetailResponse | null;
   loading: boolean;
   onClose: () => void;
-  onDownload: (documentId: string) => void;
+  onDownload: (documentId: string, filename: string) => void;
 }
 
 export function DocumentDetail(props: DocumentDetailProps) {
@@ -74,7 +74,7 @@ export function DocumentDetail(props: DocumentDetailProps) {
           size="small"
           className="!text-green-600 hover:!text-green-700"
           icon={<DownloadOutlined />}
-          onClick={() => props.onDownload(detail.documentId)}
+          onClick={() => props.onDownload(detail.documentId, detail.filename)}
         >
           下载原文件
         </Button>

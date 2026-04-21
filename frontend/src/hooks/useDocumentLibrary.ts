@@ -7,6 +7,12 @@ interface MessageApi {
   success: (content: string) => void;
 }
 
+interface DownloadLinkInfo {
+  documentId: string;
+  filename: string;
+  downloadUrl: string;
+}
+
 export function useDocumentLibrary(
   messageApi: MessageApi,
   authenticated: boolean,
@@ -19,6 +25,7 @@ export function useDocumentLibrary(
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [viewingDocument, setViewingDocument] = useState<PublicDocumentDetailResponse | null>(null);
   const [viewingLoading, setViewingLoading] = useState(false);
+  const [downloadLinkInfo, setDownloadLinkInfo] = useState<DownloadLinkInfo | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
@@ -153,16 +160,18 @@ export function useDocumentLibrary(
     setViewingDocument(null);
   }
 
-  async function handleDownloadDocument(documentId: string) {
+  async function handleShowDownloadLink(documentId: string, filename: string) {
     try {
       const response = await getDocumentDownloadLink(documentId);
       const downloadUrl = `${API_BASE_URL}${response.downloadUrl}`;
-
-      // 直接跳转下载链接，由浏览器原生处理下载，避免内存问题
-      window.location.href = downloadUrl;
+      setDownloadLinkInfo({ documentId, filename, downloadUrl });
     } catch (error) {
-      messageApi.error(error instanceof Error ? error.message : "下载失败");
+      messageApi.error(error instanceof Error ? error.message : "获取下载链接失败");
     }
+  }
+
+  function handleCloseDownloadLink() {
+    setDownloadLinkInfo(null);
   }
 
   return {
@@ -176,7 +185,9 @@ export function useDocumentLibrary(
     cancelUpload,
     handleDeleteDocument,
     handleViewDocument,
-    handleDownloadDocument,
+    handleShowDownloadLink,
+    handleCloseDownloadLink,
+    downloadLinkInfo,
     viewingDocument,
     viewingLoading,
     handleCloseDocumentDetail

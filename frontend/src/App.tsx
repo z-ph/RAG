@@ -1,9 +1,10 @@
 import { useState } from "react";
-import { App as AntdApp, Drawer, Grid } from "antd";
+import { App as AntdApp, Drawer, Grid, Modal, Input, Space, Button } from "antd";
 import { ChatWorkspace } from "./components/ChatWorkspace";
 import { DocumentSidebar } from "./components/DocumentSidebar";
 import { DocumentDetail } from "./components/DocumentDetail";
 import { AuthPanel } from "./components/AuthPanel";
+import { CopyOutlined, DownloadOutlined, LinkOutlined } from "@ant-design/icons";
 import { useAuthSession } from "./hooks/useAuthSession";
 import { useDocumentLibrary } from "./hooks/useDocumentLibrary";
 import { useRagConversation } from "./hooks/useRagConversation";
@@ -79,7 +80,7 @@ function App() {
           onDeleteDocument={documentLibrary.handleDeleteDocument}
           onCancelUpload={documentLibrary.cancelUpload}
           onViewDocument={documentLibrary.handleViewDocument}
-          onDownloadDocument={documentLibrary.handleDownloadDocument}
+          onShowDownloadLink={documentLibrary.handleShowDownloadLink}
         />
       </Drawer>
 
@@ -101,9 +102,61 @@ function App() {
           detail={documentLibrary.viewingDocument}
           loading={documentLibrary.viewingLoading}
           onClose={documentLibrary.handleCloseDocumentDetail}
-          onDownload={documentLibrary.handleDownloadDocument}
+          onDownload={documentLibrary.handleShowDownloadLink}
         />
       </Drawer>
+
+      <Modal
+        open={!!documentLibrary.downloadLinkInfo}
+        onCancel={documentLibrary.handleCloseDownloadLink}
+        footer={null}
+        closable={false}
+        width={420}
+        title={null}
+      >
+        {documentLibrary.downloadLinkInfo && (
+          <div className="py-2">
+            <div className="mb-3 flex items-start gap-2">
+              <LinkOutlined className="mt-1 text-accent-500" />
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-ink-900">
+                  下载链接
+                </p>
+                <p className="truncate text-xs text-ink-500">
+                  {documentLibrary.downloadLinkInfo.filename}
+                </p>
+              </div>
+            </div>
+            <Space.Compact className="w-full">
+              <Input
+                readOnly
+                value={documentLibrary.downloadLinkInfo.downloadUrl}
+                className="bg-ink-50"
+              />
+              <Button
+                icon={<CopyOutlined />}
+                onClick={() => {
+                  navigator.clipboard.writeText(documentLibrary.downloadLinkInfo!.downloadUrl);
+                  message.success("链接已复制到剪贴板");
+                }}
+              >
+                复制
+              </Button>
+              <Button
+                type="primary"
+                icon={<DownloadOutlined />}
+                href={documentLibrary.downloadLinkInfo.downloadUrl}
+                target="_blank"
+              >
+                下载
+              </Button>
+            </Space.Compact>
+            <p className="mt-2 text-xs text-ink-500">
+              点击"下载"按钮将在新标签页打开下载链接
+            </p>
+          </div>
+        )}
+      </Modal>
 
       <Drawer
         open={authDrawerOpen}

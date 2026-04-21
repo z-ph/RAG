@@ -1,9 +1,11 @@
 import {
   CloseOutlined,
   CloudUploadOutlined,
+  CopyOutlined,
   DeleteOutlined,
   DownloadOutlined,
   EyeOutlined,
+  LinkOutlined,
   LoadingOutlined,
   ReloadOutlined,
   StopOutlined
@@ -11,7 +13,9 @@ import {
 import {
   Button,
   Empty,
+  Modal,
   Progress,
+  Space,
   Spin,
   Upload,
   type UploadProps
@@ -31,7 +35,7 @@ interface DocumentSidebarProps {
   onCancelUpload: () => void;
   onDeleteDocument: (documentId: string) => Promise<void>;
   onViewDocument: (documentId: string) => void;
-  onDownloadDocument: (documentId: string) => void;
+  onShowDownloadLink: (documentId: string, filename: string) => void;
 }
 
 export function DocumentSidebar(props: DocumentSidebarProps) {
@@ -176,7 +180,7 @@ export function DocumentSidebar(props: DocumentSidebarProps) {
                     type="text"
                     className="!px-0 !text-green-500 hover:!text-green-600"
                     icon={<DownloadOutlined />}
-                    onClick={() => props.onDownloadDocument(item.documentId)}
+                    onClick={() => props.onShowDownloadLink(item.documentId, item.filename)}
                   >
                     下载
                   </Button>

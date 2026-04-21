@@ -2,6 +2,8 @@ import {
   CloseOutlined,
   CloudUploadOutlined,
   DeleteOutlined,
+  DownloadOutlined,
+  EyeOutlined,
   LoadingOutlined,
   ReloadOutlined,
   StopOutlined
@@ -28,6 +30,8 @@ interface DocumentSidebarProps {
   onUpload: (file: File) => Promise<void>;
   onCancelUpload: () => void;
   onDeleteDocument: (documentId: string) => Promise<void>;
+  onViewDocument: (documentId: string) => void;
+  onDownloadDocument: (documentId: string) => void;
 }
 
 export function DocumentSidebar(props: DocumentSidebarProps) {
@@ -160,6 +164,22 @@ export function DocumentSidebar(props: DocumentSidebarProps) {
                   <span className="inline-flex rounded-full bg-ink-950/6 px-3 py-1 text-xs font-medium text-ink-700">
                     {item.segmentCount} 段
                   </span>
+                  <Button
+                    type="text"
+                    className="!px-0 !text-blue-500 hover:!text-blue-600"
+                    icon={<EyeOutlined />}
+                    onClick={() => props.onViewDocument(item.documentId)}
+                  >
+                    查看
+                  </Button>
+                  <Button
+                    type="text"
+                    className="!px-0 !text-green-500 hover:!text-green-600"
+                    icon={<DownloadOutlined />}
+                    onClick={() => props.onDownloadDocument(item.documentId)}
+                  >
+                    下载
+                  </Button>
                   {props.authenticated && (
                     <Button
                       type="text"

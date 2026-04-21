@@ -116,6 +116,26 @@
               {{ item.segmentCount }} 段
             </span>
             <a-button
+              type="text"
+              class="!px-0 !text-blue-500 hover:!text-blue-600"
+              @click="emit('view-document', item.documentId)"
+            >
+              <template #icon>
+                <EyeOutlined />
+              </template>
+              查看
+            </a-button>
+            <a-button
+              type="text"
+              class="!px-0 !text-green-500 hover:!text-green-600"
+              @click="emit('download-document', item.documentId)"
+            >
+              <template #icon>
+                <DownloadOutlined />
+              </template>
+              下载
+            </a-button>
+            <a-button
               v-if="authenticated"
               type="text"
               class="!px-0 !text-rose-500 hover:!text-rose-600"
@@ -141,6 +161,8 @@ import {
   CloudUploadOutlined,
   DatabaseOutlined,
   DeleteOutlined,
+  DownloadOutlined,
+  EyeOutlined,
   LoadingOutlined,
   ReloadOutlined,
   StopOutlined
@@ -168,6 +190,8 @@ const emit = defineEmits<{
   (event: "upload", file: File): void;
   (event: "cancel-upload"): void;
   (event: "delete-document", documentId: string): void;
+  (event: "view-document", documentId: string): void;
+  (event: "download-document", documentId: string): void;
 }>();
 
 const refreshing = computed(() => props.documentsLoading || props.refreshingHealth);

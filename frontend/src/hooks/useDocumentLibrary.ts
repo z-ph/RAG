@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { ApiError, deleteDocument, listDocuments, uploadDocumentStream } from "../lib/api";
-import type { DocumentListItem, UploadProgressEvent } from "../types";
+import { ApiError, deleteDocument, getDocumentDownloadUrl, getPublicDocumentDetail, listDocuments, uploadDocumentStream } from "../lib/api";
+import type { DocumentListItem, PublicDocumentDetailResponse, UploadProgressEvent } from "../types";
 
 interface MessageApi {
   error: (content: string) => void;
@@ -149,6 +149,19 @@ export function useDocumentLibrary(
     }
   }
 
+  async function handleViewDocument(documentId: string): Promise<PublicDocumentDetailResponse | null> {
+    try {
+      return await getPublicDocumentDetail(documentId);
+    } catch (error) {
+      messageApi.error(error instanceof Error ? error.message : "获取文档详情失败");
+      return null;
+    }
+  }
+
+  function handleDownloadDocument(documentId: string) {
+    window.open(getDocumentDownloadUrl(documentId), "_blank");
+  }
+
   return {
     documents,
     documentsLoading,
@@ -158,6 +171,8 @@ export function useDocumentLibrary(
     refreshDocuments,
     handleUpload,
     cancelUpload,
-    handleDeleteDocument
+    handleDeleteDocument,
+    handleViewDocument,
+    handleDownloadDocument
   };
 }

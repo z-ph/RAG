@@ -77,6 +77,8 @@ function App() {
           onUpload={documentLibrary.handleUpload}
           onDeleteDocument={documentLibrary.handleDeleteDocument}
           onCancelUpload={documentLibrary.cancelUpload}
+          onViewDocument={documentLibrary.handleViewDocument}
+          onDownloadDocument={documentLibrary.handleDownloadDocument}
         />
       </Drawer>
 

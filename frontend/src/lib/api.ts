@@ -5,6 +5,8 @@ import type {
   DocumentListResponse,
   DocumentResponse,
   MessageResponse,
+  PublicDocumentDetailResponse,
+  PublicDocumentListResponse,
   RagRequest,
   RegistrationCodeCreateRequest,
   RegistrationCodeListResponse,
@@ -162,6 +164,22 @@ export function getDocumentHealth() {
   return requestText("/documents/health", {
     method: "GET"
   });
+}
+
+export function listPublicDocuments() {
+  return requestJson<PublicDocumentListResponse>("/documents/public", {
+    method: "GET"
+  });
+}
+
+export function getPublicDocumentDetail(documentId: string) {
+  return requestJson<PublicDocumentDetailResponse>(`/documents/public/${documentId}`, {
+    method: "GET"
+  });
+}
+
+export function getDocumentDownloadUrl(documentId: string) {
+  return `${API_BASE_URL}/documents/public/${documentId}/download`;
 }
 
 export function getRagHealth() {

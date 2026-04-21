@@ -48,6 +48,8 @@
             @upload="handleUpload"
             @cancel-upload="cancelUpload"
             @delete-document="handleDeleteDocument"
+            @view-document="handleViewDocument"
+            @download-document="handleDownloadDocument"
           />
         </a-drawer>
 
@@ -150,7 +152,9 @@ const {
   refreshDocuments,
   handleUpload,
   cancelUpload,
-  handleDeleteDocument
+  handleDeleteDocument,
+  handleViewDocument,
+  handleDownloadDocument
 } = useDocumentLibrary(message, authStatus.authenticated, async () => {
   await refreshSession(false);
 });

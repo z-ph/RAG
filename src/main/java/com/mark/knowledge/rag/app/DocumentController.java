@@ -10,6 +10,7 @@ import com.mark.knowledge.rag.service.DocumentAdminService;
 import com.mark.knowledge.rag.service.DocumentProgressCallback;
 import com.mark.knowledge.rag.service.DocumentService;
 import com.mark.knowledge.rag.service.EmbeddingService;
+import com.mark.knowledge.rag.service.FileStorageService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -38,15 +39,18 @@ public class DocumentController {
     private final DocumentService documentService;
     private final EmbeddingService embeddingService;
     private final DocumentAdminService documentAdminService;
+    private final FileStorageService fileStorageService;
     private final ExecutorService sseExecutor = Executors.newCachedThreadPool();
 
     public DocumentController(
             DocumentService documentService,
             EmbeddingService embeddingService,
-            DocumentAdminService documentAdminService) {
+            DocumentAdminService documentAdminService,
+            FileStorageService fileStorageService) {
         this.documentService = documentService;
         this.embeddingService = embeddingService;
         this.documentAdminService = documentAdminService;
+        this.fileStorageService = fileStorageService;
     }
 
     /**
@@ -77,13 +81,19 @@ public class DocumentController {
                     .body(new ErrorResponse("不支持的文件类型", "仅支持 PDF 和 TXT 文件"));
             }
 
-            try (InputStream inputStream = file.getInputStream()) {
+            byte[] fileBytes = file.getBytes();
+
+            try (InputStream processingStream = new java.io.ByteArrayInputStream(fileBytes)) {
                 DocumentService.ProcessedDocument processed = documentService.processDocument(
-                    inputStream,
+                    processingStream,
                     filename
                 );
 
                 int embeddingCount = embeddingService.storeSegments(processed.segments());
+
+                try (InputStream storageStream = new java.io.ByteArrayInputStream(fileBytes)) {
+                    fileStorageService.saveFile(processed.documentId(), filename, storageStream);
+                }
 
                 log.info("文档处理成功: {} ({} 个片段)", filename, embeddingCount);
 
@@ -164,12 +174,17 @@ public class DocumentController {
                     }
                 };
 
+                byte[] fileBytes = file.getBytes();
                 DocumentService.ProcessedDocument processed;
-                try (InputStream inputStream = file.getInputStream()) {
-                    processed = documentService.processDocument(inputStream, filename, callback);
+                try (InputStream processingStream = new java.io.ByteArrayInputStream(fileBytes)) {
+                    processed = documentService.processDocument(processingStream, filename, callback);
                 }
 
                 int embeddingCount = embeddingService.storeSegments(processed.segments(), callback);
+
+                try (InputStream storageStream = new java.io.ByteArrayInputStream(fileBytes)) {
+                    fileStorageService.saveFile(processed.documentId(), filename, storageStream);
+                }
 
                 // 发送完成事件
                 String completeJson = String.format(

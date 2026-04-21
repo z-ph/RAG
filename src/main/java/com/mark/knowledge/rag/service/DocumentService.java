@@ -135,7 +135,9 @@ public class DocumentService {
             log.info("  解析完成，耗时: {} ms", parseTime);
 
             if (rawContent.isBlank()) {
-                throw new IllegalArgumentException("文档内容为空");
+                log.warn("PDF 文件可能是扫描版或图片格式，没有内嵌文本层");
+                log.warn("建议使用包含可复制文本的 PDF 文件");
+                throw new IllegalArgumentException("文档内容为空，该 PDF 可能是扫描版/图片格式，不支持 OCR 识别");
             }
 
             if (callback != null) {

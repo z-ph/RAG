@@ -34,6 +34,25 @@ export default defineConfig(({ mode }) => {
           changeOrigin: true
         }
       }
+    },
+    build: {
+      rollupOptions: {
+        output: {
+          manualChunks: (id) => {
+            if (id.includes("node_modules")) {
+              if (id.includes("react") && (id.includes("react-dom") || id.includes("react/cjs"))) {
+                return "vendor";
+              }
+              if (id.includes("node_modules/antd")) {
+                return "antd";
+              }
+              if (id.includes("node_modules/@ant-design")) {
+                return "icons";
+              }
+            }
+          }
+        }
+      }
     }
   };
 });

@@ -272,7 +272,7 @@ public class DocumentController {
                     .body(new ErrorResponse("文件不存在", "原始文件未找到"));
             }
 
-            String downloadUrl = "/api/documents/public/" + documentId + "/download";
+            String downloadUrl = "/documents/public/" + documentId + "/download";
             return ResponseEntity.ok(new DownloadUrlResponse(downloadUrl, detail.filename()));
         } catch (Exception e) {
             log.error("获取下载链接失败：{}", documentId, e);

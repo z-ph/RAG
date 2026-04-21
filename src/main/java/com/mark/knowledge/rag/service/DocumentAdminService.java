@@ -162,11 +162,7 @@ public class DocumentAdminService {
     }
 
     public PublicDocumentDetailResponse getPublicDocumentDetail(String documentId) {
-        List<QdrantPoint> points = scrollAllWithFullPayload();
-
-        List<QdrantPoint> docPoints = points.stream()
-            .filter(p -> documentId.equals(extractDocumentId(p.payload())))
-            .toList();
+        List<QdrantPoint> docPoints = scrollFiltered(documentId);
 
         if (docPoints.isEmpty()) {
             return null;
@@ -205,7 +201,7 @@ public class DocumentAdminService {
     }
 
     private String extractTextContent(Map<String, Object> payload) {
-        for (String key : List.of("text_content", "text", "")) {
+        for (String key : List.of("text_content", "text")) {
             String value = asString(payload.get(key));
             if (value != null && !value.isBlank()) {
                 return value;
@@ -247,15 +243,23 @@ public class DocumentAdminService {
         return points;
     }
 
-    private List<QdrantPoint> scrollAllWithFullPayload() {
+    private List<QdrantPoint> scrollFiltered(String documentId) {
         List<QdrantPoint> points = new ArrayList<>();
         Object nextOffset = null;
+
+        Map<String, Object> filter = Map.of(
+            "must", List.of(Map.of(
+                "key", "documentId",
+                "match", Map.of("value", documentId)
+            ))
+        );
 
         do {
             Map<String, Object> requestBody = new LinkedHashMap<>();
             requestBody.put("limit", SCROLL_PAGE_SIZE);
             requestBody.put("with_payload", true);
             requestBody.put("with_vector", false);
+            requestBody.put("filter", filter);
             if (nextOffset != null) {
                 requestBody.put("offset", nextOffset);
             }

@@ -48,8 +48,9 @@ public class FileStorageService {
     public Path getFilePath(String documentId, String filename) {
         validateDocumentId(documentId);
         validateFilename(filename);
-        Path file = storageRoot.resolve(documentId).resolve(filename).normalize();
-        if (!file.startsWith(storageRoot)) {
+        Path docDir = storageRoot.resolve(documentId);
+        Path file = docDir.resolve(filename).normalize();
+        if (!file.startsWith(docDir)) {
             throw new IllegalArgumentException("非法文件路径");
         }
         if (!Files.isRegularFile(file)) {
@@ -63,8 +64,12 @@ public class FileStorageService {
         if (file != null) {
             Files.deleteIfExists(file);
             Path docDir = file.getParent();
-            if (Files.isDirectory(docDir) && Files.list(docDir).findFirst().isEmpty()) {
-                Files.deleteIfExists(docDir);
+            if (Files.isDirectory(docDir)) {
+                try (var entries = Files.list(docDir)) {
+                    if (entries.findFirst().isEmpty()) {
+                        Files.deleteIfExists(docDir);
+                    }
+                }
             }
             log.info("文件已删除: {}", file);
         }

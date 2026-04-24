@@ -380,11 +380,10 @@ public class RagService {
     }
 
     private int resolveRequestedMaxResults(RagRequest request) {
-        int configuredMaxResults = Math.max(1, maxResults);
-        if (request.maxResults() == null || request.maxResults() < 1) {
-            return configuredMaxResults;
+        if (request.maxResults() != null && request.maxResults() >= 1) {
+            return request.maxResults();
         }
-        return Math.min(request.maxResults(), configuredMaxResults);
+        return Math.max(1, maxResults);
     }
 
     private int resolveCandidateMaxResults(int requestedMaxResults) {

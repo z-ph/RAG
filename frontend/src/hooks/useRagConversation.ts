@@ -5,6 +5,7 @@ import {
   createStreamingAssistantMessage,
   createUserMessage
 } from "../lib/chat";
+import { clearStoredConversation, loadConversation, saveConversation } from "../lib/chatHistory";
 import type { ChatMessage } from "../types";
 
 interface MessageApi {
@@ -15,9 +16,12 @@ interface MessageApi {
 }
 
 export function useRagConversation(messageApi: MessageApi) {
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const stored = useRef(loadConversation());
+  const [messages, setMessages] = useState<ChatMessage[]>(stored.current?.messages ?? []);
   const [prompt, setPrompt] = useState("");
-  const [conversationId, setConversationId] = useState<string | null>(null);
+  const [conversationId, setConversationId] = useState<string | null>(
+    stored.current?.conversationId ?? null
+  );
   const [maxResults, setMaxResults] = useState(64);
   const [streaming, setStreaming] = useState(false);
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -28,6 +32,10 @@ export function useRagConversation(messageApi: MessageApi) {
     },
     []
   );
+
+  useEffect(() => {
+    saveConversation(messages, conversationId);
+  }, [messages, conversationId]);
 
   function updateMessage(
     targetId: string,
@@ -199,7 +207,7 @@ export function useRagConversation(messageApi: MessageApi) {
         await clearConversation(conversationId);
       }
 
-      // 清空会话时生成新的会话 ID
+      clearStoredConversation();
       setConversationId(`web-${crypto.randomUUID()}`);
       setMessages([]);
       messageApi.success("会话上下文已清空");

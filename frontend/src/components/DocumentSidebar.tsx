@@ -40,7 +40,7 @@ interface DocumentSidebarProps {
 
 export function DocumentSidebar(props: DocumentSidebarProps) {
   const uploadProps: UploadProps = {
-    accept: ".pdf,.txt",
+    accept: ".pdf,.txt,.docx,.xlsx,.pptx,.jpg,.jpeg,.png",
     multiple: false,
     showUploadList: false,
     beforeUpload(file) {

@@ -29,6 +29,7 @@ import java.net.URLEncoder;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Locale;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -42,6 +43,9 @@ import java.util.concurrent.Executors;
 public class DocumentController {
 
     private static final Logger log = LoggerFactory.getLogger(DocumentController.class);
+    private static final Set<String> ALLOWED_EXTENSIONS = Set.of(
+        ".pdf", ".txt", ".docx", ".xlsx", ".pptx", ".jpg", ".jpeg", ".png"
+    );
 
     private final DocumentService documentService;
     private final EmbeddingService embeddingService;
@@ -82,10 +86,9 @@ public class DocumentController {
                     .body(new ErrorResponse("无效文件", "文件名缺失"));
             }
 
-            String lowerFilename = filename.toLowerCase(Locale.ROOT);
-            if (!lowerFilename.endsWith(".pdf") && !lowerFilename.endsWith(".txt")) {
+            if (!isAllowedExtension(filename)) {
                 return ResponseEntity.badRequest()
-                    .body(new ErrorResponse("不支持的文件类型", "仅支持 PDF 和 TXT 文件"));
+                    .body(new ErrorResponse("不支持的文件类型", "支持 PDF, TXT, DOCX, XLSX, PPTX, JPG, PNG 文件"));
             }
 
             byte[] fileBytes = file.getBytes();
@@ -151,11 +154,10 @@ public class DocumentController {
                     return;
                 }
 
-                String lowerFilename = filename.toLowerCase(Locale.ROOT);
-                if (!lowerFilename.endsWith(".pdf") && !lowerFilename.endsWith(".txt")) {
+                if (!isAllowedExtension(filename)) {
                     emitter.send(SseEmitter.event()
                         .name("error")
-                        .data("{\"message\": \"仅支持 PDF 和 TXT 文件\", \"error\": \"不支持的文件类型\"}"));
+                        .data("{\"message\": \"支持 PDF, TXT, DOCX, XLSX, PPTX, JPG, PNG 文件\", \"error\": \"不支持的文件类型\"}"));
                     emitter.complete();
                     return;
                 }
@@ -301,9 +303,7 @@ public class DocumentController {
                     .body(new ErrorResponse("文件不存在", "原始文件未找到"));
             }
 
-            String contentType = detail.filename().toLowerCase(Locale.ROOT).endsWith(".pdf")
-                ? MediaType.APPLICATION_PDF_VALUE
-                : MediaType.TEXT_PLAIN_VALUE;
+            String contentType = resolveContentType(detail.filename());
 
             Resource resource = new FileSystemResource(filePath);
             return ResponseEntity.ok()
@@ -367,5 +367,22 @@ public class DocumentController {
     @GetMapping("/health")
     public ResponseEntity<String> health() {
         return ResponseEntity.ok("文档服务运行正常");
+    }
+
+    private String resolveContentType(String filename) {
+        String lower = filename.toLowerCase(Locale.ROOT);
+        if (lower.endsWith(".pdf")) return MediaType.APPLICATION_PDF_VALUE;
+        if (lower.endsWith(".txt")) return MediaType.TEXT_PLAIN_VALUE;
+        if (lower.endsWith(".docx")) return "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+        if (lower.endsWith(".xlsx")) return "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+        if (lower.endsWith(".pptx")) return "application/vnd.openxmlformats-officedocument.presentationml.presentation";
+        if (lower.endsWith(".jpg") || lower.endsWith(".jpeg")) return MediaType.IMAGE_JPEG_VALUE;
+        if (lower.endsWith(".png")) return MediaType.IMAGE_PNG_VALUE;
+        return MediaType.APPLICATION_OCTET_STREAM_VALUE;
+    }
+
+    private boolean isAllowedExtension(String filename) {
+        String lower = filename.toLowerCase(Locale.ROOT);
+        return ALLOWED_EXTENSIONS.stream().anyMatch(lower::endsWith);
     }
 }

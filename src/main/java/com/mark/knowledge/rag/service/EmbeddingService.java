@@ -61,8 +61,6 @@ public class EmbeddingService {
     }
 
     /**
-     * 为文本块生成并存储嵌入向量（无回调，兼容旧代码）
-     *
      * @param segments 文本块列表
      * @return 成功创建的嵌入向量数量
      */
@@ -234,7 +232,6 @@ public class EmbeddingService {
         return embeddings;
     }
 
-    // 保留旧的 storeSegments 方法用于兼容...（已被新方法替代，此处删除旧方法）
 
     private QdrantEmbeddingStore writeBatchWithRetry(
             QdrantEmbeddingStore activeStore,
@@ -363,13 +360,21 @@ public class EmbeddingService {
     }
 
     private void closeQuietly(QdrantEmbeddingStore store) {
-        if (store == null) {
-            return;
-        }
+        QdrantStoreUtils.closeQuietly(store);
+    }
+
+    /**
+     * 更新单个片段的文本和嵌入向量（通过 gRPC upsert）
+     */
+    public void updateSegment(String pointId, String newText) {
+        Embedding newEmbedding = embeddingModel.embed(newText).content();
+        TextSegment newSegment = TextSegment.from(newText);
+        QdrantEmbeddingStore store = embeddingStoreFactory.createStore();
         try {
-            store.close();
-        } catch (Exception e) {
-            log.debug("关闭Qdrant store时忽略异常: {}", e.getMessage());
+            store.add(newEmbedding, newSegment);
+            log.info("片段嵌入向量已更新: pointId={}", pointId);
+        } finally {
+            closeQuietly(store);
         }
     }
 }

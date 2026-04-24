@@ -3,6 +3,10 @@ package com.mark.knowledge.rag.service;
 import com.mark.knowledge.rag.dto.DocumentProgressEvent;
 import dev.langchain4j.data.document.Metadata;
 import dev.langchain4j.data.segment.TextSegment;
+import com.mark.knowledge.rag.service.parsers.DocxParser;
+import com.mark.knowledge.rag.service.parsers.XlsxParser;
+import com.mark.knowledge.rag.service.parsers.PptxParser;
+import dev.langchain4j.model.chat.ChatModel;
 import org.apache.pdfbox.Loader;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.text.PDFTextStripper;
@@ -86,8 +90,14 @@ public class DocumentService {
     @Value("${rag.min-text-length:80}")
     private int minTextLength;
 
+    private final ChatModel chatModel;
+
     @Value("${rag.keyword-count:6}")
     private int keywordCount;
+
+    public DocumentService(ChatModel chatModel) {
+        this.chatModel = chatModel;
+    }
 
     /**
      * 处理输入流中的文档（带进度回调）
@@ -123,12 +133,25 @@ public class DocumentService {
             long parseStart = System.currentTimeMillis();
 
             String rawContent;
-            if (filename.toLowerCase(Locale.ROOT).endsWith(".pdf")) {
+            String lowerFilename = filename.toLowerCase(Locale.ROOT);
+            if (lowerFilename.endsWith(".pdf")) {
                 rawContent = parsePdf(inputStream);
-                log.info("✓ PDF解析成功 ({} 字符)", rawContent.length());
+                log.info("PDF解析成功 ({} 字符)", rawContent.length());
+            } else if (lowerFilename.endsWith(".docx")) {
+                rawContent = DocxParser.parse(inputStream);
+                log.info("DOCX解析成功 ({} 字符)", rawContent.length());
+            } else if (lowerFilename.endsWith(".xlsx")) {
+                rawContent = XlsxParser.parse(inputStream);
+                log.info("XLSX解析成功 ({} 字符)", rawContent.length());
+            } else if (lowerFilename.endsWith(".pptx")) {
+                rawContent = PptxParser.parse(inputStream);
+                log.info("PPTX解析成功 ({} 字符)", rawContent.length());
+            } else if (lowerFilename.endsWith(".jpg") || lowerFilename.endsWith(".jpeg") || lowerFilename.endsWith(".png")) {
+                rawContent = com.mark.knowledge.rag.service.parsers.OcrParser.parse(inputStream, chatModel);
+                log.info("图片OCR解析成功 ({} 字符)", rawContent.length());
             } else {
                 rawContent = parseText(inputStream);
-                log.info("✓ 文本解析成功 ({} 字符)", rawContent.length());
+                log.info("文本解析成功 ({} 字符)", rawContent.length());
             }
 
             long parseTime = System.currentTimeMillis() - parseStart;

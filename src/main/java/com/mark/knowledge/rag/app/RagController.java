@@ -5,12 +5,15 @@ import com.mark.knowledge.rag.dto.RagRequest;
 import com.mark.knowledge.rag.dto.RagResponse;
 import com.mark.knowledge.rag.service.ConversationMemoryService;
 import com.mark.knowledge.rag.service.RagService;
+import com.mark.knowledge.rag.service.parsers.OcrParser;
+import dev.langchain4j.model.chat.ChatModel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.MediaType;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 /**
@@ -26,10 +29,12 @@ public class RagController {
 
     private final RagService ragService;
     private final ConversationMemoryService conversationMemoryService;
+    private final ChatModel chatModel;
 
-    public RagController(RagService ragService, ConversationMemoryService conversationMemoryService) {
+    public RagController(RagService ragService, ConversationMemoryService conversationMemoryService, ChatModel chatModel) {
         this.ragService = ragService;
         this.conversationMemoryService = conversationMemoryService;
+        this.chatModel = chatModel;
     }
 
     /**
@@ -123,5 +128,37 @@ public class RagController {
     @GetMapping("/health")
     public ResponseEntity<String> health() {
         return ResponseEntity.ok("RAG 服务运行正常");
+    }
+
+    @PostMapping(value = "/ask/with-image", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<?> askWithImage(
+            @RequestParam("image") MultipartFile image,
+            @RequestParam("question") String question,
+            @RequestParam(value = "conversationId", required = false) String conversationId) {
+        try {
+            if (image.isEmpty()) {
+                return ResponseEntity.badRequest()
+                    .body(new ErrorResponse("无效文件", "图片为空"));
+            }
+            if (question == null || question.isBlank()) {
+                return ResponseEntity.badRequest()
+                    .body(new ErrorResponse("无效请求", "问题不能为空"));
+            }
+
+            String ocrText;
+            try (var is = image.getInputStream()) {
+                ocrText = OcrParser.parse(is, chatModel);
+            }
+
+            String enrichedQuestion = "以下是从图片中提取的内容：\n\n" + ocrText + "\n\n用户问题：" + question;
+            RagRequest ragRequest = new RagRequest(enrichedQuestion, conversationId, null);
+            RagResponse response = ragService.ask(ragRequest);
+            return ResponseEntity.ok(response);
+
+        } catch (Exception e) {
+            log.error("图片问答失败", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(new ErrorResponse("请求失败", e.getMessage()));
+        }
     }
 }

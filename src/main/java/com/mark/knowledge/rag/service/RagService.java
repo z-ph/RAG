@@ -33,7 +33,10 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -135,6 +138,8 @@ public class RagService {
             long rerankStart = System.nanoTime();
             List<HybridMatch> matches = rerankMatches(rewrittenQuestion, vectorMatches, requestedMaxResults);
             log.info("BM25 重排耗时: {} ms，最终保留 {} 条片段", elapsedMillis(rerankStart), matches.size());
+
+            matches = enrichWithCrossDocumentResults(request, matches, requestedMaxResults);
 
             String context = matches.stream()
                 .map(match -> match.segment().text())
@@ -244,6 +249,8 @@ public class RagService {
             List<HybridMatch> matches = rerankMatches(rewrittenQuestion, vectorMatches, requestedMaxResults);
             log.info("流式 BM25 重排耗时: conversationId={}, elapsedMs={}, retained={}",
                 conversationId, elapsedMillis(rerankStart), matches.size());
+
+            matches = enrichWithCrossDocumentResults(request, matches, requestedMaxResults);
 
             sendEvent(generation, "sources", toSourceReferences(matches));
             if (shouldAbort(generation)) {
@@ -450,6 +457,91 @@ public class RagService {
             .collect(Collectors.toList());
     }
 
+    /**
+     * 从上下文中提取被引用的文档名
+     * 匹配模式如："见《XX管理办法》"、"参见XX规定"、"详见XX"
+     */
+    private List<String> extractReferencedDocuments(String context) {
+        List<String> refs = new ArrayList<>();
+        Pattern[] patterns = {
+            Pattern.compile("\u89c1[\u300a\u300c]([^\u300b\u300d]+)[\u300b\u300d]"),
+            Pattern.compile("\u53c2\u89c1[\u300a\u300c]?([^\u300b\u300d\\s]+(?:\u529e\u6cd5|\u89c4\u5b9a|\u5236\u5ea6|\u7ec6\u5219))[\u300b\u300d]?"),
+            Pattern.compile("\u8be6\u89c1[\u300a\u300c]?([^\u300b\u300d\\s]+(?:\u529e\u6cd5|\u89c4\u5b9a|\u5236\u5ea6|\u7ec6\u5219))[\u300b\u300d]?"),
+            Pattern.compile("\u6309\u7167?[\u300a\u300c]([^\u300b\u300d]+)[\u300b\u300d]"),
+        };
+        for (Pattern p : patterns) {
+            Matcher m = p.matcher(context);
+            while (m.find()) {
+                refs.add(m.group(1));
+            }
+        }
+        return refs;
+    }
+
+    /**
+     * 基于引用的文档名进行二次检索
+     */
+    private List<HybridMatch> crossDocumentSearch(
+            String question,
+            List<String> referencedDocs,
+            int maxResults) {
+        String enhancedQuery = question + " " + String.join(" ", referencedDocs);
+        var embedding = embeddingModel.embed(enhancedQuery).content();
+
+        EmbeddingSearchRequest searchRequest = EmbeddingSearchRequest.builder()
+            .queryEmbedding(embedding)
+            .maxResults(resolveCandidateMaxResults(maxResults))
+            .minScore(minScore * 0.8)
+            .build();
+
+        EmbeddingSearchResult<TextSegment> result = searchEmbeddingStore(searchRequest);
+        return rerankMatches(enhancedQuery, result.matches(), maxResults);
+    }
+
+    /**
+     * 对首次检索结果执行跨文档关联检测和二次检索，合并结果
+     */
+    private List<HybridMatch> enrichWithCrossDocumentResults(
+            RagRequest request,
+            List<HybridMatch> matches,
+            int requestedMaxResults) {
+        String initialContext = matches.stream()
+            .map(m -> m.segment().text())
+            .collect(Collectors.joining("\n\n"));
+        List<String> refs = extractReferencedDocuments(initialContext);
+
+        if (refs.isEmpty()) {
+            return matches;
+        }
+
+        log.info("检测到跨文档引用: {}", refs);
+        List<HybridMatch> crossMatches = crossDocumentSearch(
+            request.question(), refs, requestedMaxResults);
+
+        if (crossMatches.isEmpty()) {
+            return matches;
+        }
+
+        Set<String> existingHashes = matches.stream()
+            .map(m -> m.segment().metadata().getString("chunkHash"))
+            .collect(Collectors.toSet());
+
+        List<HybridMatch> merged = new ArrayList<>(matches);
+        for (HybridMatch cm : crossMatches) {
+            String hash = cm.segment().metadata().getString("chunkHash");
+            if (!existingHashes.contains(hash)) {
+                merged.add(cm);
+                existingHashes.add(hash);
+            }
+        }
+
+        log.info("跨文档关联检索完成，合并后共 {} 条片段", merged.size());
+        return merged.stream()
+            .sorted(Comparator.comparingDouble(HybridMatch::finalScore).reversed())
+            .limit(requestedMaxResults)
+            .collect(Collectors.toList());
+    }
+
     private String rewriteQuestion(String question, List<ConversationMemoryService.ConversationMessage> history) {
         if (history.isEmpty()) {
             return question;
@@ -475,14 +567,39 @@ public class RagService {
     private String buildPrompt(
             List<ConversationMemoryService.ConversationMessage> history,
             String context,
-            String question) {
-        String historyText = history.isEmpty() ? "无" : formatHistory(history);
+            String question) {        String historyText = history.isEmpty() ? "无" : formatHistory(history);
 
         return String.format("""
-            你是一个基于文档内容回答问题的助手。
-            你必须严格依据下面提供的历史对话和文档上下文回答。
-            如果上下文中没有答案，请明确说明“根据已上传文档无法回答该问题”。
-            不要编造，不要补充上下文之外的事实。
+            你是一个企业制度文档智能问答助手，基于提供的文档内容回答用户问题。
+
+            ## 回答原则
+
+            1. **语义理解与语境区分**：
+               - 准确理解制度条文在特定语境下的含义
+               - 区分相似但不同的概念（如"烟酒"指烟类和酒类产品，不等同于化学"酒精"；医用酒精不属于烟酒范畴）
+               - 识别具体品牌或产品的归属类别（如"茅台"、"五粮液"属于"酒类"，应适用烟酒相关限制）
+               - 遇到歧义时，优先采用制度文件中的定义，而非日常用语
+
+            2. **引导式回答**：
+               - 如果用户的问题过于笼统（如"怎么报销"、"有什么规定"），必须主动追问以明确具体场景
+               - 追问要简洁具体，提供2-4个选项供用户选择
+               - 例如："请问您咨询的是哪类费用的报销？（差旅费 / 接待费 / 办公费 / 其他）"
+               - 仅在问题确实模糊不清时才追问，已有足够上下文时直接回答
+
+            3. **举例说明**：
+               - 在解释抽象制度条文时，用贴近实际工作场景的具体例子帮助理解
+               - 用"例如："前缀标注举例内容，与正式条文区分
+               - 举例应涵盖常见场景和边界情况
+
+            4. **严格依据文档**：
+               - 答案必须基于下方提供的文档上下文
+               - 如果文档中没有相关信息，明确告知"根据已上传文档，暂未找到相关规定"
+               - 不编造、不推测文档之外的内容
+
+            ## 格式要求
+            - 使用中文回答
+            - 引用制度原文时用引号标注
+            - 列举多项时使用编号列表
 
             历史对话：
             %s
@@ -492,7 +609,7 @@ public class RagService {
 
             用户当前问题：%s
 
-            请直接给出中文答案：""", historyText, context, question);
+            请直接回答：""", historyText, context, question);
     }
 
     private String formatHistory(List<ConversationMemoryService.ConversationMessage> history) {
@@ -584,14 +701,7 @@ public class RagService {
     }
 
     private void closeQuietly(QdrantEmbeddingStore embeddingStore) {
-        if (embeddingStore == null) {
-            return;
-        }
-        try {
-            embeddingStore.close();
-        } catch (Exception e) {
-            log.debug("关闭Qdrant搜索store时忽略异常: {}", e.getMessage());
-        }
+        QdrantStoreUtils.closeQuietly(embeddingStore);
     }
 
     private final class RagStreamingResponseHandler implements StreamingChatResponseHandler {

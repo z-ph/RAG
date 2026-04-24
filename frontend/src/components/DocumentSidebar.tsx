@@ -20,6 +20,7 @@ import {
   Upload,
   type UploadProps
 } from "antd";
+import { useRef } from "react";
 import type { DocumentListItem, UploadProgressEvent } from "../types";
 
 interface DocumentSidebarProps {
@@ -27,11 +28,13 @@ interface DocumentSidebarProps {
   documentsLoading: boolean;
   uploading: boolean;
   uploadProgress: UploadProgressEvent | null;
+  batchTotal: number;
+  batchCurrent: number;
   deletingId: string | null;
   authenticated: boolean;
   onClose: () => void;
   onRefreshDocuments: () => Promise<void>;
-  onUpload: (file: File) => Promise<void>;
+  onUpload: (fileOrFiles: File | File[]) => Promise<void>;
   onCancelUpload: () => void;
   onDeleteDocument: (documentId: string) => Promise<void>;
   onViewDocument: (documentId: string) => void;
@@ -39,15 +42,28 @@ interface DocumentSidebarProps {
 }
 
 export function DocumentSidebar(props: DocumentSidebarProps) {
+  const fileQueue = useRef<File[]>([]);
+  const batchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const uploadProps: UploadProps = {
     accept: ".pdf,.txt,.docx,.xlsx,.pptx,.jpg,.jpeg,.png",
-    multiple: false,
+    multiple: true,
     showUploadList: false,
     beforeUpload(file) {
-      void props.onUpload(file);
+      fileQueue.current.push(file as unknown as File);
+      if (batchTimer.current != null) clearTimeout(batchTimer.current);
+      batchTimer.current = setTimeout(() => {
+        const files = fileQueue.current;
+        fileQueue.current = [];
+        void props.onUpload(files);
+      }, 0);
       return false;
     }
   };
+
+  const batchLabel = props.batchTotal > 1
+    ? `上传中 (${props.batchCurrent}/${props.batchTotal})...`
+    : "上传中...";
 
   return (
     <section className="flex h-full min-h-0 flex-col overflow-hidden px-6 py-6 max-[720px]:px-[18px] max-[720px]:py-[18px]">
@@ -79,7 +95,7 @@ export function DocumentSidebar(props: DocumentSidebarProps) {
               loading={props.uploading}
               disabled={props.uploading}
             >
-              {props.uploading ? "上传中..." : "上传文档"}
+              {props.uploading ? batchLabel : "上传文档"}
             </Button>
           </Upload>
           <Button
@@ -97,6 +113,9 @@ export function DocumentSidebar(props: DocumentSidebarProps) {
         <div className="mt-4 rounded-[16px] bg-white/[0.72] px-4 py-3 shadow-[inset_0_0_0_1px_rgba(19,34,56,0.08)]">
           <div className="flex items-center justify-between gap-2">
             <span className="text-sm font-medium text-ink-900">
+              {props.batchTotal > 1 && (
+                <span className="text-ink-500 mr-2">({props.batchCurrent}/{props.batchTotal})</span>
+              )}
               {props.uploadProgress.message}
             </span>
             <Button

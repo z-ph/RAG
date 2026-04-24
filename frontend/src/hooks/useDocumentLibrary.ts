@@ -23,6 +23,8 @@ export function useDocumentLibrary(
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<UploadProgressEvent | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [batchTotal, setBatchTotal] = useState(0);
+  const [batchCurrent, setBatchCurrent] = useState(0);
   const [viewingDocument, setViewingDocument] = useState<PublicDocumentDetailResponse | null>(null);
   const [viewingLoading, setViewingLoading] = useState(false);
   const [downloadLinkInfo, setDownloadLinkInfo] = useState<DownloadLinkInfo | null>(null);
@@ -56,12 +58,14 @@ export function useDocumentLibrary(
     }
   }
 
-  async function handleUpload(file: File) {
+  async function handleUpload(fileOrFiles: File | File[]) {
     if (!authenticated) {
       return;
     }
 
-    // Cancel any previous upload
+    const files = Array.isArray(fileOrFiles) ? fileOrFiles : [fileOrFiles];
+    if (files.length === 0) return;
+
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
     }
@@ -69,45 +73,54 @@ export function useDocumentLibrary(
 
     setUploading(true);
     setUploadProgress(null);
+    setBatchTotal(files.length);
+    setBatchCurrent(0);
 
-    try {
-      await uploadDocumentStream(
-        file,
-        {
-          onProgress: (event) => {
-            setUploadProgress(event);
-          },
-          onComplete: (event) => {
-            setUploadProgress(event);
-            messageApi.success(
-              `${event.filename || file.name} 已入库，切分 ${event.segmentCount} 段`
-            );
-            setTimeout(() => {
-              setUploading(false);
-              setUploadProgress(null);
-              void refreshDocuments();
-            }, 1000);
-          },
-          onError: (errorMessage) => {
-            messageApi.error(errorMessage);
-            setUploading(false);
-            setUploadProgress(null);
-          }
-        },
-        abortControllerRef.current.signal
-      );
-    } catch (error) {
-      if (error instanceof ApiError && error.status === 401) {
-        setDocuments([]);
-        await onUnauthorized();
-        return;
-      }
+    let successCount = 0;
+    for (let i = 0; i < files.length; i++) {
+      if (abortControllerRef.current.signal.aborted) break;
 
-      if (error instanceof Error && error.name !== "AbortError") {
-        messageApi.error(error instanceof Error ? error.message : "上传失败");
+      setBatchCurrent(i + 1);
+      const file = files[i];
+
+      try {
+        await uploadDocumentStream(
+          file,
+          {
+            onProgress: (event) => {
+              setUploadProgress(event);
+            },
+            onComplete: (event) => {
+              successCount++;
+              messageApi.success(
+                `${event.filename || file.name} 已入库，切分 ${event.segmentCount} 段`
+              );
+            },
+            onError: (errorMessage) => {
+              messageApi.error(`${file.name}: ${errorMessage}`);
+            }
+          },
+          abortControllerRef.current.signal
+        );
+      } catch (error) {
+        if (error instanceof ApiError && error.status === 401) {
+          setDocuments([]);
+          await onUnauthorized();
+          break;
+        }
+        if (error instanceof Error && error.name !== "AbortError") {
+          messageApi.error(`${file.name}: 上传失败`);
+        }
+        if (abortControllerRef.current.signal.aborted) break;
       }
-      setUploading(false);
-      setUploadProgress(null);
+    }
+
+    setUploading(false);
+    setUploadProgress(null);
+    setBatchTotal(0);
+    setBatchCurrent(0);
+    if (successCount > 0) {
+      void refreshDocuments();
     }
   }
 
@@ -182,6 +195,8 @@ export function useDocumentLibrary(
     documentsLoading,
     uploading,
     uploadProgress,
+    batchTotal,
+    batchCurrent,
     deletingId,
     refreshDocuments,
     handleUpload,

@@ -245,6 +245,32 @@ export function adminReindexDocument(documentId: string) {
   );
 }
 
+// Prompt Management API
+
+export interface PromptInfo {
+  id: number;
+  promptKey: string;
+  promptContent: string;
+  description: string;
+  updatedAt: string | null;
+  updatedBy: string | null;
+}
+
+export function listPrompts() {
+  return requestJson<PromptInfo[]>("/admin/prompts", { method: "GET" });
+}
+
+export function updatePrompt(key: string, content: string, description?: string) {
+  return requestJson<PromptInfo>(`/admin/prompts/${key}`, {
+    method: "PUT",
+    body: JSON.stringify({ content, description })
+  });
+}
+
+export function resetPrompt(key: string) {
+  return requestJson<PromptInfo>(`/admin/prompts/${key}/reset`, { method: "POST" });
+}
+
 export async function askWithImage(image: File, question: string, conversationId?: string) {
   const formData = new FormData();
   formData.append("image", image);

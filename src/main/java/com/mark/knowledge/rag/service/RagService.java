@@ -76,6 +76,7 @@ public class RagService {
     private final QdrantEmbeddingStoreFactory embeddingStoreFactory;
     private final ConversationMemoryService conversationMemoryService;
     private final Bm25Scorer bm25Scorer;
+    private final PromptService promptService;
     private final ConcurrentHashMap<String, InFlightGeneration> inFlightGenerations = new ConcurrentHashMap<>();
 
     public RagService(
@@ -84,13 +85,15 @@ public class RagService {
             EmbeddingModel embeddingModel,
             QdrantEmbeddingStoreFactory embeddingStoreFactory,
             ConversationMemoryService conversationMemoryService,
-            Bm25Scorer bm25Scorer) {
+            Bm25Scorer bm25Scorer,
+            PromptService promptService) {
         this.chatModel = chatModel;
         this.streamingChatModel = streamingChatModel;
         this.embeddingModel = embeddingModel;
         this.embeddingStoreFactory = embeddingStoreFactory;
         this.conversationMemoryService = conversationMemoryService;
         this.bm25Scorer = bm25Scorer;
+        this.promptService = promptService;
     }
 
     public RagResponse ask(RagRequest request) {
@@ -548,17 +551,8 @@ public class RagService {
         }
 
         String historyText = formatHistory(history);
-        String rewritePrompt = String.format("""
-            你需要结合历史对话，把用户当前问题改写成一个完整、独立、可用于知识库检索的问题。
-            如果当前问题本身已经完整，直接原样返回，不要增加解释。
-            只输出改写后的问题，不要输出其它内容。
-
-            历史对话：
-            %s
-
-            当前问题：
-            %s
-            """, historyText, question);
+        String rewriteTemplate = promptService.getPrompt("rag_rewrite");
+        String rewritePrompt = String.format(rewriteTemplate, historyText, question);
 
         String rewritten = chatModel.chat(rewritePrompt);
         return rewritten != null && !rewritten.isBlank() ? rewritten.trim() : question;
@@ -567,49 +561,10 @@ public class RagService {
     private String buildPrompt(
             List<ConversationMemoryService.ConversationMessage> history,
             String context,
-            String question) {        String historyText = history.isEmpty() ? "无" : formatHistory(history);
-
-        return String.format("""
-            你是一个企业制度文档智能问答助手，基于提供的文档内容回答用户问题。
-
-            ## 回答原则
-
-            1. **语义理解与语境区分**：
-               - 准确理解制度条文在特定语境下的含义
-               - 区分相似但不同的概念（如"烟酒"指烟类和酒类产品，不等同于化学"酒精"；医用酒精不属于烟酒范畴）
-               - 识别具体品牌或产品的归属类别（如"茅台"、"五粮液"属于"酒类"，应适用烟酒相关限制）
-               - 遇到歧义时，优先采用制度文件中的定义，而非日常用语
-
-            2. **引导式回答**：
-               - 如果用户的问题过于笼统（如"怎么报销"、"有什么规定"），必须主动追问以明确具体场景
-               - 追问要简洁具体，提供2-4个选项供用户选择
-               - 例如："请问您咨询的是哪类费用的报销？（差旅费 / 接待费 / 办公费 / 其他）"
-               - 仅在问题确实模糊不清时才追问，已有足够上下文时直接回答
-
-            3. **举例说明**：
-               - 在解释抽象制度条文时，用贴近实际工作场景的具体例子帮助理解
-               - 用"例如："前缀标注举例内容，与正式条文区分
-               - 举例应涵盖常见场景和边界情况
-
-            4. **严格依据文档**：
-               - 答案必须基于下方提供的文档上下文
-               - 如果文档中没有相关信息，明确告知"根据已上传文档，暂未找到相关规定"
-               - 不编造、不推测文档之外的内容
-
-            ## 格式要求
-            - 使用中文回答
-            - 引用制度原文时用引号标注
-            - 列举多项时使用编号列表
-
-            历史对话：
-            %s
-
-            文档上下文：
-            %s
-
-            用户当前问题：%s
-
-            请直接回答：""", historyText, context, question);
+            String question) {
+        String historyText = history.isEmpty() ? "无" : formatHistory(history);
+        String systemTemplate = promptService.getPrompt("rag_system");
+        return String.format(systemTemplate, historyText, context, question);
     }
 
     private String formatHistory(List<ConversationMemoryService.ConversationMessage> history) {

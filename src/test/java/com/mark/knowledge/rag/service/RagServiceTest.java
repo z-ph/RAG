@@ -19,13 +19,22 @@ class RagServiceTest {
 
     @Test
     void shouldEmitThinkingEndBeforeAnswerDelta() throws Exception {
+        PromptService promptService = new PromptService(null) {
+            @Override void initDefaults() {}
+            @Override public String getPrompt(String key) {
+                if ("rag_system".equals(key)) return "历史对话：%s\n文档上下文：%s\n用户当前问题：%s\n请直接回答：";
+                if ("rag_rewrite".equals(key)) return "历史对话：%s\n当前问题：%s";
+                return "";
+            }
+        };
         RagService service = new RagService(
             null,
             null,
             null,
             null,
             new ConversationMemoryService(6, 1800),
-            new Bm25Scorer()
+            new Bm25Scorer(),
+            promptService
         );
         CapturingSseEmitter emitter = new CapturingSseEmitter();
         Object generation = newGeneration("request-1", "conversation-1", "问题", emitter);
@@ -43,13 +52,22 @@ class RagServiceTest {
 
     @Test
     void shouldEmitThinkingEndWhenStreamCompletesWithoutAnswerDelta() throws Exception {
+        PromptService promptService = new PromptService(null) {
+            @Override void initDefaults() {}
+            @Override public String getPrompt(String key) {
+                if ("rag_system".equals(key)) return "历史对话：%s\n文档上下文：%s\n用户当前问题：%s\n请直接回答：";
+                if ("rag_rewrite".equals(key)) return "历史对话：%s\n当前问题：%s";
+                return "";
+            }
+        };
         RagService service = new RagService(
             null,
             null,
             null,
             null,
             new ConversationMemoryService(6, 1800),
-            new Bm25Scorer()
+            new Bm25Scorer(),
+            promptService
         );
         CapturingSseEmitter emitter = new CapturingSseEmitter();
         Object generation = newGeneration("request-2", "conversation-2", "问题", emitter);

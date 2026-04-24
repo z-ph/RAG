@@ -73,6 +73,8 @@ function App() {
           uploading={documentLibrary.uploading}
           deletingId={documentLibrary.deletingId}
           uploadProgress={documentLibrary.uploadProgress}
+          batchTotal={documentLibrary.batchTotal}
+          batchCurrent={documentLibrary.batchCurrent}
           authenticated={authSession.authStatus.authenticated}
           onClose={() => setDocumentDrawerOpen(false)}
           onRefreshDocuments={documentLibrary.refreshDocuments}

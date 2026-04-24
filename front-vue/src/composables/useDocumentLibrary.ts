@@ -172,8 +172,15 @@ export function useDocumentLibrary(
     viewingDocument.value = null;
   }
 
-  function handleDownloadDocument(documentId: string) {
-    window.open(getDocumentDownloadUrl(documentId), "_blank");
+  function handleDownloadDocument(documentId: string, filename?: string) {
+    const url = getDocumentDownloadUrl(documentId);
+    const link = document.createElement("a");
+    link.href = url;
+    if (filename) link.download = filename;
+    link.style.display = "none";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   }
 
   return {

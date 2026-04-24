@@ -163,8 +163,11 @@ export function useDocumentLibrary(
   async function handleShowDownloadLink(documentId: string, filename: string) {
     try {
       const response = await getDocumentDownloadLink(documentId);
-      // 直接使用后端返回的完整 URL，不再拼接
-      setDownloadLinkInfo({ documentId, filename, downloadUrl: response.downloadUrl });
+      // 拼接完整 URL（当前 host + 后端返回的路径）
+      const downloadUrl = response.downloadUrl.startsWith("http")
+        ? response.downloadUrl
+        : `${window.location.origin}${response.downloadUrl}`;
+      setDownloadLinkInfo({ documentId, filename, downloadUrl });
     } catch (error) {
       messageApi.error(error instanceof Error ? error.message : "获取下载链接失败");
     }

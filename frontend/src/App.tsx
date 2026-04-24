@@ -146,7 +146,13 @@ function App() {
                 type="primary"
                 icon={<DownloadOutlined />}
                 onClick={() => {
-                  window.open(documentLibrary.downloadLinkInfo!.downloadUrl, "_blank");
+                  const link = document.createElement("a");
+                  link.href = documentLibrary.downloadLinkInfo!.downloadUrl;
+                  link.download = documentLibrary.downloadLinkInfo!.filename;
+                  link.style.display = "none";
+                  document.body.appendChild(link);
+                  link.click();
+                  document.body.removeChild(link);
                 }}
               >
                 下载

@@ -15,6 +15,8 @@ import com.mark.knowledge.rag.service.EmbeddingService;
 import com.mark.knowledge.rag.service.FileStorageService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.core.io.FileSystemResource;
+import org.springframework.core.io.Resource;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -303,12 +305,13 @@ public class DocumentController {
                 ? MediaType.APPLICATION_PDF_VALUE
                 : MediaType.TEXT_PLAIN_VALUE;
 
+            Resource resource = new FileSystemResource(filePath);
             return ResponseEntity.ok()
                 .contentType(MediaType.parseMediaType(contentType))
                 .header("Content-Disposition",
                     "attachment; filename=\"" + URLEncoder.encode(detail.filename(), "UTF-8") + "\"")
                 .header("Content-Length", String.valueOf(Files.size(filePath)))
-                .body(filePath.toFile());
+                .body(resource);
         } catch (Exception e) {
             log.error("文件下载失败: {}", documentId, e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)

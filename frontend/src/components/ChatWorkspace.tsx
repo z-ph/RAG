@@ -7,7 +7,7 @@ import {
   SettingOutlined,
   UserOutlined
 } from "@ant-design/icons";
-import { Button, Input, Select } from "antd";
+import { Button, Input } from "antd";
 import { useRef, useState } from "react";
 import { MessageBubble } from "./MessageBubble";
 import type { ChatMessage } from "../types";
@@ -75,16 +75,15 @@ export function ChatWorkspace(props: ChatWorkspaceProps) {
             >
               文档集合
             </Button>
-            <Select
+            <Input
+              type="number"
+              min={1}
               value={props.maxResults}
-              className="!w-[108px]"
-              options={[
-                { label: "16", value: 16 },
-                { label: "64", value: 64 },
-                { label: "256", value: 256 },
-                { label: "1024", value: 1024 }
-              ]}
-              onChange={props.onMaxResultsChange}
+              className="!w-[72px] text-center"
+              onChange={(e) => {
+                const v = parseInt(e.target.value, 10);
+                if (!isNaN(v) && v >= 1) props.onMaxResultsChange(v);
+              }}
             />
             <Button
               className="!rounded-full !border-white/[0.7] !bg-white/[0.85] !px-4 !text-ink-700 !shadow-none hover:!border-accent-500/[0.25] hover:!text-accent-500"

@@ -213,15 +213,24 @@ public class RagService {
 
     private void processStreamRequest(RagRequest request, InFlightGeneration generation) {
         String conversationId = generation.conversationId();
+        long pipelineStart = System.nanoTime();
 
         try {
             if (shouldAbort(generation)) {
                 return;
             }
 
+            long historyStart = System.nanoTime();
             List<ConversationMemoryService.ConversationMessage> history = conversationMemoryService
                 .getRecentMessages(conversationId);
+            log.info("[TTFT-DETAIL] 获取历史: conversationId={}, elapsedMs={}, historySize={}, totalMs={}",
+                conversationId, elapsedMillis(historyStart), history.size(), elapsedMillis(pipelineStart));
+
+            long rewriteStart = System.nanoTime();
             String rewrittenQuestion = rewriteQuestion(request.question(), history);
+            log.info("[TTFT-DETAIL] 改写问题: conversationId={}, stepMs={}, originalLen={}, rewrittenLen={}, totalMs={}",
+                conversationId, elapsedMillis(rewriteStart),
+                request.question().length(), rewrittenQuestion.length(), elapsedMillis(pipelineStart));
             if (shouldAbort(generation)) {
                 return;
             }
@@ -229,33 +238,37 @@ public class RagService {
             int requestedMaxResults = resolveRequestedMaxResults(request);
             long questionEmbeddingStart = System.nanoTime();
             var questionEmbedding = embeddingModel.embed(rewrittenQuestion).content();
-            log.info("流式获取问题向量耗时: conversationId={}, elapsedMs={}",
-                conversationId, elapsedMillis(questionEmbeddingStart));
+            log.info("[TTFT-DETAIL] 问题向量: conversationId={}, stepMs={}, dimension={}, totalMs={}",
+                conversationId, elapsedMillis(questionEmbeddingStart), questionEmbedding.dimension(), elapsedMillis(pipelineStart));
             if (shouldAbort(generation)) {
                 return;
             }
 
+            long searchStart = System.nanoTime();
             EmbeddingSearchRequest searchRequest = EmbeddingSearchRequest.builder()
                 .queryEmbedding(questionEmbedding)
                 .maxResults(resolveCandidateMaxResults(requestedMaxResults))
                 .minScore(minScore)
                 .build();
 
-            log.info("流式问题向量维度: conversationId={}, dimension={}", conversationId, questionEmbedding.dimension());
-
             EmbeddingSearchResult<TextSegment> searchResult = searchEmbeddingStore(searchRequest);
             List<EmbeddingMatch<TextSegment>> vectorMatches = searchResult.matches();
-            log.info("流式向量检索召回: conversationId={}, matches={}, minScore={}",
-                conversationId, vectorMatches.size(), minScore);
+            log.info("[TTFT-DETAIL] 向量检索: conversationId={}, stepMs={}, matches={}, totalMs={}",
+                conversationId, elapsedMillis(searchStart), vectorMatches.size(), elapsedMillis(pipelineStart));
 
             long rerankStart = System.nanoTime();
             List<HybridMatch> matches = rerankMatches(rewrittenQuestion, vectorMatches, requestedMaxResults);
-            log.info("流式 BM25 重排耗时: conversationId={}, elapsedMs={}, retained={}",
-                conversationId, elapsedMillis(rerankStart), matches.size());
+            log.info("[TTFT-DETAIL] BM25重排: conversationId={}, stepMs={}, retained={}, totalMs={}",
+                conversationId, elapsedMillis(rerankStart), matches.size(), elapsedMillis(pipelineStart));
 
+            long crossStart = System.nanoTime();
             matches = enrichWithCrossDocumentResults(request, matches, requestedMaxResults);
+            log.info("[TTFT-DETAIL] 跨文档检索: conversationId={}, stepMs={}, total={}, totalMs={}",
+                conversationId, elapsedMillis(crossStart), matches.size(), elapsedMillis(pipelineStart));
 
             sendEvent(generation, "sources", toSourceReferences(matches));
+            log.info("[TTFT-DETAIL] sources已发送: conversationId={}, totalMs={}",
+                conversationId, elapsedMillis(pipelineStart));
             if (shouldAbort(generation)) {
                 return;
             }
@@ -273,7 +286,10 @@ public class RagService {
                 .map(match -> match.segment().text())
                 .collect(Collectors.joining("\n\n---\n\n"));
             String prompt = buildPrompt(history, context, request.question());
-            streamingChatModel.chat(prompt, new RagStreamingResponseHandler(generation, conversationId));
+            log.info("[TTFT-DETAIL] 调用模型: conversationId={}, promptChars={}, contextChunks={}, pipelineMs={}, promptPreview={}",
+                conversationId, prompt.length(), matches.size(), elapsedMillis(pipelineStart),
+                prompt.substring(0, Math.min(100, prompt.length())).replace("\n", "\\n"));
+            streamingChatModel.chat(prompt, new RagStreamingResponseHandler(generation, conversationId, pipelineStart));
         } catch (Exception e) {
             if (generation.isCancelled() || generation.isCompleted()) {
                 completeGeneration(generation);
@@ -662,10 +678,15 @@ public class RagService {
 
         private final InFlightGeneration generation;
         private final String conversationId;
+        private final long handlerCreatedAt;
+        private final long pipelineStartNanos;
+        private boolean firstTokenReceived = false;
 
-        private RagStreamingResponseHandler(InFlightGeneration generation, String conversationId) {
+        private RagStreamingResponseHandler(InFlightGeneration generation, String conversationId, long pipelineStartNanos) {
             this.generation = generation;
             this.conversationId = conversationId;
+            this.pipelineStartNanos = pipelineStartNanos;
+            this.handlerCreatedAt = System.nanoTime();
         }
 
         @Override
@@ -746,6 +767,11 @@ public class RagService {
             if (!StringUtils.hasText(text) || generation.isCancelled() || generation.isCompleted()) {
                 return;
             }
+            if (!firstTokenReceived) {
+                firstTokenReceived = true;
+                log.info("[TTFT-DETAIL] 第一个回答token: conversationId={}, modelTtftMs={}, pipelineTtftMs={}",
+                    conversationId, elapsedMillis(handlerCreatedAt), elapsedMillis(pipelineStartNanos));
+            }
             emitThinkingEndIfNeeded(generation, "answer_started");
             generation.appendAnswer(text);
             sendEvent(generation, "delta", text);
@@ -754,6 +780,11 @@ public class RagService {
         private void handlePartialThinking(String text) {
             if (!StringUtils.hasText(text) || generation.isCancelled() || generation.isCompleted()) {
                 return;
+            }
+            if (!firstTokenReceived) {
+                firstTokenReceived = true;
+                log.info("[TTFT-DETAIL] 第一个思考token: conversationId={}, modelTtftMs={}, pipelineTtftMs={}",
+                    conversationId, elapsedMillis(handlerCreatedAt), elapsedMillis(pipelineStartNanos));
             }
             generation.appendThinking(text);
             sendEvent(generation, "thinking_delta", text);

@@ -31,7 +31,18 @@ export default defineConfig(({ mode }) => {
       proxy: {
         [process.env.VITE_API_BASE_URL || "/api"]: {
           target: process.env.VITE_PROXY_TARGET || "http://localhost:8080",
-          changeOrigin: true
+          changeOrigin: true,
+          configure: (proxy) => {
+            proxy.on("proxyRes", (proxyRes, _req, res) => {
+              const contentType = proxyRes.headers["content-type"];
+              if (typeof contentType === "string" && contentType.includes("text/event-stream")) {
+                res.setHeader("Cache-Control", "no-cache");
+                res.setHeader("X-Accel-Buffering", "no");
+                proxyRes.headers["cache-control"] = "no-cache";
+                proxyRes.headers["x-accel-buffering"] = "no";
+              }
+            });
+          }
         }
       }
     },

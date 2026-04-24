@@ -19,6 +19,7 @@ export function createStreamingAssistantMessage(id: string): ChatMessage {
     content: "",
     thinking: "",
     thinkingStatus: "idle",
+    thinkingDurationMs: 0,
     createdAt: createTimestamp(),
     status: "streaming",
     sources: []
@@ -32,6 +33,7 @@ export function createUserMessage(content: string): ChatMessage {
     content,
     thinking: "",
     thinkingStatus: "idle",
+    thinkingDurationMs: 0,
     createdAt: createTimestamp(),
     status: "complete",
     sources: []

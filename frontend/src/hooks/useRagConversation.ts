@@ -89,7 +89,10 @@ export function useRagConversation(messageApi: MessageApi) {
           onThinkingEnd(payload) {
             updateMessage(assistantId, (item) => ({
               ...item,
-              thinkingStatus: payload.thinkingEnded ? "complete" : item.thinkingStatus
+              thinkingStatus: payload.thinkingEnded ? "complete" : item.thinkingStatus,
+              thinkingDurationMs: payload.thinkingEnded
+                ? Date.now() - new Date(item.createdAt).getTime()
+                : item.thinkingDurationMs
             }));
           },
           onDelta(payload) {
@@ -109,6 +112,10 @@ export function useRagConversation(messageApi: MessageApi) {
               thinking: payload.thinking ?? item.thinking,
               thinkingStatus:
                 payload.thinking || item.thinking ? "complete" : item.thinkingStatus,
+              thinkingDurationMs:
+                (payload.thinking || item.thinking) && !item.thinkingDurationMs
+                  ? Date.now() - new Date(item.createdAt).getTime()
+                  : item.thinkingDurationMs,
               status: payload.cancelled ? "cancelled" : "complete"
             }));
           },

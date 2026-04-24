@@ -168,6 +168,7 @@ export interface ChatMessage {
   content: string;
   thinking: string;
   thinkingStatus: ThinkingStatus;
+  thinkingDurationMs: number;
   createdAt: string;
   status: "complete" | "streaming" | "error" | "cancelled";
   sources: SourceReference[];

@@ -1,0 +1,82 @@
+# Development environment with hot-reload
+# Run: docker compose -f docker-compose.dev.yml up
+#
+# .env changes -> DevTools restart (~2-5s, re-reads .env via EnvironmentPostProcessor)
+# Java changes -> mvn compile -> DevTools hot-reload (~2-5s)
+# Frontend    -> Vite HMR (instant)
+
+services:
+  mysql:
+    image: docker.m.daocloud.io/mysql
+    restart: unless-stopped
+    environment:
+      TZ: ${TZ:-Asia/Shanghai}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_PASSWORD:-ChangeMe123!}
+      MYSQL_DATABASE: knowledge_rag
+      MYSQL_USER: knowledge
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-ChangeMe123!}
+    volumes:
+      - mysql-data:/var/lib/mysql
+    ports:
+      - "3306:3306"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_PASSWORD:-ChangeMe123!}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  qdrant:
+    image: docker.m.daocloud.io/qdrant/qdrant:latest
+    restart: unless-stopped
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    volumes:
+      - qdrant-data:/qdrant/storage
+
+  backend:
+    image: docker.m.daocloud.io/maven:3.9.9-eclipse-temurin-21
+    working_dir: /workspace
+    command: sh docker/dev-backend.sh
+    environment:
+      # Docker network overrides only (highest priority, beats .env file)
+      MYSQL_HOST: mysql
+      MYSQL_URL: jdbc:mysql://mysql:3306/knowledge_rag?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Shanghai&characterEncoding=utf8
+      QDRANT_HOST: qdrant
+      UPLOAD_STORAGE_PATH: /app/uploads
+    volumes:
+      - .:/workspace
+      - maven-repo:/root/.m2
+      - app-uploads:/app/uploads
+    ports:
+      - "8080:8080"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      qdrant:
+        condition: service_started
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  frontend:
+    image: docker.m.daocloud.io/node:20-alpine
+    working_dir: /app
+    command: sh -c "corepack enable && pnpm install && pnpm dev --host"
+    environment:
+      VITE_API_BASE_URL: /api
+      VITE_PROXY_TARGET: http://backend:8080
+    volumes:
+      - ./frontend:/app
+      - frontend-node-modules:/app/node_modules
+    ports:
+      - "5173:5173"
+    depends_on:
+      - backend
+
+volumes:
+  mysql-data:
+  qdrant-data:
+  maven-repo:
+  app-uploads:
+  frontend-node-modules:

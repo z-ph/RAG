@@ -82,6 +82,8 @@ public class RagController {
             SseEmitter emitter = ragService.askStream(request);
             return ResponseEntity.ok()
                 .contentType(MediaType.TEXT_EVENT_STREAM)
+                .header("Cache-Control", "no-cache")
+                .header("X-Accel-Buffering", "no")
                 .body(emitter);
 
         } catch (Exception e) {

@@ -42,6 +42,11 @@ function formatDuration(totalSeconds: number) {
   return `${minuteSegment}:${secondSegment}`;
 }
 
+function formatDurationMs(ms: number) {
+  if (ms < 1000) return `${ms}ms`;
+  return formatDuration(Math.round(ms / 1000));
+}
+
 async function copyText(text: string) {
   if (navigator.clipboard?.writeText) {
     await navigator.clipboard.writeText(text);
@@ -71,6 +76,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
   const isAssistant = message.role === "assistant";
   const showSourceLoading = isAssistant && message.status === "streaming" && message.sources.length === 0;
   const hasThinking = isAssistant && Boolean(message.thinking.trim());
+  const hasThinkingDuration = isAssistant && message.thinkingDurationMs > 0;
   const showThinkingActivity =
     isAssistant &&
     message.status === "streaming" &&
@@ -294,6 +300,12 @@ export function MessageBubble({ message }: MessageBubbleProps) {
                       className={`inline-flex rounded-full px-2 py-0.5 text-[11px] tabular-nums ${thinkingTimerClass}`}
                     >
                       {formatDuration(thinkingSeconds)}
+                    </span>
+                  ) : hasThinkingDuration ? (
+                    <span
+                      className={`inline-flex rounded-full px-2 py-0.5 text-[11px] tabular-nums ${thinkingTimerClass}`}
+                    >
+                      {formatDurationMs(message.thinkingDurationMs)}
                     </span>
                   ) : null}
                 </span>

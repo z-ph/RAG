@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { cancelConversation, clearConversation, streamRagAnswer } from "../lib/api";
+import { askWithImage, cancelConversation, clearConversation, streamRagAnswer } from "../lib/api";
 import {
   createAssistantMessageId,
   createStreamingAssistantMessage,
@@ -203,6 +203,49 @@ export function useRagConversation(messageApi: MessageApi) {
     }
   }
 
+  async function handleSendWithImage(image: File, question: string) {
+    if (streaming) return;
+
+    const nextConversationId = conversationId || `web-${crypto.randomUUID()}`;
+    const assistantId = createAssistantMessageId();
+
+    setConversationId(nextConversationId);
+    setPrompt("");
+    setStreaming(true);
+    setMessages((current) => [
+      ...current,
+      createUserMessage(`[图片] ${question}`),
+      createStreamingAssistantMessage(assistantId)
+    ]);
+
+    try {
+      const response = await askWithImage(image, question, nextConversationId);
+
+      if (response.conversationId) {
+        setConversationId(response.conversationId);
+      }
+
+      updateMessage(assistantId, (item) => ({
+        ...item,
+        content: response.answer || "未能生成回答",
+        thinking: response.thinking || "",
+        thinkingStatus: response.thinking ? "complete" as const : item.thinkingStatus,
+        status: "complete" as const,
+        sources: response.sources || []
+      }));
+    } catch (error) {
+      const errorText = error instanceof Error ? error.message : "图片问答失败";
+      updateMessage(assistantId, (item) => ({
+        ...item,
+        status: "error" as const,
+        content: errorText
+      }));
+      messageApi.error(errorText);
+    } finally {
+      setStreaming(false);
+    }
+  }
+
   return {
     messages,
     prompt,
@@ -212,6 +255,7 @@ export function useRagConversation(messageApi: MessageApi) {
     setMaxResults,
     streaming,
     handleSend,
+    handleSendWithImage,
     handleCancel,
     handleClearConversation
   };

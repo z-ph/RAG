@@ -1,11 +1,14 @@
 import {
   ClearOutlined,
   DatabaseOutlined,
+  PictureOutlined,
   SendOutlined,
   PauseCircleFilled,
+  SettingOutlined,
   UserOutlined
 } from "@ant-design/icons";
 import { Button, Input, Select } from "antd";
+import { useRef, useState } from "react";
 import { MessageBubble } from "./MessageBubble";
 import type { ChatMessage } from "../types";
 
@@ -18,14 +21,49 @@ interface ChatWorkspaceProps {
   authUser: { username: string; role: string } | null;
   onOpenDocuments: () => void;
   onOpenAuth: () => void;
+  onOpenAdmin?: () => void;
   onPromptChange: (value: string) => void;
   onMaxResultsChange: (value: number) => void;
   onSend: (question?: string) => Promise<void>;
+  onSendWithImage?: (image: File, question: string) => Promise<void>;
   onCancel: () => Promise<void>;
   onClearConversation: () => Promise<void>;
 }
 
 export function ChatWorkspace(props: ChatWorkspaceProps) {
+  const [pendingImage, setPendingImage] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
+
+  function handleImageSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setPendingImage(file);
+    setPreviewUrl(URL.createObjectURL(file));
+  }
+
+  function clearPendingImage() {
+    setPendingImage(null);
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+    setPreviewUrl(null);
+    if (imageInputRef.current) imageInputRef.current.value = "";
+  }
+
+  function handleSend() {
+    if (props.streaming) {
+      void props.onCancel();
+      return;
+    }
+    if (!props.prompt.trim()) return;
+
+    if (pendingImage && props.onSendWithImage) {
+      void props.onSendWithImage(pendingImage, props.prompt.trim());
+      clearPendingImage();
+    } else {
+      void props.onSend();
+    }
+  }
+
   return (
     <section className="flex min-h-0 w-full flex-1 flex-col overflow-hidden">
       <div className="grid min-h-0 flex-1 grid-rows-[auto_minmax(0,1fr)_auto] gap-4">
@@ -55,6 +93,15 @@ export function ChatWorkspace(props: ChatWorkspaceProps) {
             >
               清空对话
             </Button>
+            {props.onOpenAdmin && (
+              <Button
+                className="!rounded-full !border-ink-950/10 !bg-amber-50/90 !px-4 !text-ink-900 !shadow-none hover:!border-accent-500/[0.25] hover:!text-accent-500"
+                icon={<SettingOutlined />}
+                onClick={props.onOpenAdmin}
+              >
+                管理
+              </Button>
+            )}
             <Button
               className={`!rounded-full !px-4 !shadow-none ${
                 props.authenticated
@@ -76,38 +123,54 @@ export function ChatWorkspace(props: ChatWorkspaceProps) {
           ))}
         </div>
 
-        <div className="flex items-center gap-1">
-          <Input
-            value={props.prompt}
-            placeholder="输入你的问题。"
-            onChange={(event) => props.onPromptChange(event.target.value)}
-            onPressEnter={(event) => {
-              if (!event.shiftKey && !props.streaming) {
-                event.preventDefault();
-                void props.onSend();
+        <div>
+          {previewUrl && pendingImage && (
+            <div className="mb-2 flex items-center gap-2 rounded-lg bg-ink-50 px-3 py-2">
+              <img src={previewUrl} alt="preview" className="h-12 w-12 rounded object-cover" />
+              <span className="truncate text-xs text-ink-600">{pendingImage.name}</span>
+              <Button type="text" size="small" danger onClick={clearPendingImage}>移除</Button>
+            </div>
+          )}
+          <div className="flex items-center gap-1">
+            <input
+              ref={imageInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handleImageSelect}
+            />
+            <Button
+              type="text"
+              icon={<PictureOutlined />}
+              className={pendingImage ? "!text-accent-500" : ""}
+              onClick={() => imageInputRef.current?.click()}
+              title="上传图片提问"
+            />
+            <Input
+              value={props.prompt}
+              placeholder="输入你的问题。"
+              onChange={(event) => props.onPromptChange(event.target.value)}
+              onPressEnter={(event) => {
+                if (!event.shiftKey && !props.streaming) {
+                  event.preventDefault();
+                  handleSend();
+                }
+              }}
+            />
+            <Button
+              type={props.streaming ? "default" : "primary"}
+              danger={props.streaming}
+              size="large"
+              className={
+                props.streaming
+                  ? "!rounded-full !px-6 !shadow-none"
+                  : "!rounded-full !border-none !bg-accent-500 !px-6 !shadow-none hover:!bg-accent-400"
               }
-            }}
-          />
-          <Button
-            type={props.streaming ? "default" : "primary"}
-            danger={props.streaming}
-            size="large"
-            className={
-              props.streaming
-                ? "!rounded-full !px-6 !shadow-none"
-                : "!rounded-full !border-none !bg-accent-500 !px-6 !shadow-none hover:!bg-accent-400"
-            }
-            icon={props.streaming ? <PauseCircleFilled /> : <SendOutlined />}
-            disabled={!props.streaming && !props.prompt.trim()}
-            onClick={() => {
-              if (props.streaming) {
-                void props.onCancel();
-                return;
-              }
-
-              void props.onSend();
-            }}
-          />
+              icon={props.streaming ? <PauseCircleFilled /> : <SendOutlined />}
+              disabled={!props.streaming && !props.prompt.trim()}
+              onClick={handleSend}
+            />
+          </div>
         </div>
       </div>
     </section>

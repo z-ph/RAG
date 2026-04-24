@@ -3,6 +3,7 @@ import { App as AntdApp, Drawer, Grid, Modal, Input, Space, Button } from "antd"
 import { ChatWorkspace } from "./components/ChatWorkspace";
 import { DocumentSidebar } from "./components/DocumentSidebar";
 import { DocumentDetail } from "./components/DocumentDetail";
+import { DocumentAdmin } from "./components/DocumentAdmin";
 import { AuthPanel } from "./components/AuthPanel";
 import { CopyOutlined, DownloadOutlined, LinkOutlined } from "@ant-design/icons";
 import { useAuthSession } from "./hooks/useAuthSession";
@@ -14,6 +15,7 @@ function App() {
   const screens = Grid.useBreakpoint();
   const [documentDrawerOpen, setDocumentDrawerOpen] = useState(false);
   const [authDrawerOpen, setAuthDrawerOpen] = useState(false);
+  const [adminDrawerOpen, setAdminDrawerOpen] = useState(false);
   const authSession = useAuthSession(message);
   const documentLibrary = useDocumentLibrary(
     message,
@@ -45,9 +47,11 @@ function App() {
           authUser={authSession.authStatus.user || null}
           onOpenDocuments={() => setDocumentDrawerOpen(true)}
           onOpenAuth={() => setAuthDrawerOpen(true)}
+          onOpenAdmin={authSession.authStatus.authenticated && authSession.authStatus.user?.role === "ADMIN" ? () => setAdminDrawerOpen(true) : undefined}
           onPromptChange={conversation.setPrompt}
           onMaxResultsChange={conversation.setMaxResults}
           onSend={conversation.handleSend}
+          onSendWithImage={conversation.handleSendWithImage}
           onCancel={conversation.handleCancel}
           onClearConversation={conversation.handleClearConversation}
         />
@@ -200,6 +204,25 @@ function App() {
           onDeleteRegistrationCode={authSession.handleDeleteRegistrationCode}
         />
       </Drawer>
+
+      {authSession.authStatus.authenticated && authSession.authStatus.user?.role === "ADMIN" && (
+        <Drawer
+          open={adminDrawerOpen}
+          onClose={() => setAdminDrawerOpen(false)}
+          placement="right"
+          width={drawerWidth}
+          closable={false}
+          title={null}
+          classNames={{
+            mask: "!backdrop-blur-[3px]",
+            wrapper: "!shadow-none",
+            section: "!bg-[#fffaf4]",
+            body: "!h-full !p-0"
+          }}
+        >
+          <DocumentAdmin onClose={() => setAdminDrawerOpen(false)} />
+        </Drawer>
+      )}
     </main>
   );
 }

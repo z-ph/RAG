@@ -42,7 +42,7 @@ Spring Boot API
 
 - 文档模块通过 Session Cookie 鉴权，前端使用同源 `/api` 请求自动携带 Cookie
 - 本地开发仍推荐单独启动 `frontend/` 子项目
-- Docker 镜像会在构建阶段打包前端产物，并由 Spring Boot 同源托管
+- **前端不再由后端托管**，Docker / 生产环境前端需独立构建部署（见下方 Docker 部署说明）
 
 ## 仓库结构
 
@@ -70,31 +70,48 @@ Spring Boot API
 
 ## Docker 部署
 
-仓库现在提供了一个单镜像方案：
+仓库现在采用**前后端分离部署**方案：
 
-- `frontend` 在构建阶段执行 `pnpm build`
-- 打包产物会复制到 Spring Boot 的 `static/`
-- 最终镜像内同时运行 `Spring Boot + MySQL`
-- `Qdrant` 仍作为独立依赖运行，仓库已提供 `docker-compose.yml`
+- **后端**：Spring Boot 独立运行，不再托管前端静态资源
+- **前端**：由根目录 `Dockerfile` 统一多阶段构建，产物在镜像 `/app/dist` 目录，可通过 volume 导出到宿主机
+- **外部依赖**：`MySQL` + `Qdrant` 由 `docker-compose.yml` 统一管理
 
 推荐直接使用仓库根目录的 compose：
 
 ```bash
+# 构建镜像并启动后端及依赖
 docker compose up --build -d
 ```
 
 启动后访问：
 
-- 应用：`http://localhost:8080`
+- 后端 API：`http://localhost:8081`
 - Qdrant HTTP：`http://localhost:6333`
 - Qdrant gRPC：`localhost:6334`
+
+前端产物在镜像的 `/app/dist` 目录，导出到宿主机：
+
+```bash
+# 使用脚本导出（推荐）
+./scripts/export-frontend.sh
+
+# 或手动执行
+docker run --rm -v "$(pwd)/dist:/output/dist" knowledge-rag sh -c \
+  "mkdir -p /output/dist && cp -r /app/dist/* /output/dist/"
+```
+
+产物位于 `./dist`，可直接用 Nginx、CDN 或任意静态服务器部署。若本地快速验证，可用：
+
+```bash
+cd dist && npx serve .
+```
 
 补充说明：
 
 - compose 默认把 `Qdrant` 作为独立容器启动
 - 如果模型服务运行在宿主机，compose 默认使用 `host.docker.internal`
 - Linux 环境下 compose 已包含 `extra_hosts: host.docker.internal:host-gateway`
-- 如果只想看详细镜像说明和 `docker build` / `docker run` 示例，见 [docs/Docker-Deployment.md](docs/Docker-Deployment.md)
+- 详细镜像说明和 `docker build` / `docker run` 示例见 [docs/Docker-Deployment.md](docs/Docker-Deployment.md)
 
 ## 本地开发
 
@@ -206,6 +223,14 @@ pnpm dev
 默认地址：`http://localhost:5173`
 
 本地开发时，Vite 会把 `/api` 代理到 `http://localhost:8080`。
+
+如需本地生产构建验证：
+
+```bash
+cd frontend
+pnpm build
+# 产物输出到 frontend/dist，可用 npx serve 或 Nginx 托管预览
+```
 
 ### 8. 初始使用流程
 

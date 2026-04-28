@@ -5,8 +5,11 @@ import com.mark.knowledge.rag.dto.RagRequest;
 import com.mark.knowledge.rag.dto.RagResponse;
 import com.mark.knowledge.rag.service.ConversationMemoryService;
 import com.mark.knowledge.rag.service.RagService;
-import com.mark.knowledge.rag.service.parsers.OcrParser;
+import dev.langchain4j.data.message.ImageContent;
+import dev.langchain4j.data.message.TextContent;
+import dev.langchain4j.data.message.UserMessage;
 import dev.langchain4j.model.chat.ChatModel;
+import dev.langchain4j.model.chat.response.ChatResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.MediaType;
@@ -15,6 +18,9 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
+
+import java.util.Base64;
+import java.util.List;
 
 /**
  * RAG（检索增强生成）查询控制器
@@ -147,20 +153,40 @@ public class RagController {
                     .body(new ErrorResponse("无效请求", "问题不能为空"));
             }
 
-            String ocrText;
-            try (var is = image.getInputStream()) {
-                ocrText = OcrParser.parse(is, chatModel);
-            }
+            byte[] imageBytes = image.getBytes();
+            String base64Image = Base64.getEncoder().encodeToString(imageBytes);
+            String mimeType = detectMimeType(imageBytes);
+            String dataUri = "data:" + mimeType + ";base64," + base64Image;
 
-            String enrichedQuestion = "以下是从图片中提取的内容：\n\n" + ocrText + "\n\n用户问题：" + question;
-            RagRequest ragRequest = new RagRequest(enrichedQuestion, conversationId, null);
-            RagResponse response = ragService.ask(ragRequest);
-            return ResponseEntity.ok(response);
+            UserMessage userMessage = UserMessage.from(
+                TextContent.from(question),
+                ImageContent.from(dataUri)
+            );
+
+            ChatResponse chatResponse = chatModel.chat(userMessage);
+            String answer = chatResponse.aiMessage().text();
+
+            return ResponseEntity.ok(new RagResponse(
+                answer != null ? answer : "未能生成回答",
+                chatResponse.aiMessage().thinking(),
+                conversationId,
+                List.of()
+            ));
 
         } catch (Exception e) {
             log.error("图片问答失败", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(new ErrorResponse("请求失败", e.getMessage()));
         }
+    }
+
+    private String detectMimeType(byte[] bytes) {
+        if (bytes.length >= 4) {
+            if (bytes[0] == (byte) 0x89 && bytes[1] == (byte) 0x50) return "image/png";
+            if (bytes[0] == (byte) 0xFF && bytes[1] == (byte) 0xD8) return "image/jpeg";
+            if (bytes[0] == (byte) 0x47 && bytes[1] == (byte) 0x49) return "image/gif";
+            if (bytes[0] == (byte) 0x42 && bytes[1] == (byte) 0x4D) return "image/bmp";
+        }
+        return "image/png";
     }
 }

@@ -1,15 +1,14 @@
 # Dockerfile without BuildKit syntax directive for compatibility in China
 
+# 阶段1：前端构建（产物最终存放在 /app/dist，可通过 volume 挂载导出）
 FROM docker.1ms.run/node:20-alpine AS frontend-builder
 WORKDIR /workspace/frontend
-
 COPY frontend/package.json frontend/pnpm-lock.yaml ./
 RUN corepack enable && pnpm install --frozen-lockfile
-
 COPY frontend/ ./
 RUN pnpm build
 
-# 使用单独的依赖下载阶段，利用 Docker 层缓存
+# 阶段2：使用单独的依赖下载阶段，利用 Docker 层缓存
 FROM docker.m.daocloud.io/maven:3.9.9-eclipse-temurin-21 AS deps-downloader
 WORKDIR /workspace
 COPY pom.xml ./
@@ -17,6 +16,7 @@ COPY pom.xml ./
 RUN mvn dependency:go-offline -B && \
     mvn dependency:resolve-plugins -B
 
+# 阶段3：后端构建
 FROM docker.m.daocloud.io/maven:3.9.9-eclipse-temurin-21 AS backend-builder
 WORKDIR /workspace
 
@@ -24,13 +24,12 @@ WORKDIR /workspace
 COPY --from=deps-downloader /root/.m2 /root/.m2
 COPY pom.xml ./
 COPY src ./src
-COPY --from=frontend-builder /workspace/frontend/dist ./src/main/resources/static
 
 # 编译时依赖已存在，无需重新下载
 RUN mvn -B -DskipTests package && \
     find target -maxdepth 1 -type f -name '*.jar' ! -name '*.jar.original' -exec cp {} /workspace/app.jar \;
 
-# Use a smaller base image for runtime
+# 阶段4：最终运行镜像（仅运行 Spring Boot，不托管前端静态资源）
 FROM docker.m.daocloud.io/eclipse-temurin:21-jre
 
 # Install mysql-client for wait script
@@ -41,10 +40,11 @@ RUN apt-get update && \
 
 WORKDIR /app
 
-# Create scripts directory first
-RUN mkdir -p /app/scripts
+# Create directories
+RUN mkdir -p /app/scripts /app/dist
 
 COPY --from=backend-builder /workspace/app.jar /app/app.jar
+COPY --from=frontend-builder /workspace/frontend/dist /app/dist
 COPY docker/wait-for-mysql.sh /app/scripts/wait-for-mysql.sh
 COPY docker/start.sh /app/scripts/start.sh
 

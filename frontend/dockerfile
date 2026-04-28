@@ -1,0 +1,13 @@
+# --- 构建阶段 ---
+FROM docker.1ms.run/node:20-alpine AS frontend-builder
+WORKDIR /workspace/frontend
+COPY frontend/package.json frontend/pnpm-lock.yaml ./
+RUN corepack enable && pnpm install --frozen-lockfile
+COPY frontend/ ./
+RUN pnpm build
+
+# --- 输出阶段 ---
+# 使用 scratch 镜像，它不包含任何系统文件，仅作为导出载体
+FROM scratch
+# 从 builder 阶段拷贝 dist 目录到根目录
+COPY --from=frontend-builder /workspace/frontend/dist /

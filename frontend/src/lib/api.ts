@@ -144,7 +144,8 @@ export function listDocuments() {
 
 export async function uploadDocument(file: File) {
   const formData = new FormData();
-  formData.append("file", file);
+  const baseName = file.name.replace(/^.*[/\\]/, "");
+  formData.append("file", file, baseName);
 
   const response = await fetch(`${API_BASE_URL}/documents/upload`, {
     method: "POST",
@@ -311,7 +312,8 @@ export async function uploadDocumentStream(
   signal?: AbortSignal
 ): Promise<void> {
   const formData = new FormData();
-  formData.append("file", file);
+  const baseName = file.name.replace(/^.*[/\\]/, "");
+  formData.append("file", file, baseName);
 
   const response = await fetch(`${API_BASE_URL}/documents/upload/stream`, {
     method: "POST",

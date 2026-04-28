@@ -77,14 +77,12 @@ export function useDocumentLibrary(
     setBatchCurrent(0);
 
     let successCount = 0;
-    for (let i = 0; i < files.length; i++) {
-      if (abortControllerRef.current.signal.aborted) break;
+    const signal = abortControllerRef.current.signal;
+    let doneCount = 0;
 
-      setBatchCurrent(i + 1);
-      const file = files[i];
-
-      try {
-        await uploadDocumentStream(
+    await Promise.allSettled(
+      files.map((file) =>
+        uploadDocumentStream(
           file,
           {
             onProgress: (event) => {
@@ -100,20 +98,21 @@ export function useDocumentLibrary(
               messageApi.error(`${file.name}: ${errorMessage}`);
             }
           },
-          abortControllerRef.current.signal
-        );
-      } catch (error) {
-        if (error instanceof ApiError && error.status === 401) {
-          setDocuments([]);
-          await onUnauthorized();
-          break;
-        }
-        if (error instanceof Error && error.name !== "AbortError") {
-          messageApi.error(`${file.name}: 上传失败`);
-        }
-        if (abortControllerRef.current.signal.aborted) break;
-      }
-    }
+          signal
+        ).catch((error) => {
+          if (error instanceof ApiError && error.status === 401) {
+            setDocuments([]);
+            void onUnauthorized();
+            abortControllerRef.current?.abort();
+          } else if (error instanceof Error && error.name !== "AbortError") {
+            messageApi.error(`${file.name}: 上传失败`);
+          }
+        }).finally(() => {
+          doneCount++;
+          setBatchCurrent(doneCount);
+        })
+      )
+    );
 
     setUploading(false);
     setUploadProgress(null);

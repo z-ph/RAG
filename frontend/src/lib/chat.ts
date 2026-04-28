@@ -1,7 +1,8 @@
 import type { ChatMessage } from "../types";
+import { randomUUID } from "./uuid";
 
 function createMessageId(role: ChatMessage["role"]) {
-  return `${role}-${crypto.randomUUID()}`;
+  return `${role}-${randomUUID()}`;
 }
 
 function createTimestamp() {

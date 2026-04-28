@@ -6,6 +6,7 @@ import {
   createUserMessage
 } from "../lib/chat";
 import { clearStoredConversation, loadConversation, saveConversation } from "../lib/chatHistory";
+import { randomUUID } from "../lib/uuid";
 import type { ChatMessage } from "../types";
 
 interface MessageApi {
@@ -53,7 +54,7 @@ export function useRagConversation(messageApi: MessageApi) {
       return;
     }
 
-    const nextConversationId = conversationId || `web-${crypto.randomUUID()}`;
+    const nextConversationId = conversationId || `web-${randomUUID()}`;
     const assistantId = createAssistantMessageId();
 
     setConversationId(nextConversationId);
@@ -208,7 +209,7 @@ export function useRagConversation(messageApi: MessageApi) {
       }
 
       clearStoredConversation();
-      setConversationId(`web-${crypto.randomUUID()}`);
+      setConversationId(`web-${randomUUID()}`);
       setMessages([]);
       messageApi.success("会话上下文已清空");
     } catch (error) {
@@ -221,7 +222,7 @@ export function useRagConversation(messageApi: MessageApi) {
   async function handleSendWithImage(image: File, question: string, previewUrl: string) {
     if (streaming) return;
 
-    const nextConversationId = conversationId || `web-${crypto.randomUUID()}`;
+    const nextConversationId = conversationId || `web-${randomUUID()}`;
     const assistantId = createAssistantMessageId();
 
     setConversationId(nextConversationId);

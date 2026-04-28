@@ -24,6 +24,7 @@ export default defineConfig(({ mode }) => {
   loadNodeEnv(mode);
 
   return {
+    base: process.env.VITE_BASE_ROUTE || "/",
     plugins: [react(), tailwindcss()],
     server: {
       host: "0.0.0.0",

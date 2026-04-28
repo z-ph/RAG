@@ -97,13 +97,6 @@
 			<optional>true</optional>
 		</dependency>
 
-		<!-- LangChain4j Core -->
-		<dependency>
-			<groupId>dev.langchain4j</groupId>
-			<artifactId>langchain4j</artifactId>
-			<version>${langchain4j.version}</version>
-		</dependency>
-
 		<!-- LangChain4j Ollama Integration -->
 		<dependency>
 			<groupId>dev.langchain4j</groupId>

@@ -5,6 +5,7 @@ import {
   DeleteOutlined,
   DownloadOutlined,
   EyeOutlined,
+  FolderOpenOutlined,
   LinkOutlined,
   LoadingOutlined,
   ReloadOutlined,
@@ -41,24 +42,40 @@ interface DocumentSidebarProps {
   onShowDownloadLink: (documentId: string, filename: string) => void;
 }
 
+const ALLOWED_EXTENSIONS = [".pdf", ".txt", ".docx", ".xlsx", ".pptx", ".jpg", ".jpeg", ".png"];
+
+function isAllowedFile(filename: string): boolean {
+  const lower = filename.toLowerCase();
+  return ALLOWED_EXTENSIONS.some((ext) => lower.endsWith(ext));
+}
+
 export function DocumentSidebar(props: DocumentSidebarProps) {
   const fileQueue = useRef<File[]>([]);
   const batchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  function handleBeforeUpload(file: File) {
+    if (!isAllowedFile(file.name)) return false;
+    fileQueue.current.push(file);
+    if (batchTimer.current != null) clearTimeout(batchTimer.current);
+    batchTimer.current = setTimeout(() => {
+      const files = fileQueue.current;
+      fileQueue.current = [];
+      void props.onUpload(files);
+    }, 0);
+    return false;
+  }
 
   const uploadProps: UploadProps = {
     accept: ".pdf,.txt,.docx,.xlsx,.pptx,.jpg,.jpeg,.png",
     multiple: true,
     showUploadList: false,
-    beforeUpload(file) {
-      fileQueue.current.push(file as unknown as File);
-      if (batchTimer.current != null) clearTimeout(batchTimer.current);
-      batchTimer.current = setTimeout(() => {
-        const files = fileQueue.current;
-        fileQueue.current = [];
-        void props.onUpload(files);
-      }, 0);
-      return false;
-    }
+    beforeUpload: handleBeforeUpload,
+  };
+
+  const folderUploadProps: UploadProps = {
+    directory: true,
+    showUploadList: false,
+    beforeUpload: handleBeforeUpload,
   };
 
   const batchLabel = props.batchTotal > 1
@@ -96,6 +113,15 @@ export function DocumentSidebar(props: DocumentSidebarProps) {
               disabled={props.uploading}
             >
               {props.uploading ? batchLabel : "上传文档"}
+            </Button>
+          </Upload>
+          <Upload {...folderUploadProps}>
+            <Button
+              icon={props.uploading ? <LoadingOutlined /> : <FolderOpenOutlined />}
+              loading={props.uploading}
+              disabled={props.uploading}
+            >
+              {props.uploading ? batchLabel : "上传文件夹"}
             </Button>
           </Upload>
           <Button

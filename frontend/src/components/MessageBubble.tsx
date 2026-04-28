@@ -331,6 +331,13 @@ export function MessageBubble({ message }: MessageBubbleProps) {
             </section>
           ) : null}
           <div className="text-sm leading-6">
+            {!isAssistant && message.imageUrl ? (
+              <img
+                src={message.imageUrl}
+                alt="用户上传的图片"
+                className="mb-2 max-h-60 max-w-full rounded-lg object-contain"
+              />
+            ) : null}
             {message.content ? (
               <MarkdownContent
                 content={message.content}

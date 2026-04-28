@@ -166,6 +166,7 @@ export interface ChatMessage {
   id: string;
   role: "assistant" | "user";
   content: string;
+  imageUrl?: string;
   thinking: string;
   thinkingStatus: ThinkingStatus;
   thinkingDurationMs: number;

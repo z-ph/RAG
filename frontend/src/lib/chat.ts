@@ -26,11 +26,12 @@ export function createStreamingAssistantMessage(id: string): ChatMessage {
   };
 }
 
-export function createUserMessage(content: string): ChatMessage {
+export function createUserMessage(content: string, imageUrl?: string): ChatMessage {
   return {
     id: createMessageId("user"),
     role: "user",
     content,
+    imageUrl,
     thinking: "",
     thinkingStatus: "idle",
     thinkingDurationMs: 0,

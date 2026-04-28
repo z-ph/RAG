@@ -218,7 +218,7 @@ export function useRagConversation(messageApi: MessageApi) {
     }
   }
 
-  async function handleSendWithImage(image: File, question: string) {
+  async function handleSendWithImage(image: File, question: string, previewUrl: string) {
     if (streaming) return;
 
     const nextConversationId = conversationId || `web-${crypto.randomUUID()}`;
@@ -229,7 +229,7 @@ export function useRagConversation(messageApi: MessageApi) {
     setStreaming(true);
     setMessages((current) => [
       ...current,
-      createUserMessage(`[图片] ${question}`),
+      createUserMessage(question, previewUrl),
       createStreamingAssistantMessage(assistantId)
     ]);
 

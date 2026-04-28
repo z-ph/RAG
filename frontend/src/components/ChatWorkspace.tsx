@@ -25,7 +25,7 @@ interface ChatWorkspaceProps {
   onPromptChange: (value: string) => void;
   onMaxResultsChange: (value: number) => void;
   onSend: (question?: string) => Promise<void>;
-  onSendWithImage?: (image: File, question: string) => Promise<void>;
+  onSendWithImage?: (image: File, question: string, previewUrl: string) => Promise<void>;
   onCancel: () => Promise<void>;
   onClearConversation: () => Promise<void>;
 }
@@ -56,9 +56,11 @@ export function ChatWorkspace(props: ChatWorkspaceProps) {
     }
     if (!props.prompt.trim()) return;
 
-    if (pendingImage && props.onSendWithImage) {
-      void props.onSendWithImage(pendingImage, props.prompt.trim());
-      clearPendingImage();
+    if (pendingImage && props.onSendWithImage && previewUrl) {
+      void props.onSendWithImage(pendingImage, props.prompt.trim(), previewUrl);
+      setPendingImage(null);
+      setPreviewUrl(null);
+      if (imageInputRef.current) imageInputRef.current.value = "";
     } else {
       void props.onSend();
     }

@@ -106,10 +106,11 @@ class RagServiceTest {
         Constructor<?> constructor = handlerClass.getDeclaredConstructor(
             RagService.class,
             generation.getClass(),
-            String.class
+            String.class,
+            long.class
         );
         constructor.setAccessible(true);
-        return (StreamingChatResponseHandler) constructor.newInstance(service, generation, conversationId);
+        return (StreamingChatResponseHandler) constructor.newInstance(service, generation, conversationId, 0L);
     }
 
     private Class<?> findInnerClass(String simpleName) {

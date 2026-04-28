@@ -1,0 +1,140 @@
+# E2E 测试专用容器编排
+# 使用独立端口避免与开发环境冲突
+#
+# 启动测试环境：
+#   docker compose -f docker-compose.e2e.yml --env-file .env.e2e up --build -d
+# 停止测试环境：
+#   docker compose -f docker-compose.e2e.yml down -v
+#
+# 注意：前端会先执行 pnpm build 再 preview，确保测试的是生产构建。
+
+services:
+  mysql-e2e:
+    image: docker.m.daocloud.io/mysql
+    restart: unless-stopped
+    environment:
+      TZ: ${TZ:-Asia/Shanghai}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-ChangeMe123!}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-knowledge_rag}
+      MYSQL_USER: ${MYSQL_USER:-knowledge}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-ChangeMe123!}
+    volumes:
+      - mysql-e2e-data:/var/lib/mysql
+    ports:
+      - "3307:3306"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-ChangeMe123!}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  qdrant-e2e:
+    image: docker.m.daocloud.io/qdrant/qdrant:latest
+    restart: unless-stopped
+    ports:
+      - "6335:6333"
+      - "6336:6334"
+    volumes:
+      - qdrant-e2e-data:/qdrant/storage
+
+  backend-e2e:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: knowledge-rag-e2e:latest
+    restart: unless-stopped
+    ports:
+      - "8082:8080"
+    environment:
+      TZ: ${TZ:-Asia/Shanghai}
+      JAVA_OPTS: ${JAVA_OPTS:--Xmx1g}
+      # MySQL connection - use service name
+      MYSQL_URL: jdbc:mysql://mysql-e2e:3306/${MYSQL_DATABASE:-knowledge_rag}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Shanghai&characterEncoding=utf8
+      MYSQL_HOST: mysql-e2e
+      MYSQL_PORT: 3306
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-knowledge_rag}
+      MYSQL_USERNAME: root
+      MYSQL_PASSWORD: ${MYSQL_ROOT_PASSWORD:-ChangeMe123!}
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+      # Auth bootstrap
+      AUTH_BOOTSTRAP_ADMIN_USERNAME: ${AUTH_BOOTSTRAP_ADMIN_USERNAME:-admin}
+      AUTH_BOOTSTRAP_ADMIN_PASSWORD: ${AUTH_BOOTSTRAP_ADMIN_PASSWORD:-ChangeMe123!}
+      # LLM configuration (read from .env.e2e)
+      LLM_CHAT_PROVIDER: ${LLM_CHAT_PROVIDER:-ollama}
+      LLM_EMBEDDING_PROVIDER: ${LLM_EMBEDDING_PROVIDER:-ollama}
+      LLM_TIMEOUT: ${LLM_TIMEOUT:-120s}
+      OLLAMA_CHAT_BASE_URL: ${OLLAMA_CHAT_BASE_URL:-http://host.docker.internal:11434}
+      OLLAMA_EMBEDDING_BASE_URL: ${OLLAMA_EMBEDDING_BASE_URL:-http://host.docker.internal:11434}
+      OLLAMA_CHAT_MODEL: ${OLLAMA_CHAT_MODEL:-qwen2.5:7b}
+      OLLAMA_EMBEDDING_MODEL: ${OLLAMA_EMBEDDING_MODEL:-bge-base-zh}
+      OLLAMA_THINK: ${OLLAMA_THINK:-false}
+      VLLM_CHAT_BASE_URL: ${VLLM_CHAT_BASE_URL:-http://host.docker.internal:8000/v1}
+      VLLM_EMBEDDING_BASE_URL: ${VLLM_EMBEDDING_BASE_URL:-http://host.docker.internal:8000/v1}
+      VLLM_CHAT_MODEL: ${VLLM_CHAT_MODEL:-Qwen/Qwen2.5-7B-Instruct}
+      VLLM_EMBEDDING_MODEL: ${VLLM_EMBEDDING_MODEL:-BAAI/bge-base-zh-v1.5}
+      VLLM_CHAT_API_KEY: ${VLLM_CHAT_API_KEY:-}
+      VLLM_EMBEDDING_API_KEY: ${VLLM_EMBEDDING_API_KEY:-}
+      VLLM_RETURN_THINKING: ${VLLM_RETURN_THINKING:-true}
+      # File upload
+      SPRING_MULTIPART_MAX_FILE_SIZE: ${SPRING_MULTIPART_MAX_FILE_SIZE:-50MB}
+      SPRING_MULTIPART_MAX_REQUEST_SIZE: ${SPRING_MULTIPART_MAX_REQUEST_SIZE:-50MB}
+      # Qdrant
+      QDRANT_HOST: qdrant-e2e
+      QDRANT_PORT: 6334
+      QDRANT_HTTP_PORT: 6333
+      QDRANT_COLLECTION_NAME: ${QDRANT_COLLECTION_NAME:-knowledge-base-e2e}
+      QDRANT_VECTOR_SIZE: ${QDRANT_VECTOR_SIZE:-2560}
+      QDRANT_CREATE_COLLECTION_IF_NOT_EXISTS: true
+      # RAG settings
+      RAG_CHUNK_SIZE: ${RAG_CHUNK_SIZE:-320}
+      RAG_CHUNK_MIN_SIZE: ${RAG_CHUNK_MIN_SIZE:-250}
+      RAG_CHUNK_MAX_SIZE: ${RAG_CHUNK_MAX_SIZE:-350}
+      RAG_CHUNK_OVERLAP: ${RAG_CHUNK_OVERLAP:-40}
+      RAG_EMBEDDING_REQUEST_BATCH_SIZE: ${RAG_EMBEDDING_REQUEST_BATCH_SIZE:-10}
+      RAG_EMBEDDING_STORE_BATCH_SIZE: ${RAG_EMBEDDING_STORE_BATCH_SIZE:-32}
+      RAG_EMBEDDING_STORE_MAX_RETRIES: ${RAG_EMBEDDING_STORE_MAX_RETRIES:-3}
+      RAG_EMBEDDING_STORE_RETRY_BACKOFF_MS: ${RAG_EMBEDDING_STORE_RETRY_BACKOFF_MS:-1000}
+      RAG_MIN_TEXT_LENGTH: ${RAG_MIN_TEXT_LENGTH:-80}
+      RAG_KEYWORD_COUNT: ${RAG_KEYWORD_COUNT:-6}
+      RAG_MAX_RESULTS: ${RAG_MAX_RESULTS:-5}
+      RAG_MIN_SCORE: ${RAG_MIN_SCORE:-0.5}
+      RAG_MEMORY_WINDOW: ${RAG_MEMORY_WINDOW:-6}
+      RAG_SESSION_TTL_SECONDS: ${RAG_SESSION_TTL_SECONDS:-1800}
+      RAG_MEMORY_CLEANUP_INTERVAL_MS: ${RAG_MEMORY_CLEANUP_INTERVAL_MS:-300000}
+      RAG_STREAM_TIMEOUT_MS: ${RAG_STREAM_TIMEOUT_MS:-300000}
+      UPLOAD_STORAGE_PATH: /app/uploads
+      # Logging
+      LOG_LEVEL_ROOT: ${LOG_LEVEL_ROOT:-INFO}
+      LOG_LEVEL_APP: ${LOG_LEVEL_APP:-DEBUG}
+      LOG_LEVEL_LANGCHAIN4J: ${LOG_LEVEL_LANGCHAIN4J:-DEBUG}
+    volumes:
+      - app-e2e-uploads:/app/uploads
+    depends_on:
+      mysql-e2e:
+        condition: service_healthy
+      qdrant-e2e:
+        condition: service_started
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  frontend-e2e:
+    image: docker.m.daocloud.io/node:20-alpine
+    working_dir: /app
+    command: sh -c "corepack enable && pnpm install && pnpm build && pnpm preview --host --port 5174"
+    environment:
+      VITE_API_BASE_URL: /api
+      VITE_PROXY_TARGET: http://backend-e2e:8080
+    volumes:
+      - ./frontend:/app
+      - frontend-e2e-node-modules:/app/node_modules
+    ports:
+      - "5174:5174"
+    depends_on:
+      - backend-e2e
+
+volumes:
+  mysql-e2e-data:
+  qdrant-e2e-data:
+  app-e2e-uploads:
+  frontend-e2e-node-modules:

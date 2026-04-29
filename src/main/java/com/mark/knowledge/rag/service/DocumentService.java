@@ -4,8 +4,6 @@ import com.mark.knowledge.rag.dto.DocumentProgressEvent;
 import dev.langchain4j.data.document.Metadata;
 import dev.langchain4j.data.segment.TextSegment;
 import com.mark.knowledge.rag.service.parsers.DocxParser;
-import com.mark.knowledge.rag.service.parsers.XlsxParser;
-import com.mark.knowledge.rag.service.parsers.PptxParser;
 import dev.langchain4j.model.chat.ChatModel;
 import org.apache.pdfbox.Loader;
 import org.apache.pdfbox.pdmodel.PDDocument;
@@ -140,12 +138,6 @@ public class DocumentService {
             } else if (lowerFilename.endsWith(".docx")) {
                 rawContent = DocxParser.parse(inputStream);
                 log.info("DOCX解析成功 ({} 字符)", rawContent.length());
-            } else if (lowerFilename.endsWith(".xlsx")) {
-                rawContent = XlsxParser.parse(inputStream);
-                log.info("XLSX解析成功 ({} 字符)", rawContent.length());
-            } else if (lowerFilename.endsWith(".pptx")) {
-                rawContent = PptxParser.parse(inputStream);
-                log.info("PPTX解析成功 ({} 字符)", rawContent.length());
             } else {
                 rawContent = parseText(inputStream);
                 log.info("文本解析成功 ({} 字符)", rawContent.length());

@@ -19,8 +19,9 @@
     </div>
 
     <div v-if="authenticated" class="mt-4 flex flex-wrap items-center gap-2">
+      <p class="w-full text-xs text-ink-400">支持 PDF、TXT、DOCX 格式</p>
       <a-upload
-        accept=".pdf,.txt,.docx,.xlsx,.pptx"
+        accept=".pdf,.txt,.docx"
         :multiple="false"
         :show-upload-list="false"
         :before-upload="handleBeforeUpload"

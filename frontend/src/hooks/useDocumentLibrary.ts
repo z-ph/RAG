@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { API_BASE_URL, ApiError, deleteDocument, getDocumentDownloadLink, getPublicDocumentDetail, listDocuments, listPublicDocuments, uploadDocumentStream } from "../lib/api";
-import type { DocumentListItem, PublicDocumentDetailResponse, UploadProgressEvent } from "../types";
+import type { DocumentListItem, FileUploadEntry, PublicDocumentDetailResponse } from "../types";
 
 interface MessageApi {
   error: (content: string) => void;
@@ -21,10 +21,8 @@ export function useDocumentLibrary(
   const [documents, setDocuments] = useState<DocumentListItem[]>([]);
   const [documentsLoading, setDocumentsLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState<UploadProgressEvent | null>(null);
+  const [fileUploads, setFileUploads] = useState<FileUploadEntry[]>([]);
   const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [batchTotal, setBatchTotal] = useState(0);
-  const [batchCurrent, setBatchCurrent] = useState(0);
   const [viewingDocument, setViewingDocument] = useState<PublicDocumentDetailResponse | null>(null);
   const [viewingLoading, setViewingLoading] = useState(false);
   const [downloadLinkInfo, setDownloadLinkInfo] = useState<DownloadLinkInfo | null>(null);
@@ -71,30 +69,43 @@ export function useDocumentLibrary(
     }
     abortControllerRef.current = new AbortController();
 
+    const initialEntries: FileUploadEntry[] = files.map((f) => ({
+      filename: f.name,
+      status: "uploading" as const,
+      progress: null,
+    }));
+
     setUploading(true);
-    setUploadProgress(null);
-    setBatchTotal(files.length);
-    setBatchCurrent(0);
+    setFileUploads(initialEntries);
 
     let successCount = 0;
     const signal = abortControllerRef.current.signal;
-    let doneCount = 0;
 
     await Promise.allSettled(
-      files.map((file) =>
+      files.map((file, index) =>
         uploadDocumentStream(
           file,
           {
             onProgress: (event) => {
-              setUploadProgress(event);
+              setFileUploads((prev) =>
+                prev.map((entry, i) => i === index ? { ...entry, progress: event } : entry)
+              );
             },
             onComplete: (event) => {
               successCount++;
+              setFileUploads((prev) =>
+                prev.map((entry, i) => i === index ? { ...entry, status: "complete" as const } : entry)
+              );
               messageApi.success(
                 `${event.filename || file.name} 已入库，切分 ${event.segmentCount} 段`
               );
             },
             onError: (errorMessage) => {
+              setFileUploads((prev) =>
+                prev.map((entry, i) =>
+                  i === index ? { ...entry, status: "error" as const, errorMessage } : entry
+                )
+              );
               messageApi.error(`${file.name}: ${errorMessage}`);
             }
           },
@@ -105,19 +116,19 @@ export function useDocumentLibrary(
             void onUnauthorized();
             abortControllerRef.current?.abort();
           } else if (error instanceof Error && error.name !== "AbortError") {
+            setFileUploads((prev) =>
+              prev.map((entry, i) =>
+                i === index ? { ...entry, status: "error" as const, errorMessage: "上传失败" } : entry
+              )
+            );
             messageApi.error(`${file.name}: 上传失败`);
           }
-        }).finally(() => {
-          doneCount++;
-          setBatchCurrent(doneCount);
         })
       )
     );
 
     setUploading(false);
-    setUploadProgress(null);
-    setBatchTotal(0);
-    setBatchCurrent(0);
+    setFileUploads([]);
     if (successCount > 0) {
       void refreshDocuments();
     }
@@ -129,7 +140,7 @@ export function useDocumentLibrary(
       abortControllerRef.current = null;
     }
     setUploading(false);
-    setUploadProgress(null);
+    setFileUploads([]);
   }
 
   async function handleDeleteDocument(documentId: string) {
@@ -193,9 +204,7 @@ export function useDocumentLibrary(
     documents,
     documentsLoading,
     uploading,
-    uploadProgress,
-    batchTotal,
-    batchCurrent,
+    fileUploads,
     deletingId,
     refreshDocuments,
     handleUpload,

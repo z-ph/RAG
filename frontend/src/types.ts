@@ -160,6 +160,15 @@ export interface UploadCompleteEvent extends UploadProgressEvent {
   segmentCount: number;
 }
 
+export type FileUploadStatus = "uploading" | "complete" | "error";
+
+export interface FileUploadEntry {
+  filename: string;
+  status: FileUploadStatus;
+  progress: UploadProgressEvent | null;
+  errorMessage?: string;
+}
+
 export type ThinkingStatus = "idle" | "streaming" | "complete";
 
 export interface ChatMessage {

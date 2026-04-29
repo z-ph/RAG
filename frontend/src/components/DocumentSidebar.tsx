@@ -1,9 +1,11 @@
 import {
+  CheckCircleOutlined,
   CloseOutlined,
   CloudUploadOutlined,
   CopyOutlined,
   DeleteOutlined,
   DownloadOutlined,
+  CloseCircleOutlined,
   EyeOutlined,
   FolderOpenOutlined,
   LinkOutlined,
@@ -22,15 +24,13 @@ import {
   type UploadProps
 } from "antd";
 import { useRef } from "react";
-import type { DocumentListItem, UploadProgressEvent } from "../types";
+import type { DocumentListItem, FileUploadEntry } from "../types";
 
 interface DocumentSidebarProps {
   documents: DocumentListItem[];
   documentsLoading: boolean;
   uploading: boolean;
-  uploadProgress: UploadProgressEvent | null;
-  batchTotal: number;
-  batchCurrent: number;
+  fileUploads: FileUploadEntry[];
   deletingId: string | null;
   authenticated: boolean;
   onClose: () => void;
@@ -78,8 +78,8 @@ export function DocumentSidebar(props: DocumentSidebarProps) {
     beforeUpload: handleBeforeUpload,
   };
 
-  const batchLabel = props.batchTotal > 1
-    ? `上传中 (${props.batchCurrent}/${props.batchTotal})...`
+  const batchLabel = props.fileUploads.length > 1
+    ? `上传中 (${props.fileUploads.filter(f => f.status === "complete").length}/${props.fileUploads.length})...`
     : "上传中...";
 
   return (
@@ -135,14 +135,16 @@ export function DocumentSidebar(props: DocumentSidebarProps) {
         </div>
       )}
 
-      {props.uploading && props.uploadProgress && (
+      {props.uploading && props.fileUploads.length > 0 && (
         <div className="mt-4 rounded-[16px] bg-white/[0.72] px-4 py-3 shadow-[inset_0_0_0_1px_rgba(19,34,56,0.08)]">
           <div className="flex items-center justify-between gap-2">
             <span className="text-sm font-medium text-ink-900">
-              {props.batchTotal > 1 && (
-                <span className="text-ink-500 mr-2">({props.batchCurrent}/{props.batchTotal})</span>
+              {props.fileUploads.length > 1 && (
+                <span className="text-ink-500 mr-2">
+                  ({props.fileUploads.filter(f => f.status === "complete").length}/{props.fileUploads.length})
+                </span>
               )}
-              {props.uploadProgress.message}
+              上传进度
             </span>
             <Button
               type="text"
@@ -155,17 +157,29 @@ export function DocumentSidebar(props: DocumentSidebarProps) {
               取消
             </Button>
           </div>
-          <Progress
-            percent={props.uploadProgress.percent}
-            status="active"
-            strokeColor={{ from: "#108ee9", to: "#87d068" }}
-            className="mt-2"
-          />
-          {props.uploadProgress.total > 0 && props.uploadProgress.current > 0 && (
-            <p className="mt-1 text-xs text-ink-500">
-              {props.uploadProgress.current} / {props.uploadProgress.total}
-            </p>
-          )}
+          <div className="mt-2 max-h-[260px] space-y-2 overflow-y-auto">
+            {props.fileUploads.map((entry, i) => (
+              <div key={`${entry.filename}-${i}`}>
+                <div className="flex items-center gap-1.5 text-xs">
+                  {entry.status === "uploading" && <LoadingOutlined className="text-blue-500" />}
+                  {entry.status === "complete" && <CheckCircleOutlined className="text-green-500" />}
+                  {entry.status === "error" && <CloseCircleOutlined className="text-red-500" />}
+                  <span className="truncate text-ink-900" title={entry.filename}>
+                    {entry.filename}
+                  </span>
+                  {entry.status === "error" && entry.errorMessage && (
+                    <span className="text-red-500">({entry.errorMessage})</span>
+                  )}
+                </div>
+                <Progress
+                  percent={entry.status === "complete" ? 100 : (entry.progress?.percent ?? 0)}
+                  status={entry.status === "error" ? "exception" : entry.status === "complete" ? "success" : "active"}
+                  strokeColor={{ from: "#108ee9", to: "#87d068" }}
+                  size="small"
+                />
+              </div>
+            ))}
+          </div>
         </div>
       )}
 

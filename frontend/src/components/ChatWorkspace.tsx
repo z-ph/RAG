@@ -9,6 +9,7 @@ import {
 } from "@ant-design/icons";
 import { Button, Input } from "antd";
 import { useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { MessageBubble } from "./MessageBubble";
 import type { ChatMessage } from "../types";
 
@@ -21,7 +22,7 @@ interface ChatWorkspaceProps {
   authUser: { username: string; role: string } | null;
   onOpenDocuments: () => void;
   onOpenAuth: () => void;
-  onOpenAdmin?: () => void;
+  onOpenAdmin?: string;
   onPromptChange: (value: string) => void;
   onMaxResultsChange: (value: number) => void;
   onSend: (question?: string) => Promise<void>;
@@ -31,6 +32,7 @@ interface ChatWorkspaceProps {
 }
 
 export function ChatWorkspace(props: ChatWorkspaceProps) {
+  const navigate = useNavigate();
   const [pendingImage, setPendingImage] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
@@ -108,7 +110,7 @@ export function ChatWorkspace(props: ChatWorkspaceProps) {
               <Button
                 className="!rounded-full !border-ink-950/10 !bg-amber-50/90 !px-4 !text-ink-900 !shadow-none hover:!border-accent-500/[0.25] hover:!text-accent-500"
                 icon={<SettingOutlined />}
-                onClick={props.onOpenAdmin}
+                onClick={() => navigate(props.onOpenAdmin!)}
               >
                 管理
               </Button>

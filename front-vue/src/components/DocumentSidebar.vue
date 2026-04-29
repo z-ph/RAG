@@ -20,7 +20,7 @@
 
     <div v-if="authenticated" class="mt-4 flex flex-wrap items-center gap-2">
       <a-upload
-        accept=".pdf,.txt"
+        accept=".pdf,.txt,.docx,.xlsx,.pptx"
         :multiple="false"
         :show-upload-list="false"
         :before-upload="handleBeforeUpload"

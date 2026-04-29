@@ -42,7 +42,7 @@ interface DocumentSidebarProps {
   onShowDownloadLink: (documentId: string, filename: string) => void;
 }
 
-const ALLOWED_EXTENSIONS = [".pdf", ".txt", ".docx", ".xlsx", ".pptx", ".jpg", ".jpeg", ".png"];
+const ALLOWED_EXTENSIONS = [".pdf", ".txt", ".docx", ".xlsx", ".pptx"];
 
 function isAllowedFile(filename: string): boolean {
   const lower = filename.toLowerCase();

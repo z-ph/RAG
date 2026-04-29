@@ -146,9 +146,6 @@ public class DocumentService {
             } else if (lowerFilename.endsWith(".pptx")) {
                 rawContent = PptxParser.parse(inputStream);
                 log.info("PPTX解析成功 ({} 字符)", rawContent.length());
-            } else if (lowerFilename.endsWith(".jpg") || lowerFilename.endsWith(".jpeg") || lowerFilename.endsWith(".png")) {
-                rawContent = com.mark.knowledge.rag.service.parsers.OcrParser.parse(inputStream, chatModel);
-                log.info("图片OCR解析成功 ({} 字符)", rawContent.length());
             } else {
                 rawContent = parseText(inputStream);
                 log.info("文本解析成功 ({} 字符)", rawContent.length());

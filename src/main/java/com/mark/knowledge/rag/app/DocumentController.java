@@ -44,7 +44,7 @@ public class DocumentController {
 
     private static final Logger log = LoggerFactory.getLogger(DocumentController.class);
     private static final Set<String> ALLOWED_EXTENSIONS = Set.of(
-        ".pdf", ".txt", ".docx", ".xlsx", ".pptx", ".jpg", ".jpeg", ".png"
+        ".pdf", ".txt", ".docx", ".xlsx", ".pptx"
     );
 
     private final DocumentService documentService;

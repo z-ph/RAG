@@ -8,7 +8,7 @@ import {
   UserOutlined
 } from "@ant-design/icons";
 import { Button, Input } from "antd";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { MessageBubble } from "./MessageBubble";
 import type { ChatMessage } from "../types";
 
@@ -34,6 +34,16 @@ export function ChatWorkspace(props: ChatWorkspaceProps) {
   const [pendingImage, setPendingImage] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const container = messagesContainerRef.current;
+    if (!container) return;
+    const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 120;
+    if (isNearBottom) {
+      container.scrollTop = container.scrollHeight;
+    }
+  }, [props.messages]);
 
   function handleImageSelect(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -118,7 +128,7 @@ export function ChatWorkspace(props: ChatWorkspaceProps) {
             </Button>
           </div>
 
-        <div className="flex min-h-0 flex-col gap-2.5 overflow-y-auto overflow-x-hidden pr-0.5">
+        <div ref={messagesContainerRef} className="flex min-h-0 flex-col gap-2.5 overflow-y-auto overflow-x-hidden pr-0.5">
           {props.messages.map((entry) => (
             <MessageBubble key={entry.id} message={entry} />
           ))}

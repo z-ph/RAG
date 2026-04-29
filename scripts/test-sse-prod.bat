@@ -1,0 +1,1 @@
+curl -N -s "http://222.200.112.60/rag-back/api/rag/ask/stream" -H "Accept: text/event-stream" -H "Content-Type: application/json" -b "JSESSIONID=00741A5FCD38993A3A5349961C49CB5B" -H "Origin: http://222.200.112.60" -H "Referer: http://222.200.112.60/rag/" --data-raw "{\"question\":\"后端学习路线\",\"conversationId\":\"web-20f1f8f5-75b3-473b-8797-4a37abcf433d\",\"maxResults\":8}"

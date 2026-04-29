@@ -19,6 +19,7 @@ build/
 !**/src/test/**/build/
 
 log.txt
+*.log
 /src/main/resources/application.yaml
 
 ### Dot-prefixed files and folders ###

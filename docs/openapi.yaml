@@ -589,6 +589,31 @@ paths:
               schema:
                 type: string
               example: RAG 服务运行正常
+    post:
+      tags:
+        - RAG
+      summary: RAG 服务健康检查（POST）
+      operationId: ragHealthPost
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/HealthCheckRequest'
+            example:
+              echo: ping
+      responses:
+        '200':
+          description: 服务正常
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthCheckResponse'
+              example:
+                status: UP
+                message: RAG 服务运行正常
+                echo: ping
+                timestamp: '2026-04-29T12:00:00'
 components:
   securitySchemes:
     cookieAuth:
@@ -972,6 +997,30 @@ components:
           type: string
         message:
           type: string
+        timestamp:
+          type: string
+          format: date-time
+    HealthCheckRequest:
+      type: object
+      properties:
+        echo:
+          type: string
+          nullable: true
+    HealthCheckResponse:
+      type: object
+      required:
+        - status
+        - message
+        - timestamp
+      properties:
+        status:
+          type: string
+          example: UP
+        message:
+          type: string
+        echo:
+          type: string
+          nullable: true
         timestamp:
           type: string
           format: date-time

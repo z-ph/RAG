@@ -37,11 +37,7 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
         // 允许的前端地址，生产环境替换为实际域名
-        configuration.setAllowedOriginPatterns(List.of(
-            "http://localhost:*",
-            "http://127.0.0.1:*",
-            "http://*.localhost:*"
-        ));
+        configuration.setAllowedOriginPatterns(List.of("*"));
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("*"));
         configuration.setAllowCredentials(true);

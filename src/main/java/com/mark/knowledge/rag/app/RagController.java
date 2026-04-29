@@ -1,6 +1,8 @@
 package com.mark.knowledge.rag.app;
 
 import com.mark.knowledge.rag.dto.ErrorResponse;
+import com.mark.knowledge.rag.dto.HealthCheckRequest;
+import com.mark.knowledge.rag.dto.HealthCheckResponse;
 import com.mark.knowledge.rag.dto.RagRequest;
 import com.mark.knowledge.rag.dto.RagResponse;
 import com.mark.knowledge.rag.service.ConversationMemoryService;
@@ -19,6 +21,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
+import java.time.LocalDateTime;
 import java.util.Base64;
 import java.util.List;
 
@@ -136,6 +139,18 @@ public class RagController {
     @GetMapping("/health")
     public ResponseEntity<String> health() {
         return ResponseEntity.ok("RAG 服务运行正常");
+    }
+
+    /**
+     * 健康检查接口（POST）
+     *
+     * @param request 健康检查请求（可选，echo 字段会被原样返回）
+     * @return 健康状态
+     */
+    @PostMapping("/health")
+    public ResponseEntity<HealthCheckResponse> healthPost(@RequestBody(required = false) HealthCheckRequest request) {
+        String echo = request != null ? request.echo() : null;
+        return ResponseEntity.ok(new HealthCheckResponse("UP", "RAG 服务运行正常", echo));
     }
 
     @PostMapping(value = "/ask/with-image", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)

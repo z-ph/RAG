@@ -58,6 +58,14 @@ class AuthControllerTest {
 
         mockMvc.perform(get("/api/rag/health"))
             .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/rag/health")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"echo\":\"ping\"}"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.status").value("UP"))
+            .andExpect(jsonPath("$.message").value("RAG 服务运行正常"))
+            .andExpect(jsonPath("$.echo").value("ping"));
     }
 
     @Test

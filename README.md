@@ -279,6 +279,7 @@ pnpm build
 | `POST` | `/api/rag/conversations/{conversationId}/cancel` | 取消进行中的流式生成 |
 | `DELETE` | `/api/rag/conversations/{conversationId}` | 清空会话上下文 |
 | `GET` | `/api/rag/health` | RAG 服务健康检查 |
+| `POST` | `/api/rag/health` | RAG 服务健康检查（POST，可用于验证请求体转发） |
 
 ### SSE 事件
 

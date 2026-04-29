@@ -7,12 +7,16 @@ import com.mark.knowledge.auth.entity.UserAccount;
  */
 public record AuthUserResponse(
     String username,
-    String role
+    String role,
+    String roleCode
 ) {
     public static AuthUserResponse from(UserAccount userAccount) {
-        String roleDisplay = userAccount.getAssignedRole() != null
+        String roleName = userAccount.getAssignedRole() != null
             ? userAccount.getAssignedRole().getName()
             : userAccount.getRole();
-        return new AuthUserResponse(userAccount.getUsername(), roleDisplay);
+        String roleCode = userAccount.getAssignedRole() != null
+            ? userAccount.getAssignedRole().getCode()
+            : userAccount.getRole();
+        return new AuthUserResponse(userAccount.getUsername(), roleName, roleCode);
     }
 }

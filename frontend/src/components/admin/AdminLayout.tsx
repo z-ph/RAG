@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
-import { Layout, Menu, Button, Avatar, Dropdown, theme, Grid } from "antd";
+import { useState } from "react";
+import { Layout, Menu, Button, Avatar, Dropdown, Grid } from "antd";
 import {
   DashboardOutlined,
   UserOutlined,
@@ -14,7 +14,6 @@ import {
   CommentOutlined
 } from "@ant-design/icons";
 import { Outlet, useLocation, useNavigate, Link } from "react-router-dom";
-import { useAuthSession } from "../../hooks/useAuthSession";
 import type { AuthStatusResponse } from "../../types";
 
 const { Header, Sider, Content } = Layout;
@@ -58,21 +57,25 @@ export function AdminLayout({ authStatus, onLogout }: AdminLayoutProps) {
   ];
 
   return (
-    <Layout className="min-h-screen">
+    <Layout style={{ minHeight: "100vh" }}>
       <Sider
         trigger={null}
         collapsible
         collapsed={collapsed}
         breakpoint="lg"
-        collapsedWidth={screens.xs ? 0 : 80}
+        collapsedWidth={screens.xs ? 0 : 64}
         onBreakpoint={(broken) => setCollapsed(broken)}
-        className="!bg-[#132238]"
+        width={200}
+        style={{ background: "var(--color-sidebar)" }}
       >
-        <div className="flex h-16 items-center justify-center gap-2 px-4">
+        <div className="flex h-12 items-center gap-3 px-5 border-b border-white/10">
           {!collapsed && (
-            <span className="text-lg font-bold text-white">管理后台</span>
+            <>
+              <div className="h-5 w-5 bg-accent-500" />
+              <span className="text-sm font-bold tracking-wider text-white uppercase">Admin</span>
+            </>
           )}
-          {collapsed && <SettingOutlined className="text-xl text-white" />}
+          {collapsed && <div className="mx-auto h-5 w-5 bg-accent-500" />}
         </div>
         <Menu
           theme="dark"
@@ -80,25 +83,25 @@ export function AdminLayout({ authStatus, onLogout }: AdminLayoutProps) {
           selectedKeys={[selectedKey]}
           items={menuItems}
           onClick={({ key }) => navigate(key)}
-          className="!bg-[#132238] !border-r-0"
-          style={{ background: "#132238" }}
+          style={{ background: "transparent", borderInlineEnd: 0 }}
         />
       </Sider>
       <Layout>
-        <Header className="!bg-white flex items-center justify-between px-6 shadow-sm">
+        <Header className="flex items-center justify-between px-6" style={{ background: "#fff", borderBottom: "1px solid #e5e7eb", height: 48, lineHeight: "48px", padding: "0 24px" }}>
           <Button
             type="text"
             icon={collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
             onClick={() => setCollapsed(!collapsed)}
+            className="text-ink-600"
           />
-          <div className="flex items-center gap-4">
-            <Link to="/" className="flex items-center gap-1 text-sm text-ink-600 hover:text-accent-500">
+          <div className="flex items-center gap-6">
+            <Link to="/" className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wider text-ink-500 transition-colors hover:text-ink-900">
               <CommentOutlined />
               返回对话
             </Link>
             <Dropdown menu={{ items: userMenuItems }} placement="bottomRight">
-              <div className="flex cursor-pointer items-center gap-2">
-                <Avatar size="small" className="!bg-accent-500">
+              <div className="flex cursor-pointer items-center gap-2 py-1 pr-3 transition-colors hover:bg-black/[0.04]">
+                <Avatar size="small" className="!bg-ink-800 !text-white" style={{ borderRadius: 0 }}>
                   {authStatus.user?.username?.charAt(0).toUpperCase()}
                 </Avatar>
                 <span className="text-sm font-medium text-ink-900">
@@ -108,7 +111,7 @@ export function AdminLayout({ authStatus, onLogout }: AdminLayoutProps) {
             </Dropdown>
           </div>
         </Header>
-        <Content className="m-6 bg-white rounded-xl p-6 shadow-sm">
+        <Content style={{ flex: "1 1 0", minHeight: 0, overflow: "auto", background: "#f9fafb", padding: 24 }}>
           <Outlet />
         </Content>
       </Layout>

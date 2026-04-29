@@ -69,6 +69,7 @@ export interface PublicDocumentDetailResponse {
 export interface AuthUser {
   username: string;
   role: string;
+  roleCode: string;
 }
 
 export interface AuthStatusResponse {

@@ -19,7 +19,7 @@ interface ChatWorkspaceProps {
   maxResults: number;
   streaming: boolean;
   authenticated: boolean;
-  authUser: { username: string; role: string } | null;
+  authUser: { username: string; role: string; roleCode: string } | null;
   onOpenDocuments: () => void;
   onOpenAuth: () => void;
   onOpenAdmin?: string;
@@ -83,7 +83,7 @@ export function ChatWorkspace(props: ChatWorkspaceProps) {
       <div className="grid min-h-0 flex-1 grid-rows-[auto_minmax(0,1fr)_auto] gap-4">
           <div className="flex flex-wrap items-center gap-2 justify-end">
             <Button
-              className="!rounded-full !border-ink-950/10 !bg-sky-50/90 !px-4 !text-ink-900 !shadow-none hover:!border-accent-500/[0.25] hover:!text-accent-500"
+              className="!border-ink-950/10 !bg-sky-50/90 !px-4 !text-ink-900 !shadow-none hover:!border-accent-500/25 hover:!text-accent-500"
               icon={<DatabaseOutlined />}
               onClick={props.onOpenDocuments}
             >
@@ -93,14 +93,14 @@ export function ChatWorkspace(props: ChatWorkspaceProps) {
               type="number"
               min={1}
               value={props.maxResults}
-              className="!w-[72px] text-center"
+              className="!w-[72px] !border-ink-950/10 !bg-white/80 !text-center !shadow-none hover:!border-accent-500/25"
               onChange={(e) => {
                 const v = parseInt(e.target.value, 10);
                 if (!isNaN(v) && v >= 1) props.onMaxResultsChange(v);
               }}
             />
             <Button
-              className="!rounded-full !border-white/[0.7] !bg-white/[0.85] !px-4 !text-ink-700 !shadow-none hover:!border-accent-500/[0.25] hover:!text-accent-500"
+              className="!border-ink-950/10 !bg-white/80 !px-4 !text-ink-700 !shadow-none hover:!border-accent-500/25 hover:!text-accent-500"
               icon={<ClearOutlined />}
               onClick={() => void props.onClearConversation()}
             >
@@ -108,7 +108,7 @@ export function ChatWorkspace(props: ChatWorkspaceProps) {
             </Button>
             {props.onOpenAdmin && (
               <Button
-                className="!rounded-full !border-ink-950/10 !bg-amber-50/90 !px-4 !text-ink-900 !shadow-none hover:!border-accent-500/[0.25] hover:!text-accent-500"
+                className="!border-ink-950/10 !bg-amber-50/90 !px-4 !text-ink-900 !shadow-none hover:!border-accent-500/25 hover:!text-accent-500"
                 icon={<SettingOutlined />}
                 onClick={() => navigate(props.onOpenAdmin!)}
               >
@@ -116,17 +116,19 @@ export function ChatWorkspace(props: ChatWorkspaceProps) {
               </Button>
             )}
             <Button
-              className={`!rounded-full !px-4 !shadow-none ${
+              className={`!px-4 !shadow-none max-[720px]:max-w-[140px] ${
                 props.authenticated
-                  ? "!border-volcano-200 !bg-volcano-50/80 !text-volcano-700 hover:!border-volcano-300 hover:!text-volcano-800"
-                  : "!border-ink-950/10 !bg-white/[0.72] !text-ink-700 hover:!border-accent-500/[0.25] hover:!text-accent-500"
+                  ? "!border-accent-200 !bg-accent-100 !text-accent-500 hover:!border-accent-300 hover:!text-accent-400"
+                  : "!border-ink-950/10 !bg-white/80 !text-ink-700 hover:!border-accent-500/25 hover:!text-accent-500"
               }`}
               icon={<UserOutlined />}
               onClick={props.onOpenAuth}
             >
-              {props.authenticated && props.authUser
-                ? `${props.authUser.username} (${props.authUser.role === "ADMIN" ? "管理" : "成员"})`
-                : "用户登录"}
+              <span className="truncate">
+                {props.authenticated && props.authUser
+                  ? `${props.authUser.username} · ${props.authUser.roleCode === "ADMIN" || props.authUser.roleCode === "SUPER_ADMIN" ? "管理" : "成员"}`
+                  : "用户登录"}
+              </span>
             </Button>
           </div>
 
@@ -138,8 +140,8 @@ export function ChatWorkspace(props: ChatWorkspaceProps) {
 
         <div>
           {previewUrl && pendingImage && (
-            <div className="mb-2 flex items-center gap-2 rounded-lg bg-ink-50 px-3 py-2">
-              <img src={previewUrl} alt="preview" className="h-12 w-12 rounded object-cover" />
+            <div className="mb-2 flex items-center gap-2 bg-ink-50 px-3 py-2">
+              <img src={previewUrl} alt="preview" className="h-12 w-12 object-cover" />
               <span className="truncate text-xs text-ink-600">{pendingImage.name}</span>
               <Button type="text" size="small" danger onClick={clearPendingImage}>移除</Button>
             </div>
@@ -176,8 +178,8 @@ export function ChatWorkspace(props: ChatWorkspaceProps) {
               size="large"
               className={
                 props.streaming
-                  ? "!rounded-full !px-6 !shadow-none"
-                  : "!rounded-full !border-none !bg-accent-500 !px-6 !shadow-none hover:!bg-accent-400"
+                  ? "!px-6 !shadow-none"
+                  : "!border-none !bg-accent-500 !px-6 !shadow-none hover:!bg-accent-400"
               }
               icon={props.streaming ? <PauseCircleFilled /> : <SendOutlined />}
               disabled={!props.streaming && !props.prompt.trim()}

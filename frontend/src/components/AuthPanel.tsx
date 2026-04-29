@@ -39,27 +39,15 @@ interface RegisterFormValues {
   registrationCode: string;
 }
 
-interface CreateCodeFormValues {
-  note?: string;
-  expiresAt?: string;
-}
-
-const dateFormatter = new Intl.DateTimeFormat("zh-CN", {
-  month: "2-digit",
-  day: "2-digit",
-  hour: "2-digit",
-  minute: "2-digit"
-});
-
 export function AuthPanel(props: AuthPanelProps) {
   const navigate = useNavigate();
   const [loginForm] = Form.useForm<LoginFormValues>();
   const [registerForm] = Form.useForm<RegisterFormValues>();
 
-  const isAdmin = props.authUser?.role === "ADMIN";
+  const isAdmin = props.authUser?.roleCode === "ADMIN" || props.authUser?.roleCode === "SUPER_ADMIN";
 
-  function roleLabel(role?: string | null) {
-    return role === "ADMIN" ? "管理员" : "成员";
+  function roleLabel(roleCode?: string | null) {
+    return roleCode === "ADMIN" || roleCode === "SUPER_ADMIN" ? "管理员" : "成员";
   }
 
   return (
@@ -76,7 +64,7 @@ export function AuthPanel(props: AuthPanelProps) {
         <Button
           type="text"
           shape="circle"
-          className="!text-ink-500 hover:!bg-white/[0.8] hover:!text-ink-950"
+          className="!text-ink-500 transition-colors hover:!bg-white/80 hover:!text-ink-950"
           icon={<CloseOutlined />}
           onClick={props.onClose}
           title="关闭"
@@ -90,7 +78,7 @@ export function AuthPanel(props: AuthPanelProps) {
           </div>
         ) : props.authenticated && props.authUser ? (
           <div className="space-y-6">
-            <div className="rounded-[28px] bg-white/[0.72] px-5 py-5 shadow-[inset_0_0_0_1px_rgba(19,34,56,0.08)]">
+            <div className="border border-ink-300 bg-white px-5 py-5">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <p className="text-xs font-bold uppercase tracking-[0.12em] text-ink-500">
@@ -102,7 +90,7 @@ export function AuthPanel(props: AuthPanelProps) {
                       {props.authUser.username}
                     </span>
                     <Tag color={isAdmin ? "volcano" : "gold"} bordered={false}>
-                      {roleLabel(props.authUser.role)}
+                      {roleLabel(props.authUser.roleCode)}
                     </Tag>
                   </div>
                   <p className="mt-2 text-xs leading-6 text-ink-500">
@@ -119,8 +107,8 @@ export function AuthPanel(props: AuthPanelProps) {
               </div>
             </div>
 
-                {isAdmin ? (
-              <div className="rounded-[28px] bg-white/[0.72] px-5 py-5 shadow-[inset_0_0_0_1px_rgba(19,34,56,0.08)]">
+            {isAdmin ? (
+              <div className="border border-ink-300 bg-white px-5 py-5">
                 <p className="text-sm font-semibold text-ink-950">管理后台</p>
                 <p className="mt-1 text-xs leading-6 text-ink-500">
                   进入后台管理系统，进行用户、角色、权限、注册码等高级管理操作。
@@ -140,7 +128,7 @@ export function AuthPanel(props: AuthPanelProps) {
             ) : null}
           </div>
         ) : (
-          <div className="rounded-[28px] bg-white/[0.72] px-5 py-5 shadow-[inset_0_0_0_1px_rgba(19,34,56,0.08)]">
+          <div className="border border-ink-300 bg-white px-5 py-5">
             <p className="text-sm leading-7 text-ink-700">
               文档管理需要登录。新用户必须使用管理员发放的一次性注册码注册。
             </p>
@@ -170,7 +158,7 @@ export function AuthPanel(props: AuthPanelProps) {
                       >
                         <Input.Password prefix={<LockOutlined />} placeholder="请输入密码" />
                       </Form.Item>
-                      <Button type="primary" htmlType="submit" loading={props.authSubmitting}>
+                      <Button type="primary" htmlType="submit" loading={props.authSubmitting} className="!bg-accent-500 hover:!bg-accent-400">
                         登录
                       </Button>
                     </Form>
@@ -208,7 +196,7 @@ export function AuthPanel(props: AuthPanelProps) {
                       >
                         <Input prefix={<KeyOutlined />} placeholder="例如：ABCD-EFGH-JKLM" />
                       </Form.Item>
-                      <Button type="primary" htmlType="submit" loading={props.authSubmitting}>
+                      <Button type="primary" htmlType="submit" loading={props.authSubmitting} className="!bg-accent-500 hover:!bg-accent-400">
                         注册
                       </Button>
                     </Form>

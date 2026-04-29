@@ -108,8 +108,8 @@ export function MessageBubble({ message }: MessageBubbleProps) {
     ? "border border-sky-500/[0.14] bg-white text-ink-900"
     : "bg-accent-500 text-white";
   const bubbleClass = isAssistant
-    ? "rounded-tl-[8px] bg-white text-ink-950"
-    : "rounded-tr-[8px] bg-accent-500 text-white";
+    ? "bg-white text-ink-950"
+    : "bg-accent-500 text-white";
   const sourceDividerClass = isAssistant ? "border-ink-950/8" : "border-white/[0.2]";
   const sourceLabelClass = isAssistant ? "text-ink-700" : "text-white/[0.82]";
   const sourceHintClass = isAssistant ? "text-ink-500" : "text-white/70";
@@ -204,7 +204,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
   return (
     <article className={`flex w-full items-start gap-2 ${rowClass}`}>
       <div
-        className={`grid h-8 w-8 shrink-0 place-items-center rounded-full text-xs font-bold tracking-[0.04em] ${avatarClass}`}
+        className={`grid h-8 w-8 shrink-0 place-items-center text-xs font-bold tracking-[0.04em] ${avatarClass}`}
         aria-hidden="true"
       >
         {avatarLabel}
@@ -218,7 +218,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
           <span>{formatTime(message.createdAt)}</span>
           <button
             type="button"
-            className={`inline-flex items-center gap-1 rounded-full border px-2 py-1 text-[11px] font-medium transition-colors disabled:cursor-not-allowed disabled:border-ink-950/8 disabled:bg-ink-950/[0.04] disabled:text-ink-950/[0.32] ${copyButtonClass}`}
+            className={`inline-flex items-center gap-1 border px-2 py-1 text-[11px] font-medium transition-colors disabled:cursor-not-allowed disabled:border-ink-950/8 disabled:bg-ink-950/[0.04] disabled:text-ink-950/[0.32] ${copyButtonClass}`}
             onClick={() => void handleCopy()}
             disabled={!copyableContent}
             aria-label={copied ? "已复制消息" : "复制消息"}
@@ -230,11 +230,11 @@ export function MessageBubble({ message }: MessageBubbleProps) {
         </div>
 
         <div
-          className={`inline-flex max-w-full flex-col rounded-[18px] px-3 py-2.5 shadow-[inset_0_0_0_1px_rgba(19,34,56,0.06)] ${bubbleClass}`}
+          className={`inline-flex max-w-full flex-col px-3 py-2.5 shadow-[0_0_0_1px_rgba(19,34,56,0.06)] ${bubbleClass}`}
         >
           {showSourceLoading ? (
             <div
-              className={`mb-2 inline-flex items-center gap-2 rounded-full border px-2.5 py-1 text-xs font-medium ${sourceLoadingClass}`}
+              className={`mb-2 inline-flex items-center gap-2 border px-2.5 py-1 text-xs font-medium ${sourceLoadingClass}`}
             >
               <LoadingOutlined className="text-[12px]" />
               <span>正在检索文档</span>
@@ -268,7 +268,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
                         {source.filename}
                       </strong>
                       <span
-                        className={`inline-flex shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold ${scoreClass}`}
+                        className={`inline-flex shrink-0 px-2 py-0.5 text-[11px] font-semibold ${scoreClass}`}
                       >
                         {formatScore(source.relevanceScore)}
                       </span>
@@ -282,10 +282,10 @@ export function MessageBubble({ message }: MessageBubbleProps) {
             </details>
           ) : null}
           {hasThinking ? (
-            <section className={`mb-2 rounded-[16px] border ${thinkingFrameClass}`}>
+            <section className={`mb-2 border ${thinkingFrameClass}`}>
               <button
                 type="button"
-                className={`flex w-full items-center justify-between gap-3 px-3 py-2 text-left ${thinkingOpen ? `sticky top-0 z-20 rounded-t-[15px] border-b backdrop-blur-sm shadow-[0_1px_0_rgba(115,65,0,0.08)] ${thinkingDividerClass} ${thinkingStickyBarClass}` : "rounded-[15px]"}`}
+                className={`flex w-full items-center justify-between gap-3 px-3 py-2 text-left ${thinkingOpen ? `sticky top-0 z-20 border-b backdrop-blur-sm shadow-[0_1px_0_rgba(115,65,0,0.08)] ${thinkingDividerClass} ${thinkingStickyBarClass}` : ""}`}
                 onClick={() => setThinkingOpen((current) => !current)}
                 aria-expanded={thinkingOpen}
               >
@@ -293,17 +293,17 @@ export function MessageBubble({ message }: MessageBubbleProps) {
                   <BulbOutlined />
                   <span>{message.thinkingStatus === "streaming" ? "思考中" : "思考过程"}</span>
                   {message.thinkingStatus === "streaming" ? (
-                    <span className="inline-block h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
+                    <span className="inline-block h-1.5 w-1.5 bg-amber-500 animate-pulse" />
                   ) : null}
                   {showThinkingActivity ? (
                     <span
-                      className={`inline-flex rounded-full px-2 py-0.5 text-[11px] tabular-nums ${thinkingTimerClass}`}
+                      className={`inline-flex px-2 py-0.5 text-[11px] tabular-nums ${thinkingTimerClass}`}
                     >
                       {formatDuration(thinkingSeconds)}
                     </span>
                   ) : hasThinkingDuration ? (
                     <span
-                      className={`inline-flex rounded-full px-2 py-0.5 text-[11px] tabular-nums ${thinkingTimerClass}`}
+                      className={`inline-flex px-2 py-0.5 text-[11px] tabular-nums ${thinkingTimerClass}`}
                     >
                       {formatDurationMs(message.thinkingDurationMs)}
                     </span>
@@ -335,7 +335,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
               <img
                 src={message.imageUrl}
                 alt="用户上传的图片"
-                className="mb-2 max-h-60 max-w-full rounded-lg object-contain"
+                className="mb-2 max-h-60 max-w-full object-contain"
               />
             ) : null}
             {message.content ? (
@@ -361,13 +361,13 @@ export function MessageBubble({ message }: MessageBubbleProps) {
           </div>
 
           {message.status === "error" ? (
-            <span className="mt-2 inline-flex rounded-full bg-rose-500/[0.14] px-3 py-1 text-xs font-medium text-rose-700">
+            <span className="mt-2 inline-flex bg-rose-500/[0.14] px-3 py-1 text-xs font-medium text-rose-700">
               本轮生成失败
             </span>
           ) : null}
           {message.status === "cancelled" ? (
             <span
-              className={`mt-2 inline-flex rounded-full px-3 py-1 text-xs font-medium ${isAssistant ? "bg-amber-500/[0.16] text-amber-700" : "bg-white/[0.18] text-white"}`}
+              className={`mt-2 inline-flex px-3 py-1 text-xs font-medium ${isAssistant ? "bg-amber-500/[0.16] text-amber-700" : "bg-white/[0.18] text-white"}`}
             >
               已取消
             </span>

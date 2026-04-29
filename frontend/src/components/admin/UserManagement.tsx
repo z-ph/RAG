@@ -228,7 +228,7 @@ export function UserManagement() {
   return (
     <div className="flex h-full flex-col">
       <div className="mb-4 flex items-center justify-between">
-        <h2 className="text-lg font-semibold text-ink-950">用户管理</h2>
+        <h2 className="text-lg font-bold uppercase tracking-wider text-ink-950">用户管理</h2>
         <Space>
           <Button icon={<ReloadOutlined />} onClick={fetchUsers} loading={loading}>
             刷新
@@ -240,13 +240,15 @@ export function UserManagement() {
       </div>
 
       <Spin spinning={loading}>
-        <Table<User>
-          rowKey="id"
-          columns={columns}
-          dataSource={users}
-          pagination={{ pageSize: 10, showSizeChanger: true, showTotal: (t) => `共 ${t} 条` }}
-          locale={{ emptyText: "暂无用户数据" }}
-        />
+        <div className="border border-ink-300">
+          <Table<User>
+            rowKey="id"
+            columns={columns}
+            dataSource={users}
+            pagination={{ pageSize: 10, showSizeChanger: true, showTotal: (t) => `共 ${t} 条` }}
+            locale={{ emptyText: "暂无用户数据" }}
+          />
+        </div>
       </Spin>
 
       {/* Create User Modal */}

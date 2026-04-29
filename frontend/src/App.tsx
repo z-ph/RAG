@@ -52,7 +52,7 @@ function ChatPage() {
           authUser={authSession.authStatus.user || null}
           onOpenDocuments={() => setDocumentDrawerOpen(true)}
           onOpenAuth={() => setAuthDrawerOpen(true)}
-          onOpenAdmin={authSession.authStatus.authenticated && authSession.authStatus.user?.role === "ADMIN" ? "/admin" : undefined}
+          onOpenAdmin={authSession.authStatus.authenticated && (authSession.authStatus.user?.roleCode === "ADMIN" || authSession.authStatus.user?.roleCode === "SUPER_ADMIN") ? "/admin" : undefined}
           onPromptChange={conversation.setPrompt}
           onMaxResultsChange={conversation.setMaxResults}
           onSend={conversation.handleSend}
@@ -211,7 +211,7 @@ function AdminRoutes() {
     return (
       <div className="flex h-screen items-center justify-center">
         <div className="text-center">
-          <div className="mb-2 h-8 w-8 animate-spin rounded-full border-2 border-accent-500 border-t-transparent mx-auto" />
+          <div className="mb-2 h-8 w-8 animate-spin border-2 border-accent-500 border-t-transparent mx-auto" />
           <p className="text-sm text-ink-500">加载中...</p>
         </div>
       </div>
@@ -222,9 +222,8 @@ function AdminRoutes() {
     return <Navigate to="/" replace />;
   }
 
-  const isAdmin = authSession.authStatus.user?.role === "ADMIN"
-    || authSession.authStatus.user?.role === "超级管理员"
-    || authSession.authStatus.user?.role === "管理员";
+  const isAdmin = authSession.authStatus.user?.roleCode === "ADMIN"
+    || authSession.authStatus.user?.roleCode === "SUPER_ADMIN";
 
   if (!isAdmin) {
     return (
@@ -247,7 +246,7 @@ function AdminRoutes() {
 
 function App() {
   return (
-    <BrowserRouter>
+    <BrowserRouter basename="/rag">
       <Routes>
         <Route path="/" element={<ChatPage />} />
         <Route element={<AdminRoutes />}>

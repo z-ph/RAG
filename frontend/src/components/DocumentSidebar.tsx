@@ -96,7 +96,7 @@ export function DocumentSidebar(props: DocumentSidebarProps) {
         <Button
           type="text"
           shape="circle"
-          className="!text-ink-500 hover:!bg-white/[0.8] hover:!text-ink-950"
+          className="!text-ink-500 transition-colors hover:!bg-white/80 hover:!text-ink-950"
           icon={<CloseOutlined />}
           onClick={props.onClose}
           title="关闭文档集合"
@@ -137,7 +137,7 @@ export function DocumentSidebar(props: DocumentSidebarProps) {
       )}
 
       {props.uploading && props.fileUploads.length > 0 && (
-        <div className="mt-4 rounded-[16px] bg-white/[0.72] px-4 py-3 shadow-[inset_0_0_0_1px_rgba(19,34,56,0.08)]">
+        <div className="mt-4 border border-ink-300 bg-white px-4 py-3">
           <div className="flex items-center justify-between gap-2">
             <span className="text-sm font-medium text-ink-900">
               {props.fileUploads.length > 1 && (
@@ -162,20 +162,20 @@ export function DocumentSidebar(props: DocumentSidebarProps) {
             {props.fileUploads.map((entry, i) => (
               <div key={`${entry.filename}-${i}`}>
                 <div className="flex items-center gap-1.5 text-xs">
-                  {entry.status === "uploading" && <LoadingOutlined className="text-blue-500" />}
-                  {entry.status === "complete" && <CheckCircleOutlined className="text-green-500" />}
-                  {entry.status === "error" && <CloseCircleOutlined className="text-red-500" />}
+                  {entry.status === "uploading" && <LoadingOutlined className="text-accent-500" />}
+                  {entry.status === "complete" && <CheckCircleOutlined className="text-emerald-600" />}
+                  {entry.status === "error" && <CloseCircleOutlined className="text-rose-600" />}
                   <span className="truncate text-ink-900" title={entry.filename}>
                     {entry.filename}
                   </span>
                   {entry.status === "error" && entry.errorMessage && (
-                    <span className="text-red-500">({entry.errorMessage})</span>
+                    <span className="text-rose-600">({entry.errorMessage})</span>
                   )}
                 </div>
                 <Progress
                   percent={entry.status === "complete" ? 100 : (entry.progress?.percent ?? 0)}
                   status={entry.status === "error" ? "exception" : entry.status === "complete" ? "success" : "active"}
-                  strokeColor={{ from: "#108ee9", to: "#87d068" }}
+                  strokeColor={{ from: "#f25b2a", to: "#ff894f" }}
                   size="small"
                 />
               </div>
@@ -224,13 +224,14 @@ export function DocumentSidebar(props: DocumentSidebarProps) {
                     文档 ID: {item.documentId}
                   </p>
                 </div>
-                <div className="flex shrink-0 items-center gap-3">
-                  <span className="inline-flex rounded-full bg-ink-950/6 px-3 py-1 text-xs font-medium text-ink-700">
+                <div className="flex shrink-0 flex-wrap items-center gap-2 max-[720px]:gap-1.5">
+                  <span className="inline-flex bg-ink-950/6 px-3 py-1 text-xs font-medium text-ink-700">
                     {item.segmentCount} 段
                   </span>
                   <Button
                     type="text"
-                    className="!px-0 !text-blue-500 hover:!text-blue-600"
+                    size="small"
+                    className="!min-h-[36px] !min-w-[36px] !text-ink-600 hover:!text-accent-500"
                     icon={<EyeOutlined />}
                     onClick={() => props.onViewDocument(item.documentId)}
                   >
@@ -238,7 +239,8 @@ export function DocumentSidebar(props: DocumentSidebarProps) {
                   </Button>
                   <Button
                     type="text"
-                    className="!px-0 !text-green-500 hover:!text-green-600"
+                    size="small"
+                    className="!min-h-[36px] !min-w-[36px] !text-ink-600 hover:!text-accent-500"
                     icon={<DownloadOutlined />}
                     onClick={() => props.onShowDownloadLink(item.documentId, item.filename)}
                   >
@@ -247,7 +249,8 @@ export function DocumentSidebar(props: DocumentSidebarProps) {
                   {props.authenticated && (
                     <Button
                       type="text"
-                      className="!px-0 !text-rose-500 hover:!text-rose-600"
+                      size="small"
+                      className="!min-h-[36px] !min-w-[36px] !text-accent-500 hover:!text-accent-400"
                       icon={<DeleteOutlined />}
                       loading={props.deletingId === item.documentId}
                       onClick={() => void props.onDeleteDocument(item.documentId)}

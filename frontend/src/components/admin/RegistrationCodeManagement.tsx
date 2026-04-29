@@ -159,7 +159,7 @@ export function RegistrationCodeManagement() {
       key: "code",
       width: 200,
       render: (code: string) => (
-        <span className="inline-flex items-center gap-1.5 rounded-full bg-ink-950/6 px-3 py-0.5 text-xs font-semibold tracking-[0.14em] text-ink-900">
+        <span className="inline-flex items-center gap-1.5 bg-ink-950/6 px-3 py-0.5 text-xs font-semibold tracking-[0.14em] text-ink-900">
           <KeyOutlined className="text-[10px]" />
           {code}
         </span>
@@ -259,11 +259,11 @@ export function RegistrationCodeManagement() {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="mb-5 flex items-center justify-between">
+      <div className="mb-4 flex items-center justify-between">
         <div>
-          <h2 className="text-lg font-semibold text-ink-950">注册码管理</h2>
-          <p className="mt-1 text-sm text-ink-500">
-            管理员生成一次性注册码，用户注册后立即失效；支持手动禁用和删除。
+          <h2 className="text-lg font-bold uppercase tracking-wider text-ink-950">注册码管理</h2>
+          <p className="mt-1 text-xs text-ink-500 uppercase tracking-wider">
+            生成一次性注册码，支持禁用和删除
           </p>
         </div>
         <Space>
@@ -281,15 +281,16 @@ export function RegistrationCodeManagement() {
       </div>
 
       <Spin spinning={loading}>
-        <Table<RegistrationCode>
-          rowKey="id"
-          columns={columns}
-          dataSource={codes}
-          pagination={{ pageSize: 10, showSizeChanger: true, showTotal: (t) => `共 ${t} 条` }}
-          scroll={{ x: 1200 }}
-          size="middle"
-          className="[&_.ant-table-thead>tr>th]:!bg-ink-50 [&_.ant-table-thead>tr>th]:!text-ink-700 [&_.ant-table-thead>tr>th]:!font-semibold"
-        />
+        <div className="border border-ink-300">
+          <Table<RegistrationCode>
+            rowKey="id"
+            columns={columns}
+            dataSource={codes}
+            pagination={{ pageSize: 10, showSizeChanger: true, showTotal: (t) => `共 ${t} 条` }}
+            scroll={{ x: 1200 }}
+            size="middle"
+          />
+        </div>
       </Spin>
 
       <Modal

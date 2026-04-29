@@ -33,6 +33,7 @@ export default defineConfig(({ mode }) => {
         [process.env.VITE_API_BASE_URL || "/api"]: {
           target: process.env.VITE_PROXY_TARGET || "http://localhost:8080",
           changeOrigin: true,
+          rewrite: (path) => path.replace(new RegExp(`^${process.env.VITE_API_BASE_URL || "/api"}`), ""),
           configure: (proxy) => {
             proxy.on("proxyRes", (proxyRes, _req, res) => {
               const contentType = proxyRes.headers["content-type"];

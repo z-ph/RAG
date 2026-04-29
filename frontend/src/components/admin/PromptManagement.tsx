@@ -159,11 +159,11 @@ export function PromptManagement() {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="mb-5 flex items-center justify-between">
+      <div className="mb-4 flex items-center justify-between">
         <div>
-          <h2 className="text-lg font-semibold text-ink-950">提示词管理</h2>
-          <p className="mt-1 text-sm text-ink-500">
-            查看、编辑和重置系统提示词配置。重置将恢复为默认值。
+          <h2 className="text-lg font-bold uppercase tracking-wider text-ink-950">提示词管理</h2>
+          <p className="mt-1 text-xs text-ink-500 uppercase tracking-wider">
+            查看、编辑和重置系统提示词配置
           </p>
         </div>
         <Button icon={<ReloadOutlined />} onClick={fetchPrompts} loading={loading}>
@@ -172,15 +172,16 @@ export function PromptManagement() {
       </div>
 
       <Spin spinning={loading}>
-        <Table<PromptInfo>
-          rowKey="id"
-          columns={columns}
-          dataSource={prompts}
-          pagination={{ pageSize: 10, showSizeChanger: true, showTotal: (t) => `共 ${t} 条` }}
-          scroll={{ x: 920 }}
-          size="middle"
-          className="[&_.ant-table-thead>tr>th]:!bg-ink-50 [&_.ant-table-thead>tr>th]:!text-ink-700 [&_.ant-table-thead>tr>th]:!font-semibold"
-        />
+        <div className="border border-ink-300">
+          <Table<PromptInfo>
+            rowKey="id"
+            columns={columns}
+            dataSource={prompts}
+            pagination={{ pageSize: 10, showSizeChanger: true, showTotal: (t) => `共 ${t} 条` }}
+            scroll={{ x: 920 }}
+            size="middle"
+          />
+        </div>
       </Spin>
 
       <Modal

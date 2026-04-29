@@ -132,12 +132,19 @@ public class UserAccountService implements UserDetailsService {
 
     @Transactional
     public void ensureBootstrapAdmin(String username, String rawPassword, Role adminRole) {
-        if (hasAdminAccount()) {
-            return;
-        }
-
         if (username == null || username.isBlank() || rawPassword == null || rawPassword.isBlank()) {
             throw new IllegalStateException("未找到管理员账号，且未配置有效的初始管理员用户名/密码");
+        }
+
+        Optional<UserAccount> existing = findByUsername(normalizeUsername(username));
+        if (existing.isPresent()) {
+            UserAccount admin = existing.get();
+            if (admin.getAssignedRole() == null) {
+                admin.setAssignedRole(adminRole);
+                userAccountRepository.save(admin);
+                log.info("已更新管理员账号的角色绑定: {} -> {}", admin.getUsername(), adminRole.getCode());
+            }
+            return;
         }
 
         UserAccount adminAccount = createUser(username, rawPassword, adminRole);

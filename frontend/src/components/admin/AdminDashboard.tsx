@@ -1,28 +1,23 @@
 import { useEffect, useState } from "react";
-import { Card, Row, Col, Statistic, Spin } from "antd";
+import { Spin } from "antd";
 import {
   UserOutlined,
   SafetyCertificateOutlined,
   KeyOutlined,
   FileTextOutlined
 } from "@ant-design/icons";
-import { listUsers } from "../../lib/adminApi";
-import { listRoles } from "../../lib/adminApi";
-import { listPermissions } from "../../lib/adminApi";
+import { listUsers, listRoles, listPermissions } from "../../lib/adminApi";
 import { listRegistrationCodes } from "../../lib/api";
-import type { User } from "../../types/admin";
-import type { Role } from "../../types/admin";
-import type { Permission } from "../../types/admin";
-import type { RegistrationCode } from "../../types";
+
+interface StatItem {
+  label: string;
+  value: number;
+  icon: React.ReactNode;
+}
 
 export function AdminDashboard() {
   const [loading, setLoading] = useState(true);
-  const [stats, setStats] = useState({
-    users: 0,
-    roles: 0,
-    permissions: 0,
-    codes: 0
-  });
+  const [stats, setStats] = useState<StatItem[]>([]);
 
   useEffect(() => {
     async function loadStats() {
@@ -33,12 +28,12 @@ export function AdminDashboard() {
           listPermissions(),
           listRegistrationCodes().then(r => r.codes)
         ]);
-        setStats({
-          users: users.length,
-          roles: roles.length,
-          permissions: permissions.length,
-          codes: codes.length
-        });
+        setStats([
+          { label: "用户总数", value: users.length, icon: <UserOutlined /> },
+          { label: "角色总数", value: roles.length, icon: <SafetyCertificateOutlined /> },
+          { label: "权限总数", value: permissions.length, icon: <KeyOutlined /> },
+          { label: "注册码总数", value: codes.length, icon: <FileTextOutlined /> },
+        ]);
       } catch {
         // ignore
       } finally {
@@ -50,46 +45,19 @@ export function AdminDashboard() {
 
   return (
     <div>
-      <h1 className="mb-6 text-xl font-bold text-ink-900">管理后台概览</h1>
+      <h1 className="text-lg font-bold uppercase tracking-wider text-ink-900 mb-6">管理后台概览</h1>
       <Spin spinning={loading}>
-        <Row gutter={[16, 16]}>
-          <Col xs={24} sm={12} lg={6}>
-            <Card>
-              <Statistic
-                title="用户总数"
-                value={stats.users}
-                prefix={<UserOutlined className="text-accent-500" />}
-              />
-            </Card>
-          </Col>
-          <Col xs={24} sm={12} lg={6}>
-            <Card>
-              <Statistic
-                title="角色总数"
-                value={stats.roles}
-                prefix={<SafetyCertificateOutlined className="text-accent-500" />}
-              />
-            </Card>
-          </Col>
-          <Col xs={24} sm={12} lg={6}>
-            <Card>
-              <Statistic
-                title="权限总数"
-                value={stats.permissions}
-                prefix={<KeyOutlined className="text-accent-500" />}
-              />
-            </Card>
-          </Col>
-          <Col xs={24} sm={12} lg={6}>
-            <Card>
-              <Statistic
-                title="注册码总数"
-                value={stats.codes}
-                prefix={<FileTextOutlined className="text-accent-500" />}
-              />
-            </Card>
-          </Col>
-        </Row>
+        <div className="grid grid-cols-2 gap-px bg-ink-300 lg:grid-cols-4">
+          {stats.map(item => (
+            <div key={item.label} className="bg-white px-5 py-5">
+              <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wider text-ink-500 mb-2">
+                {item.icon}
+                {item.label}
+              </div>
+              <div className="text-3xl font-bold text-ink-950 tabular-nums">{item.value}</div>
+            </div>
+          ))}
+        </div>
       </Spin>
     </div>
   );

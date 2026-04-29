@@ -62,20 +62,22 @@ export function PermissionManagement() {
   return (
     <div className="flex h-full flex-col">
       <div className="mb-4 flex items-center justify-between">
-        <h2 className="text-lg font-semibold text-ink-950">权限管理</h2>
+        <h2 className="text-lg font-bold uppercase tracking-wider text-ink-950">权限管理</h2>
         <Button icon={<ReloadOutlined />} onClick={fetchPermissions} loading={loading}>
           刷新
         </Button>
       </div>
 
       <Spin spinning={loading}>
-        <Table<Permission>
-          rowKey="id"
-          columns={columns}
-          dataSource={permissions}
-          pagination={{ pageSize: 10, showSizeChanger: true, showTotal: (t) => `共 ${t} 条` }}
-          locale={{ emptyText: <Empty description="暂无权限数据" /> }}
-        />
+        <div className="border border-ink-300">
+          <Table<Permission>
+            rowKey="id"
+            columns={columns}
+            dataSource={permissions}
+            pagination={{ pageSize: 10, showSizeChanger: true, showTotal: (t) => `共 ${t} 条` }}
+            locale={{ emptyText: <Empty description="暂无权限数据" /> }}
+          />
+        </div>
       </Spin>
     </div>
   );

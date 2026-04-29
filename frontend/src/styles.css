@@ -1,17 +1,34 @@
 @import "tailwindcss";
 
 @theme {
-  --font-sans: "Space Grotesk", "Noto Sans SC", "Segoe UI", "PingFang SC", sans-serif;
-  --color-ink-950: #132238;
-  --color-ink-900: #24364d;
-  --color-ink-700: #42546d;
-  --color-ink-500: #63738b;
-  --color-accent-500: #f25b2a;
-  --color-accent-400: #ff894f;
-  --color-accent-100: #fff4ed;
-  --color-sky-100: #eef3ff;
-  --color-sky-50: #f7fbff;
-  --color-canvas: #f6f0e8;
+  --font-sans: "Noto Sans SC", "Segoe UI", "PingFang SC", sans-serif;
+  --font-mono: "SF Mono", "Cascadia Mono", "Consolas", "Menlo", monospace;
+
+  /* Industrial palette — cold, utilitarian, authoritative */
+  --color-ink-950: #111827;
+  --color-ink-900: #1f2937;
+  --color-ink-800: #374151;
+  --color-ink-700: #4b5563;
+  --color-ink-600: #6b7280;
+  --color-ink-500: #9ca3af;
+  --color-ink-400: #d1d5db;
+  --color-ink-300: #e5e7eb;
+  --color-ink-200: #f3f4f6;
+  --color-ink-100: #f9fafb;
+
+  --color-accent-600: #b91c1c;
+  --color-accent-500: #dc2626;
+  --color-accent-400: #ef4444;
+  --color-accent-100: #fef2f2;
+
+  --color-steel-600: #2563eb;
+  --color-steel-500: #3b82f6;
+  --color-steel-100: #eff6ff;
+
+  --color-canvas: #f9fafb;
+  --color-panel: #ffffff;
+  --color-sidebar: #111827;
+  --color-sidebar-hover: #1f2937;
 }
 
 @layer base {
@@ -46,5 +63,184 @@
   textarea,
   select {
     font: inherit;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-accent-500);
+    outline-offset: 2px;
+    border-radius: 0;
+  }
+
+  .ant-btn:focus-visible {
+    outline: 2px solid var(--color-accent-500);
+    outline-offset: 2px;
+    border-radius: 0;
+  }
+
+  /* Industrial admin overrides */
+  .ant-layout {
+    background: transparent !important;
+  }
+
+  .ant-layout-sider {
+    background: var(--color-sidebar) !important;
+    box-shadow: none !important;
+  }
+
+  .ant-layout-header {
+    background: var(--color-panel) !important;
+    border-bottom: 1px solid var(--color-ink-300) !important;
+    box-shadow: none !important;
+    padding-inline: 0 !important;
+    line-height: 48px !important;
+    height: 48px !important;
+  }
+
+  .ant-layout-content {
+    background: var(--color-canvas) !important;
+  }
+
+  .ant-menu {
+    border-inline-end: none !important;
+  }
+
+  .ant-menu-dark {
+    background: transparent !important;
+  }
+
+  .ant-menu-dark .ant-menu-item-selected {
+    background: rgba(255, 255, 255, 0.08) !important;
+    border-left: 3px solid var(--color-accent-500) !important;
+  }
+
+  .ant-menu-dark .ant-menu-item {
+    border-radius: 0 !important;
+    margin-block: 0 !important;
+    margin-inline: 0 !important;
+    padding-left: 20px !important;
+    width: 100% !important;
+  }
+
+  .ant-menu-dark .ant-menu-item:hover {
+    background: var(--color-sidebar-hover) !important;
+  }
+
+  .ant-table {
+    border-radius: 0 !important;
+  }
+
+  .ant-table-container {
+    border-radius: 0 !important;
+    border: 1px solid var(--color-ink-300) !important;
+    border-inline-start: 1px solid var(--color-ink-300) !important;
+  }
+
+  .ant-table-thead > tr > th {
+    background: var(--color-ink-100) !important;
+    color: var(--color-ink-700) !important;
+    font-weight: 600 !important;
+    font-size: 12px !important;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    border-bottom: 1px solid var(--color-ink-300) !important;
+    padding: 10px 16px !important;
+  }
+
+  .ant-table-tbody > tr > td {
+    border-bottom: 1px solid var(--color-ink-200) !important;
+    padding: 10px 16px !important;
+    font-size: 13px !important;
+    color: var(--color-ink-800) !important;
+  }
+
+  .ant-table-tbody > tr:last-child > td {
+    border-bottom: none !important;
+  }
+
+  .ant-table-tbody > tr:hover > td {
+    background: var(--color-ink-100) !important;
+  }
+
+  .ant-pagination {
+    margin: 12px 0 0 0 !important;
+  }
+
+  .ant-tag {
+    border-radius: 0 !important;
+    font-size: 11px !important;
+    padding: 1px 6px !important;
+    font-weight: 500 !important;
+    letter-spacing: 0.02em;
+    border: none !important;
+  }
+
+  .ant-modal-content {
+    border-radius: 0 !important;
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.15) !important;
+  }
+
+  .ant-modal-header {
+    border-radius: 0 !important;
+    border-bottom: 1px solid var(--color-ink-200) !important;
+    padding: 14px 20px !important;
+  }
+
+  .ant-modal-body {
+    padding: 20px !important;
+  }
+
+  .ant-modal-footer {
+    border-top: 1px solid var(--color-ink-200) !important;
+    padding: 12px 20px !important;
+  }
+
+  .ant-btn {
+    border-radius: 0 !important;
+    font-size: 13px !important;
+    height: 32px !important;
+    padding: 0 16px !important;
+    font-weight: 500 !important;
+  }
+
+  .ant-btn-primary {
+    background: var(--color-ink-900) !important;
+    border-color: var(--color-ink-900) !important;
+    color: #fff !important;
+  }
+
+  .ant-btn-primary:hover {
+    background: var(--color-ink-800) !important;
+    border-color: var(--color-ink-800) !important;
+  }
+
+  .ant-btn-default:hover {
+    border-color: var(--color-ink-400) !important;
+    color: var(--color-ink-800) !important;
+  }
+
+  .ant-input,
+  .ant-input-password,
+  .ant-select-selector,
+  .ant-picker {
+    border-radius: 0 !important;
+    font-size: 13px !important;
+  }
+
+  .ant-select-dropdown {
+    border-radius: 0 !important;
+  }
+
+  .ant-drawer-content {
+    border-radius: 0 !important;
+  }
+
+  .ant-form-item-label > label {
+    font-size: 13px !important;
+    color: var(--color-ink-700) !important;
+    font-weight: 500 !important;
+  }
+
+  .ant-spin-container::after {
+    border-radius: 0 !important;
   }
 }

@@ -214,7 +214,7 @@ export function RoleManagement() {
   return (
     <div className="flex h-full flex-col">
       <div className="mb-4 flex items-center justify-between">
-        <h2 className="text-lg font-semibold text-ink-950">角色管理</h2>
+        <h2 className="text-lg font-bold uppercase tracking-wider text-ink-950">角色管理</h2>
         <Space>
           <Button icon={<ReloadOutlined />} onClick={fetchRoles} loading={loading}>
             刷新
@@ -226,13 +226,15 @@ export function RoleManagement() {
       </div>
 
       <Spin spinning={loading}>
-        <Table<Role>
-          rowKey="id"
-          columns={columns}
-          dataSource={roles}
-          pagination={{ pageSize: 10, showSizeChanger: true, showTotal: (t) => `共 ${t} 条` }}
-          locale={{ emptyText: "暂无角色数据" }}
-        />
+        <div className="border border-ink-300">
+          <Table<Role>
+            rowKey="id"
+            columns={columns}
+            dataSource={roles}
+            pagination={{ pageSize: 10, showSizeChanger: true, showTotal: (t) => `共 ${t} 条` }}
+            locale={{ emptyText: "暂无角色数据" }}
+          />
+        </div>
       </Spin>
 
       {/* Create Role Modal */}

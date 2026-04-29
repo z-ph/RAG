@@ -52,27 +52,27 @@ export function DocumentDetail(props: DocumentDetailProps) {
       </div>
 
       <div className="mt-4 flex flex-wrap items-center gap-2">
-        <span className="inline-flex items-center gap-1.5 rounded-full bg-ink-950/6 px-3 py-1 text-xs font-medium text-ink-700">
+        <span className="inline-flex items-center gap-1.5 bg-ink-950/6 px-3 py-1 text-xs font-medium text-ink-700">
           <FileTextOutlined />
           {detail.filename}
         </span>
         {detail.category && (
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-accent-100 px-3 py-1 text-xs font-medium text-accent-500">
+          <span className="inline-flex items-center gap-1.5 bg-accent-100 px-3 py-1 text-xs font-medium text-accent-500">
             {detail.category}
           </span>
         )}
-        <span className="inline-flex rounded-full bg-ink-950/6 px-3 py-1 text-xs font-medium text-ink-700">
+        <span className="inline-flex bg-ink-950/6 px-3 py-1 text-xs font-medium text-ink-700">
           {detail.segmentCount} 段
         </span>
         {detail.documentTime && (
-          <span className="inline-flex rounded-full bg-ink-950/6 px-3 py-1 text-xs font-medium text-ink-500">
+          <span className="inline-flex bg-ink-950/6 px-3 py-1 text-xs font-medium text-ink-500">
             {detail.documentTime}
           </span>
         )}
         <Button
           type="text"
           size="small"
-          className="!text-green-600 hover:!text-green-700"
+          className="!text-ink-600 hover:!text-accent-500"
           icon={<DownloadOutlined />}
           onClick={() => props.onDownload(detail.documentId, detail.filename)}
         >
@@ -86,7 +86,7 @@ export function DocumentDetail(props: DocumentDetailProps) {
           {detail.keywords.split(",").map((kw, i) => (
             <span
               key={i}
-              className="rounded-full bg-sky-100 px-2 py-0.5 text-xs text-sky-700"
+              className="bg-sky-100 px-2 py-0.5 text-xs text-sky-700"
             >
               {kw.trim()}
             </span>
@@ -99,10 +99,10 @@ export function DocumentDetail(props: DocumentDetailProps) {
           {detail.segments.map((segment) => (
             <div
               key={segment.chunkIndex}
-              className="rounded-[12px] bg-white/[0.72] px-4 py-3 shadow-[inset_0_0_0_1px_rgba(19,34,56,0.08)]"
+              className="border border-ink-300 bg-white px-4 py-3"
             >
               <div className="mb-2 flex items-center gap-2">
-                <span className="inline-flex rounded-full bg-ink-950/6 px-2 py-0.5 text-[10px] font-medium text-ink-500">
+                <span className="inline-flex bg-ink-950/6 px-2 py-0.5 text-[10px] font-medium text-ink-500">
                   #{segment.chunkIndex}
                 </span>
               </div>

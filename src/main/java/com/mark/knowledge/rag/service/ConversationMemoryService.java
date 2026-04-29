@@ -9,6 +9,7 @@ import org.springframework.stereotype.Service;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -59,6 +60,28 @@ public class ConversationMemoryService {
         sessions.remove(conversationId);
     }
 
+    public Set<String> getUsedChunkHashes(String conversationId) {
+        if (conversationId == null || conversationId.isBlank()) {
+            return Set.of();
+        }
+        ConversationSession session = sessions.get(conversationId);
+        if (session == null) {
+            return Set.of();
+        }
+        return session.snapshotUsedChunkHashes();
+    }
+
+    public void recordUsedChunkHashes(String conversationId, Set<String> chunkHashes) {
+        if (conversationId == null || conversationId.isBlank()) {
+            return;
+        }
+        if (chunkHashes == null || chunkHashes.isEmpty()) {
+            return;
+        }
+        ConversationSession session = sessions.computeIfAbsent(conversationId, ignored -> new ConversationSession());
+        session.addUsedChunkHashes(chunkHashes);
+    }
+
     @Scheduled(fixedDelayString = "${rag.memory-cleanup-interval-ms:300000}")
     public void cleanupExpiredSessions() {
         Instant expireBefore = Instant.now().minusSeconds(sessionTtlSeconds);
@@ -96,6 +119,7 @@ public class ConversationMemoryService {
 
     private static final class ConversationSession {
         private final List<ConversationMessage> messages = new ArrayList<>();
+        private final Set<String> usedChunkHashes = ConcurrentHashMap.newKeySet();
         private Instant lastAccessTime = Instant.now();
 
         private synchronized void add(ConversationMessage message, int memoryWindow) {
@@ -106,6 +130,15 @@ public class ConversationMemoryService {
 
         private synchronized List<ConversationMessage> snapshot() {
             return List.copyOf(messages);
+        }
+
+        private synchronized void addUsedChunkHashes(Set<String> hashes) {
+            usedChunkHashes.addAll(hashes);
+            touch();
+        }
+
+        private synchronized Set<String> snapshotUsedChunkHashes() {
+            return Set.copyOf(usedChunkHashes);
         }
 
         private synchronized void trimToWindow(int memoryWindow) {

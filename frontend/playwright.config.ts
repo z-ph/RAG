@@ -10,8 +10,8 @@ import { defineConfig, devices } from "@playwright/test";
  *   PLAYWRIGHT_ADMIN_PASSWORD - 测试管理员密码，默认 ChangeMe123!
  */
 
-const baseURL = process.env.PLAYWRIGHT_BASE_URL || "http://localhost:5174";
-const apiURL = process.env.PLAYWRIGHT_API_URL || "http://localhost:8082";
+const baseURL = process.env.PLAYWRIGHT_BASE_URL || "http://localhost:5178/rag";
+const apiURL = process.env.PLAYWRIGHT_API_URL || "http://localhost:8081";
 
 export default defineConfig({
   testDir: "./e2e/tests",

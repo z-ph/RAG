@@ -1,6 +1,5 @@
 import { test, expect } from "../fixtures";
 import { ChatPage } from "../pages/chat.page";
-import { AuthPage } from "../pages/auth.page";
 import { AdminPage } from "../pages/admin.page";
 import {
   createRegistrationCode,
@@ -10,24 +9,19 @@ import {
 
 test.describe("管理后台交互", () => {
   test("管理员可访问提示词管理", async ({ adminPage }) => {
-    const chat = new ChatPage(adminPage);
     const admin = new AdminPage(adminPage);
 
-    await chat.goto();
-    await chat.openAdmin();
+    await admin.gotoPrompts();
 
-    await expect(admin.drawer).toBeVisible();
     await expect(
       adminPage.locator("text=提示词管理")
     ).toBeVisible();
   });
 
   test("管理员编辑并保存提示词", async ({ adminPage }) => {
-    const chat = new ChatPage(adminPage);
     const admin = new AdminPage(adminPage);
 
-    await chat.goto();
-    await chat.openAdmin();
+    await admin.gotoPrompts();
 
     // 等待列表加载
     await expect(adminPage.locator(".ant-list-item").first()).toBeVisible({
@@ -60,11 +54,9 @@ test.describe("管理后台交互", () => {
   });
 
   test("管理员重置提示词", async ({ adminPage }) => {
-    const chat = new ChatPage(adminPage);
     const admin = new AdminPage(adminPage);
 
-    await chat.goto();
-    await chat.openAdmin();
+    await admin.gotoPrompts();
 
     await expect(adminPage.locator(".ant-list-item").first()).toBeVisible({
       timeout: 10_000,
@@ -83,17 +75,12 @@ test.describe("管理后台交互", () => {
   });
 
   test("管理员生成注册码", async ({ adminPage }) => {
-    const chat = new ChatPage(adminPage);
-    const auth = new AuthPage(adminPage);
+    const admin = new AdminPage(adminPage);
 
-    await chat.goto();
-    await chat.openAuth();
-
-    // 切换到注册码管理区域（已在登录状态下显示）
-    await expect(auth.getRegistrationCodeForm()).toBeVisible();
+    await admin.gotoRegistrationCodes();
 
     const note = `e2e-generated-${Date.now()}`;
-    await auth.createRegistrationCode(note);
+    await admin.createRegistrationCode(note);
 
     // 验证成功提示
     await expect(
@@ -102,7 +89,7 @@ test.describe("管理后台交互", () => {
 
     // 验证注册码出现在列表中
     await expect(
-      adminPage.locator("article").filter({ hasText: note }).first()
+      adminPage.locator("tr").filter({ hasText: note }).first()
     ).toBeVisible();
 
     // 清理
@@ -118,21 +105,17 @@ test.describe("管理后台交互", () => {
     const regCode = await createRegistrationCode("e2e-disable-test");
 
     try {
-      const chat = new ChatPage(adminPage);
-      const auth = new AuthPage(adminPage);
+      const admin = new AdminPage(adminPage);
 
-      await chat.goto();
-      await chat.openAuth();
-
-      await expect(auth.getRegistrationCodeForm()).toBeVisible();
+      await admin.gotoRegistrationCodes();
 
       // 禁用该注册码
-      await auth.disableRegistrationCode(regCode.code);
+      await admin.disableRegistrationCode(regCode.code);
 
       // 验证状态变为"已禁用"
       await expect(
         adminPage
-          .locator("article")
+          .locator("tr")
           .filter({ hasText: regCode.code })
           .locator("text=已禁用")
       ).toBeVisible();
@@ -149,20 +132,16 @@ test.describe("管理后台交互", () => {
     // 先创建一个注册码
     const regCode = await createRegistrationCode("e2e-delete-test");
 
-    const chat = new ChatPage(adminPage);
-    const auth = new AuthPage(adminPage);
+    const admin = new AdminPage(adminPage);
 
-    await chat.goto();
-    await chat.openAuth();
-
-    await expect(auth.getRegistrationCodeForm()).toBeVisible();
+    await admin.gotoRegistrationCodes();
 
     // 删除该注册码
-    await auth.deleteRegistrationCode(regCode.code);
+    await admin.deleteRegistrationCode(regCode.code);
 
     // 验证已消失
     await expect(
-      adminPage.locator("article").filter({ hasText: regCode.code })
+      adminPage.locator("tr").filter({ hasText: regCode.code })
     ).not.toBeVisible();
   });
 });

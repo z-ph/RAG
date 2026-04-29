@@ -4,8 +4,9 @@ import com.mark.knowledge.auth.dto.AuthStatusResponse;
 import com.mark.knowledge.auth.dto.AuthUserResponse;
 import com.mark.knowledge.auth.dto.LoginRequest;
 import com.mark.knowledge.auth.dto.RegisterRequest;
+import com.mark.knowledge.auth.entity.Role;
 import com.mark.knowledge.auth.entity.UserAccount;
-import com.mark.knowledge.auth.entity.UserRole;
+import com.mark.knowledge.auth.repository.RoleRepository;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
 import org.springframework.security.authentication.AnonymousAuthenticationToken;
@@ -27,14 +28,17 @@ public class AuthService {
     private final AuthenticationManager authenticationManager;
     private final UserAccountService userAccountService;
     private final RegistrationCodeService registrationCodeService;
+    private final RoleRepository roleRepository;
 
     public AuthService(
             AuthenticationManager authenticationManager,
             UserAccountService userAccountService,
-            RegistrationCodeService registrationCodeService) {
+            RegistrationCodeService registrationCodeService,
+            RoleRepository roleRepository) {
         this.authenticationManager = authenticationManager;
         this.userAccountService = userAccountService;
         this.registrationCodeService = registrationCodeService;
+        this.roleRepository = roleRepository;
     }
 
     public UserAccount login(LoginRequest request, HttpServletRequest httpServletRequest) {
@@ -56,7 +60,10 @@ public class AuthService {
         userAccountService.ensureUsernameAvailable(normalizedUsername);
         registrationCodeService.consumeCode(request.registrationCode(), normalizedUsername);
 
-        UserAccount userAccount = userAccountService.createUser(normalizedUsername, request.password(), UserRole.USER);
+        Role defaultUserRole = roleRepository.findByCode("USER")
+            .orElseThrow(() -> new IllegalStateException("系统未配置默认用户角色"));
+
+        UserAccount userAccount = userAccountService.createUser(normalizedUsername, request.password(), defaultUserRole);
 
         Authentication authentication = authenticationManager.authenticate(
             UsernamePasswordAuthenticationToken.unauthenticated(normalizedUsername, request.password())

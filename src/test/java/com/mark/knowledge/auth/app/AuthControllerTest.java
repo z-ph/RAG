@@ -76,7 +76,7 @@ class AuthControllerTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.authenticated").value(true))
             .andExpect(jsonPath("$.user.username").value("admin"))
-            .andExpect(jsonPath("$.user.role").value("ADMIN"));
+            .andExpect(jsonPath("$.user.role").value("超级管理员"));
     }
 
     @Test

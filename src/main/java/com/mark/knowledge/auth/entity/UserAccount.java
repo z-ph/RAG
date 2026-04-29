@@ -2,11 +2,12 @@ package com.mark.knowledge.auth.entity;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
@@ -30,9 +31,12 @@ public class UserAccount {
     @Column(name = "password_hash", nullable = false, length = 255)
     private String passwordHash;
 
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 16)
-    private UserRole role;
+    @Column(name = "role", nullable = false, length = 16)
+    private String role;
+
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "role_id")
+    private Role assignedRole;
 
     @Column(nullable = false)
     private boolean enabled = true;
@@ -46,10 +50,11 @@ public class UserAccount {
     protected UserAccount() {
     }
 
-    public UserAccount(String username, String passwordHash, UserRole role) {
+    public UserAccount(String username, String passwordHash, Role assignedRole) {
         this.username = username;
         this.passwordHash = passwordHash;
-        this.role = role;
+        this.assignedRole = assignedRole;
+        this.role = assignedRole != null ? assignedRole.getCode() : "USER";
         this.enabled = true;
     }
 
@@ -77,12 +82,31 @@ public class UserAccount {
         return passwordHash;
     }
 
-    public UserRole getRole() {
+    public void setPasswordHash(String passwordHash) {
+        this.passwordHash = passwordHash;
+    }
+
+    public String getRole() {
         return role;
+    }
+
+    public Role getAssignedRole() {
+        return assignedRole;
+    }
+
+    public void setAssignedRole(Role assignedRole) {
+        this.assignedRole = assignedRole;
+        if (assignedRole != null) {
+            this.role = assignedRole.getCode();
+        }
     }
 
     public boolean isEnabled() {
         return enabled;
+    }
+
+    public void setEnabled(boolean enabled) {
+        this.enabled = enabled;
     }
 
     public LocalDateTime getCreatedAt() {
@@ -91,9 +115,5 @@ public class UserAccount {
 
     public LocalDateTime getUpdatedAt() {
         return updatedAt;
-    }
-
-    public void setEnabled(boolean enabled) {
-        this.enabled = enabled;
     }
 }

@@ -1,10 +1,11 @@
 package com.mark.knowledge.auth.service;
 
+import com.mark.knowledge.auth.entity.Role;
 import com.mark.knowledge.auth.entity.UserAccount;
-import com.mark.knowledge.auth.entity.UserRole;
 import com.mark.knowledge.auth.repository.UserAccountRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
@@ -13,6 +14,8 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
 import java.util.regex.Pattern;
@@ -40,9 +43,23 @@ public class UserAccountService implements UserDetailsService {
         UserAccount userAccount = findByUsername(normalizeUsername(username))
             .orElseThrow(() -> new UsernameNotFoundException("用户不存在: " + username));
 
+        List<SimpleGrantedAuthority> authorities = new ArrayList<>();
+
+        if (userAccount.getAssignedRole() != null) {
+            authorities.add(new SimpleGrantedAuthority("ROLE_" + userAccount.getAssignedRole().getCode()));
+            userAccount.getAssignedRole().getPermissions().forEach(p ->
+                authorities.add(new SimpleGrantedAuthority(p.getCode()))
+            );
+        } else {
+            String legacyRole = userAccount.getRole();
+            if (legacyRole != null) {
+                authorities.add(new SimpleGrantedAuthority("ROLE_" + legacyRole));
+            }
+        }
+
         return User.withUsername(userAccount.getUsername())
             .password(userAccount.getPasswordHash())
-            .roles(userAccount.getRole().name())
+            .authorities(authorities)
             .disabled(!userAccount.isEnabled())
             .build();
     }
@@ -60,11 +77,21 @@ public class UserAccountService implements UserDetailsService {
 
     @Transactional(readOnly = true)
     public boolean hasAdminAccount() {
-        return userAccountRepository.countByRole(UserRole.ADMIN) > 0;
+        return userAccountRepository.countByRole("ADMIN") > 0;
+    }
+
+    @Transactional(readOnly = true)
+    public List<UserAccount> findAllUsers() {
+        return userAccountRepository.findAllByOrderByCreatedAtDesc();
+    }
+
+    @Transactional(readOnly = true)
+    public Optional<UserAccount> findById(Long id) {
+        return userAccountRepository.findById(id);
     }
 
     @Transactional
-    public UserAccount createUser(String username, String rawPassword, UserRole role) {
+    public UserAccount createUser(String username, String rawPassword, Role role) {
         String normalizedUsername = normalizeUsername(username);
         validatePassword(rawPassword);
 
@@ -81,7 +108,30 @@ public class UserAccountService implements UserDetailsService {
     }
 
     @Transactional
-    public void ensureBootstrapAdmin(String username, String rawPassword) {
+    public UserAccount updateUser(Long id, Role role, Boolean enabled) {
+        UserAccount user = userAccountRepository.findById(id)
+            .orElseThrow(() -> new IllegalArgumentException("用户不存在"));
+
+        if (role != null) {
+            user.setAssignedRole(role);
+        }
+
+        if (enabled != null) {
+            user.setEnabled(enabled);
+        }
+
+        return userAccountRepository.save(user);
+    }
+
+    @Transactional
+    public void deleteUser(Long id) {
+        UserAccount user = userAccountRepository.findById(id)
+            .orElseThrow(() -> new IllegalArgumentException("用户不存在"));
+        userAccountRepository.delete(user);
+    }
+
+    @Transactional
+    public void ensureBootstrapAdmin(String username, String rawPassword, Role adminRole) {
         if (hasAdminAccount()) {
             return;
         }
@@ -90,7 +140,7 @@ public class UserAccountService implements UserDetailsService {
             throw new IllegalStateException("未找到管理员账号，且未配置有效的初始管理员用户名/密码");
         }
 
-        UserAccount adminAccount = createUser(username, rawPassword, UserRole.ADMIN);
+        UserAccount adminAccount = createUser(username, rawPassword, adminRole);
         log.info("已初始化默认管理员账号: {}", adminAccount.getUsername());
     }
 
@@ -119,5 +169,28 @@ public class UserAccountService implements UserDetailsService {
         if (rawPassword.length() < 8 || rawPassword.length() > 72) {
             throw new IllegalArgumentException("密码长度需为 8-72 位");
         }
+    }
+
+    @Transactional
+    public void changePassword(String username, String currentPassword, String newPassword) {
+        UserAccount user = getRequiredByUsername(username);
+
+        if (!passwordEncoder.matches(currentPassword, user.getPasswordHash())) {
+            throw new IllegalArgumentException("当前密码不正确");
+        }
+
+        validatePassword(newPassword);
+        user.setPasswordHash(passwordEncoder.encode(newPassword));
+        userAccountRepository.save(user);
+    }
+
+    @Transactional
+    public void resetPassword(Long userId, String newPassword) {
+        UserAccount user = userAccountRepository.findById(userId)
+            .orElseThrow(() -> new IllegalArgumentException("用户不存在"));
+
+        validatePassword(newPassword);
+        user.setPasswordHash(passwordEncoder.encode(newPassword));
+        userAccountRepository.save(user);
     }
 }

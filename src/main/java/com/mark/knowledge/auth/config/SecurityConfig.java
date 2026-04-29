@@ -36,7 +36,6 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        // 允许的前端地址，生产环境替换为实际域名
         configuration.setAllowedOriginPatterns(List.of("*"));
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("*"));
@@ -62,8 +61,9 @@ public class SecurityConfig {
                 .requestMatchers("/api/rag/**").permitAll()
                 .requestMatchers("/api/documents/health").permitAll()
                 .requestMatchers("/api/documents/public/**").permitAll()
-                .requestMatchers("/api/auth/login", "/api/auth/register", "/api/auth/logout", "/api/auth/me").permitAll()
-                .requestMatchers("/api/auth/registration-codes/**").hasRole("ADMIN")
+                .requestMatchers("/api/auth/login", "/api/auth/register", "/api/auth/logout", "/api/auth/me", "/api/auth/change-password").permitAll()
+                .requestMatchers("/api/auth/registration-codes/**").hasAnyRole("ADMIN", "SUPER_ADMIN")
+                .requestMatchers("/api/admin/**").authenticated()
                 .requestMatchers("/api/documents/**").authenticated()
                 .anyRequest().permitAll()
             )

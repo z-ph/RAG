@@ -10,6 +10,9 @@ public record AuthUserResponse(
     String role
 ) {
     public static AuthUserResponse from(UserAccount userAccount) {
-        return new AuthUserResponse(userAccount.getUsername(), userAccount.getRole().name());
+        String roleDisplay = userAccount.getAssignedRole() != null
+            ? userAccount.getAssignedRole().getName()
+            : userAccount.getRole();
+        return new AuthUserResponse(userAccount.getUsername(), roleDisplay);
     }
 }

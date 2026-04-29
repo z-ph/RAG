@@ -3,6 +3,7 @@ package com.mark.knowledge.auth.app;
 import com.mark.knowledge.auth.dto.AuthStatusResponse;
 import com.mark.knowledge.auth.dto.AuthSuccessResponse;
 import com.mark.knowledge.auth.dto.AuthUserResponse;
+import com.mark.knowledge.auth.dto.ChangePasswordRequest;
 import com.mark.knowledge.auth.dto.LoginRequest;
 import com.mark.knowledge.auth.dto.MessageResponse;
 import com.mark.knowledge.auth.dto.RegisterRequest;
@@ -13,6 +14,7 @@ import com.mark.knowledge.auth.entity.RegistrationCode;
 import com.mark.knowledge.auth.entity.UserAccount;
 import com.mark.knowledge.auth.service.AuthService;
 import com.mark.knowledge.auth.service.RegistrationCodeService;
+import com.mark.knowledge.auth.service.UserAccountService;
 import com.mark.knowledge.rag.dto.ErrorResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
@@ -44,10 +46,12 @@ public class AuthController {
 
     private final AuthService authService;
     private final RegistrationCodeService registrationCodeService;
+    private final UserAccountService userAccountService;
 
-    public AuthController(AuthService authService, RegistrationCodeService registrationCodeService) {
+    public AuthController(AuthService authService, RegistrationCodeService registrationCodeService, UserAccountService userAccountService) {
         this.authService = authService;
         this.registrationCodeService = registrationCodeService;
+        this.userAccountService = userAccountService;
     }
 
     @PostMapping("/login")
@@ -83,6 +87,16 @@ public class AuthController {
     @GetMapping("/me")
     public ResponseEntity<AuthStatusResponse> me(Authentication authentication) {
         return ResponseEntity.ok(authService.getCurrentUser(authentication));
+    }
+
+    @PostMapping("/change-password")
+    public ResponseEntity<?> changePassword(@RequestBody ChangePasswordRequest request, Authentication authentication) {
+        try {
+            userAccountService.changePassword(authentication.getName(), request.currentPassword(), request.newPassword());
+            return ResponseEntity.ok(new MessageResponse("密码已修改"));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(new ErrorResponse("修改失败", e.getMessage()));
+        }
     }
 
     @GetMapping("/registration-codes")

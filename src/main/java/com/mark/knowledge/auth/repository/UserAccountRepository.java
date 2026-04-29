@@ -1,9 +1,9 @@
 package com.mark.knowledge.auth.repository;
 
 import com.mark.knowledge.auth.entity.UserAccount;
-import com.mark.knowledge.auth.entity.UserRole;
 import org.springframework.data.jpa.repository.JpaRepository;
 
+import java.util.List;
 import java.util.Optional;
 
 public interface UserAccountRepository extends JpaRepository<UserAccount, Long> {
@@ -12,5 +12,7 @@ public interface UserAccountRepository extends JpaRepository<UserAccount, Long> 
 
     boolean existsByUsername(String username);
 
-    long countByRole(UserRole role);
+    long countByRole(String role);
+
+    List<UserAccount> findAllByOrderByCreatedAtDesc();
 }

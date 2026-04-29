@@ -33,6 +33,7 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.regex.Matcher;
@@ -69,6 +70,9 @@ public class RagService {
 
     @Value("${rag.rerank.bm25-weight:0.4}")
     private double bm25Weight;
+
+    @Value("${rag.chunk-dedup-enabled:true}")
+    private boolean chunkDedupEnabled;
 
     private final ChatModel chatModel;
     private final StreamingChatModel streamingChatModel;
@@ -143,6 +147,9 @@ public class RagService {
             log.info("BM25 重排耗时: {} ms，最终保留 {} 条片段", elapsedMillis(rerankStart), matches.size());
 
             matches = enrichWithCrossDocumentResults(request, matches, requestedMaxResults);
+
+            matches = deduplicateBySessionHistory(conversationId, matches);
+            extractAndRecordChunkHashes(conversationId, matches);
 
             String context = matches.stream()
                 .map(match -> match.segment().text())
@@ -265,6 +272,9 @@ public class RagService {
             matches = enrichWithCrossDocumentResults(request, matches, requestedMaxResults);
             log.info("[TTFT-DETAIL] 跨文档检索: conversationId={}, stepMs={}, total={}, totalMs={}",
                 conversationId, elapsedMillis(crossStart), matches.size(), elapsedMillis(pipelineStart));
+
+            matches = deduplicateBySessionHistory(conversationId, matches);
+            extractAndRecordChunkHashes(conversationId, matches);
 
             sendEvent(generation, "sources", toSourceReferences(matches));
             log.info("[TTFT-DETAIL] sources已发送: conversationId={}, totalMs={}",
@@ -558,6 +568,46 @@ public class RagService {
             .sorted(Comparator.comparingDouble(HybridMatch::finalScore).reversed())
             .limit(requestedMaxResults)
             .collect(Collectors.toList());
+    }
+
+    private List<HybridMatch> deduplicateBySessionHistory(String conversationId, List<HybridMatch> matches) {
+        if (!chunkDedupEnabled || conversationId == null || matches == null || matches.isEmpty()) {
+            return matches;
+        }
+
+        Set<String> usedHashes = conversationMemoryService.getUsedChunkHashes(conversationId);
+        if (usedHashes.isEmpty()) {
+            return matches;
+        }
+
+        List<HybridMatch> filtered = matches.stream()
+            .filter(match -> {
+                String chunkHash = match.segment().metadata().getString("chunkHash");
+                return chunkHash == null || !usedHashes.contains(chunkHash);
+            })
+            .collect(Collectors.toList());
+
+        int removed = matches.size() - filtered.size();
+        if (removed > 0) {
+            log.info("会话 {} 跨轮次去重过滤掉 {} 条已出现片段", conversationId, removed);
+        }
+
+        return filtered;
+    }
+
+    private void extractAndRecordChunkHashes(String conversationId, List<HybridMatch> matches) {
+        if (conversationId == null || matches == null || matches.isEmpty()) {
+            return;
+        }
+
+        Set<String> chunkHashes = matches.stream()
+            .map(match -> match.segment().metadata().getString("chunkHash"))
+            .filter(Objects::nonNull)
+            .collect(Collectors.toSet());
+
+        if (!chunkHashes.isEmpty()) {
+            conversationMemoryService.recordUsedChunkHashes(conversationId, chunkHashes);
+        }
     }
 
     private String rewriteQuestion(String question, List<ConversationMemoryService.ConversationMessage> history) {

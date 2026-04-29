@@ -1,5 +1,7 @@
 package com.mark.knowledge.rag.service;
 
+import dev.langchain4j.data.document.Metadata;
+import dev.langchain4j.data.segment.TextSegment;
 import dev.langchain4j.model.chat.response.PartialThinking;
 import dev.langchain4j.model.chat.response.StreamingChatResponseHandler;
 import org.junit.jupiter.api.Test;
@@ -8,8 +10,12 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.io.IOException;
 import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -80,6 +86,135 @@ class RagServiceTest {
             List.of("thinking_delta", "thinking_end", "complete"),
             emitter.eventNames()
         );
+    }
+
+    @Test
+    void shouldDeduplicateBySessionHistory() throws Exception {
+        ConversationMemoryService memoryService = new ConversationMemoryService(6, 1800);
+        RagService service = new RagService(null, null, null, null, memoryService, new Bm25Scorer(), null);
+        setChunkDedupEnabled(service, true);
+        memoryService.recordUsedChunkHashes("test-conv-1", Set.of("hash1", "hash2"));
+
+        Class<?> hybridMatchClass = findInnerClass("HybridMatch");
+        Constructor<?> ctor = hybridMatchClass.getDeclaredConstructor(
+            TextSegment.class, double.class, double.class, double.class
+        );
+        ctor.setAccessible(true);
+
+        TextSegment seg1 = TextSegment.from("text1", new Metadata(Map.of("chunkHash", "hash1")));
+        TextSegment seg2 = TextSegment.from("text2", new Metadata(Map.of("chunkHash", "hash2")));
+        TextSegment seg3 = TextSegment.from("text3", new Metadata(Map.of("chunkHash", "hash3")));
+
+        Object m1 = ctor.newInstance(seg1, 0.9, 0.8, 0.85);
+        Object m2 = ctor.newInstance(seg2, 0.8, 0.7, 0.75);
+        Object m3 = ctor.newInstance(seg3, 0.7, 0.6, 0.65);
+
+        Method dedupMethod = RagService.class.getDeclaredMethod(
+            "deduplicateBySessionHistory", String.class, List.class);
+        dedupMethod.setAccessible(true);
+
+        @SuppressWarnings("unchecked")
+        List<Object> result = (List<Object>) dedupMethod.invoke(service, "test-conv-1", List.of(m1, m2, m3));
+
+        assertEquals(1, result.size());
+        TextSegment remainingSeg = (TextSegment) hybridMatchClass.getMethod("segment").invoke(result.get(0));
+        assertEquals("text3", remainingSeg.text());
+    }
+
+    @Test
+    void shouldNotDeduplicateWhenDisabled() throws Exception {
+        ConversationMemoryService memoryService = new ConversationMemoryService(6, 1800);
+        RagService service = new RagService(null, null, null, null, memoryService, new Bm25Scorer(), null);
+        setChunkDedupEnabled(service, false);
+        memoryService.recordUsedChunkHashes("test-conv-2", Set.of("hash1"));
+
+        Class<?> hybridMatchClass = findInnerClass("HybridMatch");
+        Constructor<?> ctor = hybridMatchClass.getDeclaredConstructor(
+            TextSegment.class, double.class, double.class, double.class
+        );
+        ctor.setAccessible(true);
+
+        TextSegment seg1 = TextSegment.from("text1", new Metadata(Map.of("chunkHash", "hash1")));
+        TextSegment seg2 = TextSegment.from("text2", new Metadata(Map.of("chunkHash", "hash2")));
+
+        Object m1 = ctor.newInstance(seg1, 0.9, 0.8, 0.85);
+        Object m2 = ctor.newInstance(seg2, 0.8, 0.7, 0.75);
+
+        Method dedupMethod = RagService.class.getDeclaredMethod(
+            "deduplicateBySessionHistory", String.class, List.class);
+        dedupMethod.setAccessible(true);
+
+        @SuppressWarnings("unchecked")
+        List<Object> result = (List<Object>) dedupMethod.invoke(service, "test-conv-2", List.of(m1, m2));
+
+        assertEquals(2, result.size());
+    }
+
+    @Test
+    void shouldPreserveMatchesWithNullChunkHash() throws Exception {
+        ConversationMemoryService memoryService = new ConversationMemoryService(6, 1800);
+        RagService service = new RagService(null, null, null, null, memoryService, new Bm25Scorer(), null);
+        setChunkDedupEnabled(service, true);
+        memoryService.recordUsedChunkHashes("test-conv-3", Set.of("hash1"));
+
+        Class<?> hybridMatchClass = findInnerClass("HybridMatch");
+        Constructor<?> ctor = hybridMatchClass.getDeclaredConstructor(
+            TextSegment.class, double.class, double.class, double.class
+        );
+        ctor.setAccessible(true);
+
+        // Match without "chunkHash" in metadata → getString returns null
+        TextSegment seg1 = TextSegment.from("text1", new Metadata(Map.of()));
+        TextSegment seg2 = TextSegment.from("text2", new Metadata(Map.of("chunkHash", "hash1")));
+
+        Object m1 = ctor.newInstance(seg1, 0.9, 0.8, 0.85);
+        Object m2 = ctor.newInstance(seg2, 0.8, 0.7, 0.75);
+
+        Method dedupMethod = RagService.class.getDeclaredMethod(
+            "deduplicateBySessionHistory", String.class, List.class);
+        dedupMethod.setAccessible(true);
+
+        @SuppressWarnings("unchecked")
+        List<Object> result = (List<Object>) dedupMethod.invoke(service, "test-conv-3", List.of(m1, m2));
+
+        // seg1 (null chunkHash) should be kept; seg2 ("hash1" duplicate) should be removed
+        assertEquals(1, result.size());
+    }
+
+    @Test
+    void shouldKeepAllMatchesWhenNoUsedHashes() throws Exception {
+        ConversationMemoryService memoryService = new ConversationMemoryService(6, 1800);
+        RagService service = new RagService(null, null, null, null, memoryService, new Bm25Scorer(), null);
+        setChunkDedupEnabled(service, true);
+
+        Class<?> hybridMatchClass = findInnerClass("HybridMatch");
+        Constructor<?> ctor = hybridMatchClass.getDeclaredConstructor(
+            TextSegment.class, double.class, double.class, double.class
+        );
+        ctor.setAccessible(true);
+
+        TextSegment seg1 = TextSegment.from("text1", new Metadata(Map.of("chunkHash", "hash1")));
+        TextSegment seg2 = TextSegment.from("text2", new Metadata(Map.of("chunkHash", "hash2")));
+        TextSegment seg3 = TextSegment.from("text3", new Metadata(Map.of("chunkHash", "hash3")));
+
+        Object m1 = ctor.newInstance(seg1, 0.9, 0.8, 0.85);
+        Object m2 = ctor.newInstance(seg2, 0.8, 0.7, 0.75);
+        Object m3 = ctor.newInstance(seg3, 0.7, 0.6, 0.65);
+
+        Method dedupMethod = RagService.class.getDeclaredMethod(
+            "deduplicateBySessionHistory", String.class, List.class);
+        dedupMethod.setAccessible(true);
+
+        @SuppressWarnings("unchecked")
+        List<Object> result = (List<Object>) dedupMethod.invoke(service, "test-conv-4", List.of(m1, m2, m3));
+
+        assertEquals(3, result.size());
+    }
+
+    private void setChunkDedupEnabled(RagService service, boolean enabled) throws Exception {
+        Field field = RagService.class.getDeclaredField("chunkDedupEnabled");
+        field.setAccessible(true);
+        field.setBoolean(service, enabled);
     }
 
     private Object newGeneration(

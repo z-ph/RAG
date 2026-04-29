@@ -64,6 +64,7 @@ rag:
   session-ttl-seconds: ${RAG_SESSION_TTL_SECONDS:1800}
   memory-cleanup-interval-ms: ${RAG_MEMORY_CLEANUP_INTERVAL_MS:300000}
   stream-timeout-ms: ${RAG_STREAM_TIMEOUT_MS:300000}
+  chunk-dedup-enabled: ${RAG_CHUNK_DEDUP_ENABLED:true}
 
 upload:
   storage-path: ${UPLOAD_STORAGE_PATH:/app/uploads}

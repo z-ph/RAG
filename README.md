@@ -374,7 +374,12 @@ rag:
   session-ttl-seconds: ${RAG_SESSION_TTL_SECONDS:1800}
   memory-cleanup-interval-ms: ${RAG_MEMORY_CLEANUP_INTERVAL_MS:300000}
   stream-timeout-ms: ${RAG_STREAM_TIMEOUT_MS:300000}
+  chunk-dedup-enabled: ${RAG_CHUNK_DEDUP_ENABLED:true}
 ```
+
+说明：
+
+- `chunk-dedup-enabled` 控制跨轮次检索片段去重，默认开启
 
 ## 数据与存储
 

@@ -4,7 +4,6 @@ import com.mark.knowledge.rag.dto.DocumentProgressEvent;
 import com.mark.knowledge.rag.service.parsers.DocxParser;
 import dev.langchain4j.data.document.Metadata;
 import dev.langchain4j.data.segment.TextSegment;
-import dev.langchain4j.model.chat.ChatModel;
 import org.apache.pdfbox.Loader;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.text.PDFTextStripper;
@@ -86,13 +85,10 @@ public class DocumentService {
     @Value("${rag.min-text-length:80}")
     private int minTextLength;
 
-    private final ChatModel chatModel;
-
     @Value("${rag.keyword-count:6}")
     private int keywordCount;
 
-    public DocumentService(ChatModel chatModel) {
-        this.chatModel = chatModel;
+    public DocumentService() {
     }
 
     /**

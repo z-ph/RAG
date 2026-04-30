@@ -1,6 +1,5 @@
 package com.mark.knowledge.rag.service;
 
-import com.mark.knowledge.rag.store.QdrantEmbeddingStoreFactory;
 import dev.langchain4j.data.embedding.Embedding;
 import dev.langchain4j.model.embedding.EmbeddingModel;
 import org.slf4j.Logger;

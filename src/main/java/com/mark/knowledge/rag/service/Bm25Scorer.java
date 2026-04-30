@@ -134,7 +134,7 @@ public class Bm25Scorer {
     private Map<String, Integer> buildTermFrequencies(List<String> tokens) {
         Map<String, Integer> termFrequencies = new HashMap<>();
         for (String token : tokens) {
-            termFrequencies.merge(token, 1, Integer::sum);
+            termFrequencies.put(token, termFrequencies.getOrDefault(token, 0) + 1);
         }
         return termFrequencies;
     }

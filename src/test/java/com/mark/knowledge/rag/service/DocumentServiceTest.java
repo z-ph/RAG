@@ -1,12 +1,9 @@
 package com.mark.knowledge.rag.service;
 
 import dev.langchain4j.data.segment.TextSegment;
-import dev.langchain4j.model.chat.ChatModel;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
-
-import static org.mockito.Mockito.mock;
 
 import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
@@ -25,7 +22,7 @@ class DocumentServiceTest {
 
     @BeforeEach
     void setUp() {
-        documentService = new DocumentService(mock(ChatModel.class));
+        documentService = new DocumentService();
         ReflectionTestUtils.setField(documentService, "chunkSize", 320);
         ReflectionTestUtils.setField(documentService, "chunkMinSize", 250);
         ReflectionTestUtils.setField(documentService, "chunkMaxSize", 350);

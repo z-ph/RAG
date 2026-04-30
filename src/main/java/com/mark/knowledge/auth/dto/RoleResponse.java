@@ -1,6 +1,5 @@
 package com.mark.knowledge.auth.dto;
 
-import com.mark.knowledge.auth.entity.Permission;
 import com.mark.knowledge.auth.entity.Role;
 
 import java.time.LocalDateTime;

@@ -2,12 +2,7 @@ package com.mark.knowledge.rag.service;
 
 import com.mark.knowledge.rag.store.QdrantEmbeddingStoreFactory;
 import dev.langchain4j.data.embedding.Embedding;
-import dev.langchain4j.data.segment.TextSegment;
 import dev.langchain4j.model.embedding.EmbeddingModel;
-import dev.langchain4j.store.embedding.EmbeddingMatch;
-import dev.langchain4j.store.embedding.EmbeddingSearchRequest;
-import dev.langchain4j.store.embedding.EmbeddingSearchResult;
-import dev.langchain4j.store.embedding.qdrant.QdrantEmbeddingStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -32,17 +27,14 @@ public class SegmentAdminService {
     private final String collectionName;
     private final WebClient webClient;
     private final EmbeddingModel embeddingModel;
-    private final QdrantEmbeddingStoreFactory embeddingStoreFactory;
 
     public SegmentAdminService(
             @Value("${qdrant.host:localhost}") String qdrantHost,
             @Value("${qdrant.http-port:6333}") int qdrantHttpPort,
             @Value("${qdrant.collection-name:knowledge-base}") String collectionName,
-            EmbeddingModel embeddingModel,
-            QdrantEmbeddingStoreFactory embeddingStoreFactory) {
+            EmbeddingModel embeddingModel) {
         this.collectionName = collectionName;
         this.embeddingModel = embeddingModel;
-        this.embeddingStoreFactory = embeddingStoreFactory;
         this.webClient = WebClient.builder()
             .codecs(this::configureCodecs)
             .baseUrl(String.format("http://%s:%d", qdrantHost, qdrantHttpPort))

@@ -1,9 +1,9 @@
 package com.mark.knowledge.rag.service;
 
 import com.mark.knowledge.rag.dto.DocumentProgressEvent;
+import com.mark.knowledge.rag.service.parsers.DocxParser;
 import dev.langchain4j.data.document.Metadata;
 import dev.langchain4j.data.segment.TextSegment;
-import com.mark.knowledge.rag.service.parsers.DocxParser;
 import dev.langchain4j.model.chat.ChatModel;
 import org.apache.pdfbox.Loader;
 import org.apache.pdfbox.pdmodel.PDDocument;
@@ -13,10 +13,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
-import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.nio.ByteBuffer;
 import java.nio.CharBuffer;
 import java.nio.charset.CharacterCodingException;
@@ -778,7 +776,7 @@ public class DocumentService {
             if (KEYWORD_STOP_WORDS.contains(token)) {
                 continue;
             }
-            scores.merge(token, weight, Integer::sum);
+            scores.merge(token, weight, (a, b) -> a + b);
         }
     }
 
@@ -814,7 +812,7 @@ public class DocumentService {
         }
 
         int adjustedWeight = title.contains(token) ? weight + 3 : weight;
-        scores.merge(token, adjustedWeight, Integer::sum);
+        scores.merge(token, adjustedWeight, (a, b) -> a + b);
     }
 
     private boolean isRepeatedCharacters(String token) {

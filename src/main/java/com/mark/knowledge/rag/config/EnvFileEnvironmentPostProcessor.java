@@ -12,6 +12,7 @@ import java.nio.file.Paths;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+@SuppressWarnings("deprecation")
 public class EnvFileEnvironmentPostProcessor implements EnvironmentPostProcessor {
 
     @Override

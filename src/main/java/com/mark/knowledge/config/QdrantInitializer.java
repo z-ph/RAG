@@ -104,16 +104,17 @@ public class QdrantInitializer implements ApplicationRunner {
      * @param webClient WebClient实例
      * @return 集合信息，如果不存在则返回null
      */
+    @SuppressWarnings("unchecked")
     private CollectionInfo getCollectionInfo(WebClient webClient) {
         try {
-            Mono<Map> response = webClient
+            Mono<Map<String, Object>> response = webClient
                     .get()
                     .uri("/collections/" + collectionName)
                     .accept(MediaType.APPLICATION_JSON)
                     .retrieve()
-                    .bodyToMono(new ParameterizedTypeReference<Map>() {});
+                    .bodyToMono(new ParameterizedTypeReference<Map<String, Object>>() {});
 
-            Map result = response.block();
+            Map<String, Object> result = response.block();
 
             if (result != null && result.containsKey("result")) {
                 Map<String, Object> resultMap = (Map<String, Object>) result.get("result");

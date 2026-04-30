@@ -2,7 +2,6 @@ package com.mark.knowledge.rag.app;
 
 
 import com.mark.knowledge.rag.dto.DocumentDeleteResponse;
-import com.mark.knowledge.rag.dto.DocumentProgressEvent;
 import com.mark.knowledge.rag.dto.DocumentResponse;
 import com.mark.knowledge.rag.dto.DownloadUrlResponse;
 import com.mark.knowledge.rag.dto.ErrorResponse;

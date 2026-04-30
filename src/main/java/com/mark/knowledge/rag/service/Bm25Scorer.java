@@ -38,7 +38,7 @@ public class Bm25Scorer {
 
             for (String queryToken : queryTokens) {
                 if (termFrequencies.containsKey(queryToken)) {
-                    documentFrequencies.merge(queryToken, 1, Integer::sum);
+                    documentFrequencies.merge(queryToken, 1, (a, b) -> a + b);
                 }
             }
         }

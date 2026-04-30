@@ -654,9 +654,7 @@ public class RagService {
 
     private String buildNewContext(String conversationId, List<HybridMatch> matches) {
         if (!chunkDedupEnabled || conversationId == null || matches == null || matches.isEmpty()) {
-            return matches.stream()
-                .map(match -> match.segment().text())
-                .collect(Collectors.joining("\n\n---\n\n"));
+            return "";
         }
 
         Set<String> usedHashes = conversationMemoryService.getUsedChunkHashes(conversationId);

@@ -37,14 +37,22 @@ export function ChatWorkspace(props: ChatWorkspaceProps) {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
+  const prevMessageCountRef = useRef(0);
 
   useEffect(() => {
     const container = messagesContainerRef.current;
     if (!container) return;
-    const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 120;
-    if (isNearBottom) {
+    const messageCount = props.messages.length;
+    const lastMessage = props.messages[messageCount - 1];
+    if (messageCount > prevMessageCountRef.current && lastMessage?.role === "user") {
       container.scrollTop = container.scrollHeight;
+    } else {
+      const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 120;
+      if (isNearBottom) {
+        container.scrollTop = container.scrollHeight;
+      }
     }
+    prevMessageCountRef.current = messageCount;
   }, [props.messages]);
 
   function handleImageSelect(e: React.ChangeEvent<HTMLInputElement>) {
@@ -76,6 +84,10 @@ export function ChatWorkspace(props: ChatWorkspaceProps) {
     } else {
       void props.onSend();
     }
+    requestAnimationFrame(() => {
+      const container = messagesContainerRef.current;
+      if (container) container.scrollTop = container.scrollHeight;
+    });
   }
 
   return (
@@ -132,7 +144,7 @@ export function ChatWorkspace(props: ChatWorkspaceProps) {
             </Button>
           </div>
 
-        <div ref={messagesContainerRef} className="flex min-h-0 flex-col gap-2.5 overflow-y-auto overflow-x-hidden pr-0.5">
+        <div ref={messagesContainerRef} className="custom-scrollbar flex min-h-0 flex-col gap-2.5 overflow-y-auto overflow-x-hidden pr-0.5">
           {props.messages.map((entry) => (
             <MessageBubble key={entry.id} message={entry} />
           ))}

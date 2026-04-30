@@ -831,7 +831,8 @@ public class RagService {
             String finalAnswer = generation.answer();
             String finalThinking = generation.thinking();
             if (response != null && response.aiMessage() != null) {
-                if (StringUtils.hasLength(response.aiMessage().text())) {
+                // 仅当流式未产出答案时才使用完整响应文本（避免含 <think > 标签的原始文本覆盖已解析的内容）
+                if (!StringUtils.hasLength(finalAnswer) && StringUtils.hasLength(response.aiMessage().text())) {
                     finalAnswer = response.aiMessage().text();
                 }
                 if (StringUtils.hasLength(response.aiMessage().thinking())) {

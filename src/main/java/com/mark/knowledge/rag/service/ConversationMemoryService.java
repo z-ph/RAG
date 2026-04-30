@@ -1,5 +1,8 @@
 package com.mark.knowledge.rag.service;
 
+import dev.langchain4j.data.message.AiMessage;
+import dev.langchain4j.data.message.ChatMessage;
+import dev.langchain4j.data.message.UserMessage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -13,7 +16,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * 基于内存的会话上下文服务。
+ * 基于内存的会话上下文服务，使用 langchain4j ChatMessage 管理消息列表。
  */
 @Service
 public class ConversationMemoryService {
@@ -31,26 +34,29 @@ public class ConversationMemoryService {
         this.sessionTtlSeconds = sessionTtlSeconds;
     }
 
-    public List<ConversationMessage> getRecentMessages(String conversationId) {
+    public List<ChatMessage> getMessages(String conversationId) {
         if (conversationId == null || conversationId.isBlank()) {
             return List.of();
         }
-
         ConversationSession session = sessions.get(conversationId);
         if (session == null) {
             return List.of();
         }
-
         session.touch();
         return session.snapshot();
     }
 
     public void appendUserMessage(String conversationId, String content) {
-        appendMessage(conversationId, ConversationRole.USER, content);
+        appendMessage(conversationId, UserMessage.from(content));
     }
 
-    public void appendAssistantMessage(String conversationId, String content) {
-        appendMessage(conversationId, ConversationRole.ASSISTANT, content);
+    public void appendAiMessage(String conversationId, String content) {
+        appendMessage(conversationId, AiMessage.from(content));
+    }
+
+    public void appendAiMessage(String conversationId, String content, String thinking) {
+        AiMessage aiMessage = AiMessage.builder().text(content).thinking(thinking).build();
+        appendMessage(conversationId, aiMessage);
     }
 
     public void clear(String conversationId) {
@@ -93,42 +99,26 @@ public class ConversationMemoryService {
         }
     }
 
-    private void appendMessage(String conversationId, ConversationRole role, String content) {
+    private void appendMessage(String conversationId, ChatMessage message) {
         if (conversationId == null || conversationId.isBlank()) {
             return;
         }
-        if (content == null || content.isBlank()) {
-            return;
-        }
-
         ConversationSession session = sessions.computeIfAbsent(conversationId, ignored -> new ConversationSession());
-        session.add(new ConversationMessage(role, content.trim(), Instant.now()), memoryWindow);
-    }
-
-    public enum ConversationRole {
-        USER,
-        ASSISTANT
-    }
-
-    public record ConversationMessage(
-        ConversationRole role,
-        String content,
-        Instant timestamp
-    ) {
+        session.add(message, memoryWindow);
     }
 
     private static final class ConversationSession {
-        private final List<ConversationMessage> messages = new ArrayList<>();
+        private final List<ChatMessage> messages = new ArrayList<>();
         private final Set<String> usedChunkHashes = ConcurrentHashMap.newKeySet();
         private Instant lastAccessTime = Instant.now();
 
-        private synchronized void add(ConversationMessage message, int memoryWindow) {
+        private synchronized void add(ChatMessage message, int memoryWindow) {
             messages.add(message);
             trimToWindow(memoryWindow);
             touch();
         }
 
-        private synchronized List<ConversationMessage> snapshot() {
+        private synchronized List<ChatMessage> snapshot() {
             return List.copyOf(messages);
         }
 

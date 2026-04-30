@@ -100,13 +100,13 @@ class ConversationMemoryServiceTest {
 
         service.recordUsedChunkHashes(conversationId, Set.of("hash-persist"));
         service.appendUserMessage(conversationId, "Hello");
-        service.appendAssistantMessage(conversationId, "Hi there");
+        service.appendAiMessage(conversationId, "Hi there");
 
         assertEquals(
                 Set.of("hash-persist"),
                 service.getUsedChunkHashes(conversationId)
         );
-        assertEquals(2, service.getRecentMessages(conversationId).size());
+        assertEquals(2, service.getMessages(conversationId).size());
         service.clear(conversationId);
     }
 

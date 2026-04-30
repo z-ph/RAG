@@ -4,6 +4,9 @@ import com.mark.knowledge.rag.dto.RagRequest;
 import com.mark.knowledge.rag.dto.RagResponse;
 import com.mark.knowledge.rag.dto.SourceReference;
 import com.mark.knowledge.rag.store.QdrantEmbeddingStoreFactory;
+import dev.langchain4j.data.message.AiMessage;
+import dev.langchain4j.data.message.ChatMessage;
+import dev.langchain4j.data.message.SystemMessage;
 import dev.langchain4j.data.message.UserMessage;
 import dev.langchain4j.data.segment.TextSegment;
 import dev.langchain4j.model.chat.ChatModel;
@@ -109,8 +112,7 @@ public class RagService {
                 cancelGenerationInternal(conversationId, "同步请求到达，取消已有流式生成");
             }
 
-            List<ConversationMemoryService.ConversationMessage> history = conversationMemoryService
-                .getRecentMessages(conversationId);
+            List<ChatMessage> history = conversationMemoryService.getMessages(conversationId);
             String rewrittenQuestion = rewriteQuestion(request.question(), history);
             int requestedMaxResults = resolveRequestedMaxResults(request);
 
@@ -133,7 +135,7 @@ public class RagService {
 
             if (vectorMatches.isEmpty()) {
                 conversationMemoryService.appendUserMessage(conversationId, request.question());
-                conversationMemoryService.appendAssistantMessage(conversationId, EMPTY_MATCH_ANSWER);
+                conversationMemoryService.appendAiMessage(conversationId, EMPTY_MATCH_ANSWER, null);
                 return new RagResponse(
                     EMPTY_MATCH_ANSWER,
                     null,
@@ -148,20 +150,19 @@ public class RagService {
 
             matches = enrichWithCrossDocumentResults(request, matches, requestedMaxResults);
 
-            matches = deduplicateBySessionHistory(conversationId, matches);
+            String newContext = buildNewContext(conversationId, matches);
             extractAndRecordChunkHashes(conversationId, matches);
 
-            String context = matches.stream()
-                .map(match -> match.segment().text())
-                .collect(Collectors.joining("\n\n---\n\n"));
-
-            String prompt = buildPrompt(history, context, request.question());
+            List<ChatMessage> toSend = buildMessagesToSend(history, newContext, request.question());
             long answerStart = System.nanoTime();
-            GeneratedAnswer generatedAnswer = generateAnswer(prompt);
+            GeneratedAnswer generatedAnswer = generateAnswer(toSend);
             log.info("AI 基于知识库生成答案耗时: {} ms", elapsedMillis(answerStart));
 
+            if (!newContext.isEmpty()) {
+                conversationMemoryService.appendUserMessage(conversationId, "新增文档上下文：\n" + newContext);
+            }
             conversationMemoryService.appendUserMessage(conversationId, request.question());
-            conversationMemoryService.appendAssistantMessage(conversationId, generatedAnswer.answer());
+            conversationMemoryService.appendAiMessage(conversationId, generatedAnswer.answer(), generatedAnswer.thinking());
 
             return new RagResponse(
                 generatedAnswer.answer(),
@@ -228,8 +229,7 @@ public class RagService {
             }
 
             long historyStart = System.nanoTime();
-            List<ConversationMemoryService.ConversationMessage> history = conversationMemoryService
-                .getRecentMessages(conversationId);
+            List<ChatMessage> history = conversationMemoryService.getMessages(conversationId);
             log.info("[TTFT-DETAIL] 获取历史: conversationId={}, elapsedMs={}, historySize={}, totalMs={}",
                 conversationId, elapsedMillis(historyStart), history.size(), elapsedMillis(pipelineStart));
 
@@ -273,7 +273,7 @@ public class RagService {
             log.info("[TTFT-DETAIL] 跨文档检索: conversationId={}, stepMs={}, total={}, totalMs={}",
                 conversationId, elapsedMillis(crossStart), matches.size(), elapsedMillis(pipelineStart));
 
-            matches = deduplicateBySessionHistory(conversationId, matches);
+            String newContext = buildNewContext(conversationId, matches);
             extractAndRecordChunkHashes(conversationId, matches);
 
             sendEvent(generation, "sources", toSourceReferences(matches));
@@ -286,20 +286,16 @@ public class RagService {
             if (matches.isEmpty()) {
                 sendEvent(generation, "delta", EMPTY_MATCH_ANSWER);
                 conversationMemoryService.appendUserMessage(conversationId, request.question());
-                conversationMemoryService.appendAssistantMessage(conversationId, EMPTY_MATCH_ANSWER);
+                conversationMemoryService.appendAiMessage(conversationId, EMPTY_MATCH_ANSWER, null);
                 sendEvent(generation, "complete", buildCompletePayload(conversationId, false, EMPTY_MATCH_ANSWER, null));
                 completeGeneration(generation);
                 return;
             }
 
-            String context = matches.stream()
-                .map(match -> match.segment().text())
-                .collect(Collectors.joining("\n\n---\n\n"));
-            String prompt = buildPrompt(history, context, request.question());
-            log.info("[TTFT-DETAIL] 调用模型: conversationId={}, promptChars={}, contextChunks={}, pipelineMs={}, promptPreview={}",
-                conversationId, prompt.length(), matches.size(), elapsedMillis(pipelineStart),
-                prompt.substring(0, Math.min(100, prompt.length())).replace("\n", "\\n"));
-            streamingChatModel.chat(prompt, new RagStreamingResponseHandler(generation, conversationId, pipelineStart));
+            List<ChatMessage> toSend = buildMessagesToSend(history, newContext, request.question());
+            log.info("[TTFT-DETAIL] 调用模型: conversationId={}, messageCount={}, contextChunks={}, pipelineMs={}",
+                conversationId, toSend.size(), matches.size(), elapsedMillis(pipelineStart));
+            streamingChatModel.chat(toSend, new RagStreamingResponseHandler(generation, conversationId, pipelineStart, newContext));
         } catch (Exception e) {
             if (generation.isCancelled() || generation.isCompleted()) {
                 completeGeneration(generation);
@@ -570,31 +566,6 @@ public class RagService {
             .collect(Collectors.toList());
     }
 
-    private List<HybridMatch> deduplicateBySessionHistory(String conversationId, List<HybridMatch> matches) {
-        if (!chunkDedupEnabled || conversationId == null || matches == null || matches.isEmpty()) {
-            return matches;
-        }
-
-        Set<String> usedHashes = conversationMemoryService.getUsedChunkHashes(conversationId);
-        if (usedHashes.isEmpty()) {
-            return matches;
-        }
-
-        List<HybridMatch> filtered = matches.stream()
-            .filter(match -> {
-                String chunkHash = match.segment().metadata().getString("chunkHash");
-                return chunkHash == null || !usedHashes.contains(chunkHash);
-            })
-            .collect(Collectors.toList());
-
-        int removed = matches.size() - filtered.size();
-        if (removed > 0) {
-            log.info("会话 {} 跨轮次去重过滤掉 {} 条已出现片段", conversationId, removed);
-        }
-
-        return filtered;
-    }
-
     private void extractAndRecordChunkHashes(String conversationId, List<HybridMatch> matches) {
         if (conversationId == null || matches == null || matches.isEmpty()) {
             return;
@@ -610,12 +581,27 @@ public class RagService {
         }
     }
 
-    private String rewriteQuestion(String question, List<ConversationMemoryService.ConversationMessage> history) {
+    private String rewriteQuestion(String question, List<ChatMessage> history) {
         if (history.isEmpty()) {
             return question;
         }
 
-        String historyText = formatHistory(history);
+        String historyText = history.stream()
+            .map(msg -> {
+                if (msg instanceof UserMessage userMsg) {
+                    return "用户：" + userMsg.singleText();
+                } else if (msg instanceof AiMessage aiMsg) {
+                    return "助手：" + aiMsg.text();
+                }
+                return null;
+            })
+            .filter(Objects::nonNull)
+            .collect(Collectors.joining("\n"));
+
+        if (historyText.isBlank()) {
+            return question;
+        }
+
         String rewriteTemplate = promptService.getPrompt("rag_rewrite");
         String rewritePrompt = String.format(rewriteTemplate, historyText, question);
 
@@ -623,20 +609,79 @@ public class RagService {
         return rewritten != null && !rewritten.isBlank() ? rewritten.trim() : question;
     }
 
-    private String buildPrompt(
-            List<ConversationMemoryService.ConversationMessage> history,
-            String context,
-            String question) {
-        String historyText = history.isEmpty() ? "无" : formatHistory(history);
-        String systemTemplate = promptService.getPrompt("rag_system");
-        return String.format(systemTemplate, historyText, context, question);
+    private List<ChatMessage> buildMessagesToSend(List<ChatMessage> history, String newContext, String question) {
+        String systemPrompt = promptService.getPrompt("rag_system");
+        List<ChatMessage> toSend = new ArrayList<>();
+        toSend.add(SystemMessage.from(systemPrompt));
+        for (ChatMessage msg : history) {
+            if (msg instanceof AiMessage aiMsg && aiMsg.thinking() != null) {
+                toSend.add(AiMessage.from(aiMsg.text()));
+            } else {
+                toSend.add(msg);
+            }
+        }
+        if (!newContext.isEmpty()) {
+            toSend.add(UserMessage.from("新增文档上下文：\n" + newContext));
+        }
+        toSend.add(UserMessage.from(question));
+
+        log.debug("发送给模型的消息列表 (共 {} 条):", toSend.size());
+        for (int i = 0; i < toSend.size(); i++) {
+            ChatMessage msg = toSend.get(i);
+            String preview;
+            if (msg instanceof SystemMessage sysMsg) {
+                preview = "[System] " + truncate(sysMsg.text(), 80);
+            } else if (msg instanceof UserMessage userMsg) {
+                preview = "[User] " + truncate(userMsg.singleText(), 80);
+            } else if (msg instanceof AiMessage aiMsg) {
+                String thinking = aiMsg.thinking();
+                preview = "[Ai] text=" + truncate(aiMsg.text(), 60)
+                    + ", hasThinking=" + (thinking != null && !thinking.isEmpty())
+                    + ", thinkingLen=" + (thinking != null ? thinking.length() : 0);
+            } else {
+                preview = "[" + msg.type() + "] " + truncate(msg.toString(), 80);
+            }
+            log.debug("  msg[{}]: {}", i, preview);
+        }
+
+        return toSend;
     }
 
-    private String formatHistory(List<ConversationMemoryService.ConversationMessage> history) {
-        return history.stream()
-            .map(message -> (message.role() == ConversationMemoryService.ConversationRole.USER ? "用户：" : "助手：")
-                + message.content())
-            .collect(Collectors.joining("\n"));
+    private static String truncate(String s, int maxLen) {
+        if (s == null) return "null";
+        return s.length() <= maxLen ? s : s.substring(0, maxLen) + "...";
+    }
+
+    private String buildNewContext(String conversationId, List<HybridMatch> matches) {
+        if (!chunkDedupEnabled || conversationId == null || matches == null || matches.isEmpty()) {
+            return matches.stream()
+                .map(match -> match.segment().text())
+                .collect(Collectors.joining("\n\n---\n\n"));
+        }
+
+        Set<String> usedHashes = conversationMemoryService.getUsedChunkHashes(conversationId);
+        if (usedHashes.isEmpty()) {
+            return matches.stream()
+                .map(match -> match.segment().text())
+                .collect(Collectors.joining("\n\n---\n\n"));
+        }
+
+        List<HybridMatch> newMatches = matches.stream()
+            .filter(match -> {
+                String chunkHash = match.segment().metadata().getString("chunkHash");
+                return chunkHash == null || !usedHashes.contains(chunkHash);
+            })
+            .collect(Collectors.toList());
+
+        if (newMatches.isEmpty()) {
+            log.info("会话 {} 所有片段已发送过，本轮不附加文档上下文", conversationId);
+            return "";
+        }
+
+        log.info("会话 {} 去重后新增 {} / {} 条片段", conversationId, newMatches.size(), matches.size());
+        return newMatches.stream()
+            .map(match -> match.segment().text())
+            .collect(Collectors.joining("\n\n---\n\n"));
     }
 
     private List<SourceReference> toSourceReferences(List<HybridMatch> matches) {
@@ -651,8 +696,8 @@ public class RagService {
             .collect(Collectors.toList());
     }
 
-    private GeneratedAnswer generateAnswer(String prompt) {
-        ChatResponse response = chatModel.chat(UserMessage.from(prompt));
+    private GeneratedAnswer generateAnswer(List<ChatMessage> messages) {
+        ChatResponse response = chatModel.chat(messages);
         if (response == null || response.aiMessage() == null) {
             return new GeneratedAnswer("", null);
         }
@@ -730,12 +775,14 @@ public class RagService {
         private final String conversationId;
         private final long handlerCreatedAt;
         private final long pipelineStartNanos;
+        private final String newContext;
         private boolean firstTokenReceived = false;
 
-        private RagStreamingResponseHandler(InFlightGeneration generation, String conversationId, long pipelineStartNanos) {
+        private RagStreamingResponseHandler(InFlightGeneration generation, String conversationId, long pipelineStartNanos, String newContext) {
             this.generation = generation;
             this.conversationId = conversationId;
             this.pipelineStartNanos = pipelineStartNanos;
+            this.newContext = newContext;
             this.handlerCreatedAt = System.nanoTime();
         }
 
@@ -770,6 +817,19 @@ public class RagService {
                 return;
             }
 
+            log.info("模型响应完成: conversationId={}, hasResponse={}, hasAiMessage={}, "
+                    + "streamedThinkingLen={}, streamedAnswerLen={}, "
+                    + "responseThinkingLen={}, responseAnswerLen={}",
+                conversationId,
+                response != null,
+                response != null && response.aiMessage() != null,
+                generation.thinking().length(),
+                generation.answer().length(),
+                response != null && response.aiMessage() != null && response.aiMessage().thinking() != null
+                    ? response.aiMessage().thinking().length() : -1,
+                response != null && response.aiMessage() != null && response.aiMessage().text() != null
+                    ? response.aiMessage().text().length() : -1);
+
             String finalAnswer = generation.answer();
             String finalThinking = generation.thinking();
             if (response != null && response.aiMessage() != null) {
@@ -787,8 +847,11 @@ public class RagService {
 
             if (!generation.isCancelled()) {
                 if (StringUtils.hasText(finalAnswer)) {
+                    if (newContext != null && !newContext.isEmpty()) {
+                        conversationMemoryService.appendUserMessage(conversationId, "新增文档上下文：\n" + newContext);
+                    }
                     conversationMemoryService.appendUserMessage(conversationId, generation.question());
-                    conversationMemoryService.appendAssistantMessage(conversationId, finalAnswer);
+                    conversationMemoryService.appendAiMessage(conversationId, finalAnswer, finalThinking);
                 }
                 sendEvent(generation, "complete", buildCompletePayload(conversationId, false, finalAnswer, finalThinking));
             } else {
@@ -822,9 +885,84 @@ public class RagService {
                 log.info("[TTFT-DETAIL] 第一个回答token: conversationId={}, modelTtftMs={}, pipelineTtftMs={}",
                     conversationId, elapsedMillis(handlerCreatedAt), elapsedMillis(pipelineStartNanos));
             }
-            emitThinkingEndIfNeeded(generation, "answer_started");
-            generation.appendAnswer(text);
-            sendEvent(generation, "delta", text);
+
+            // 某些模型（如 glm-4.6v-flash）在多轮对话时不会返回 reasoning_content，
+            // 而是将思考内容包裹在 <think>...</think> 标签中放在 content 字段里。
+            // 这里需要解析 <think> 标签，将标签内的内容路由到 thinking_delta 事件。
+            String combined = generation.takeTagBuffer() + text;
+            int processed = 0;
+
+            while (processed < combined.length()) {
+                if (generation.isInsideThinkTag()) {
+                    int closeIdx = combined.indexOf("</think>", processed);
+                    if (closeIdx >= 0) {
+                        String thinking = combined.substring(processed, closeIdx);
+                        if (!thinking.isEmpty()) {
+                            generation.appendThinking(thinking);
+                            sendEvent(generation, "thinking_delta", thinking);
+                        }
+                        generation.setInsideThinkTag(false);
+                        processed = closeIdx + 8;
+                        emitThinkingEndIfNeeded(generation, "think_tag_closed");
+                    } else {
+                        int remaining = combined.length() - processed;
+                        if (remaining <= 8 && !combined.substring(processed).contains("<")) {
+                            String thinking = combined.substring(processed);
+                            if (!thinking.isEmpty()) {
+                                generation.appendThinking(thinking);
+                                sendEvent(generation, "thinking_delta", thinking);
+                            }
+                            generation.setTagBuffer("");
+                            return;
+                        }
+                        int saveLen = Math.min(8, remaining);
+                        int splitPoint = combined.length() - saveLen;
+                        String thinking = combined.substring(processed, splitPoint);
+                        if (!thinking.isEmpty()) {
+                            generation.appendThinking(thinking);
+                            sendEvent(generation, "thinking_delta", thinking);
+                        }
+                        generation.setTagBuffer(combined.substring(splitPoint));
+                        return;
+                    }
+                } else {
+                    int openIdx = combined.indexOf("<think>", processed);
+                    if (openIdx >= 0) {
+                        String beforeThink = combined.substring(processed, openIdx);
+                        if (!beforeThink.isEmpty()) {
+                            emitThinkingEndIfNeeded(generation, "answer_started");
+                            generation.appendAnswer(beforeThink);
+                            sendEvent(generation, "delta", beforeThink);
+                        }
+                        generation.setInsideThinkTag(true);
+                        processed = openIdx + 7;
+                    } else {
+                        int remaining = combined.length() - processed;
+                        if (remaining <= 7 && !combined.substring(processed).contains("<")) {
+                            String answer = combined.substring(processed);
+                            if (!answer.isEmpty()) {
+                                emitThinkingEndIfNeeded(generation, "answer_started");
+                                generation.appendAnswer(answer);
+                                sendEvent(generation, "delta", answer);
+                            }
+                            generation.setTagBuffer("");
+                            return;
+                        }
+                        int saveLen = Math.min(7, remaining);
+                        int splitPoint = combined.length() - saveLen;
+                        String answer = combined.substring(processed, splitPoint);
+                        if (!answer.isEmpty()) {
+                            emitThinkingEndIfNeeded(generation, "answer_started");
+                            generation.appendAnswer(answer);
+                            sendEvent(generation, "delta", answer);
+                        }
+                        generation.setTagBuffer(combined.substring(splitPoint));
+                        return;
+                    }
+                }
+            }
+
+            generation.setTagBuffer("");
         }
 
         private void handlePartialThinking(String text) {
@@ -852,6 +990,8 @@ public class RagService {
         private final AtomicBoolean thinkingEnded = new AtomicBoolean(false);
         private final StringBuilder answerBuilder = new StringBuilder();
         private final StringBuilder thinkingBuilder = new StringBuilder();
+        private volatile boolean insideThinkTag = false;
+        private final StringBuilder tagBuffer = new StringBuilder();
 
         private InFlightGeneration(String requestId, String conversationId, String question, SseEmitter emitter) {
             this.requestId = requestId;
@@ -956,6 +1096,31 @@ public class RagService {
         private boolean hasThinking() {
             synchronized (thinkingBuilder) {
                 return thinkingBuilder.length() > 0;
+            }
+        }
+
+        private boolean isInsideThinkTag() {
+            return insideThinkTag;
+        }
+
+        private void setInsideThinkTag(boolean value) {
+            insideThinkTag = value;
+        }
+
+        private String takeTagBuffer() {
+            synchronized (tagBuffer) {
+                String result = tagBuffer.toString();
+                tagBuffer.setLength(0);
+                return result;
+            }
+        }
+
+        private void setTagBuffer(String value) {
+            synchronized (tagBuffer) {
+                tagBuffer.setLength(0);
+                if (value != null) {
+                    tagBuffer.append(value);
+                }
             }
         }
     }

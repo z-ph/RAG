@@ -85,8 +85,11 @@ services:
       LOG_LEVEL_ROOT: ${LOG_LEVEL_ROOT:-INFO}
       LOG_LEVEL_APP: ${LOG_LEVEL_APP:-DEBUG}
       LOG_LEVEL_LANGCHAIN4J: ${LOG_LEVEL_LANGCHAIN4J:-DEBUG}
+      LOG_PATH: /app/logs
+      SPRING_PROFILES_ACTIVE: docker
     volumes:
       - app-uploads:/app/uploads
+      - ./logs:/app/logs
     depends_on:
       mysql:
         condition: service_healthy

@@ -91,7 +91,7 @@
             class="flex w-full items-center justify-between gap-3 px-3 py-2 text-left"
             :class="[thinkingOpen ? `sticky top-0 z-20 rounded-t-[15px] border-b backdrop-blur-sm shadow-[0_1px_0_rgba(115,65,0,0.08)] ${thinkingDividerClass} ${thinkingStickyBarClass}` : 'rounded-[15px]']"
             @click="thinkingOpen = !thinkingOpen"
-            aria-expanded="thinkingOpen"
+            :aria-expanded="thinkingOpen"
           >
             <span class="inline-flex items-center gap-2 text-xs font-semibold" :class="thinkingLabelClass">
               <BulbOutlined />
@@ -117,6 +117,12 @@
         </section>
 
         <div class="text-sm leading-6">
+          <img
+            v-if="!isAssistant && message.imageUrl"
+            :src="message.imageUrl"
+            alt="用户上传的图片"
+            class="mb-2 max-h-60 max-w-full object-contain rounded-lg"
+          />
           <MarkdownContent
             v-if="message.content"
             :content="message.content"
@@ -135,12 +141,16 @@
           />
         </div>
 
-        <span
-          v-if="message.status === 'error'"
-          class="mt-2 inline-flex rounded-full bg-rose-500/[0.14] px-3 py-1 text-xs font-medium text-rose-700"
-        >
-          本轮生成失败
-        </span>
+          <span
+            v-if="message.thinkingStatus === 'streaming'"
+            class="inline-block h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse"
+          />
+          <span v-if="showThinkingActivity" class="inline-flex rounded-full px-2 py-0.5 text-[11px] tabular-nums" :class="thinkingTimerClass">
+            {{ formatDuration(thinkingSeconds) }}
+          </span>
+          <span v-else-if="hasThinkingDuration" class="inline-flex rounded-full px-2 py-0.5 text-[11px] tabular-nums" :class="thinkingTimerClass">
+            {{ formatDurationMs(message.thinkingDurationMs) }}
+          </span>
         <span
           v-if="message.status === 'cancelled'"
           class="mt-2 inline-flex rounded-full px-3 py-1 text-xs font-medium"
@@ -202,6 +212,11 @@ function formatDuration(totalSeconds: number) {
   return `${minuteSegment}:${secondSegment}`;
 }
 
+function formatDurationMs(ms: number) {
+  if (ms < 1000) return `${ms}ms`;
+  return formatDuration(Math.round(ms / 1000));
+}
+
 async function copyText(text: string) {
   if (navigator.clipboard?.writeText) {
     await navigator.clipboard.writeText(text);
@@ -225,6 +240,7 @@ async function copyText(text: string) {
 
 const isAssistant = computed(() => props.message.role === "assistant");
 const hasThinking = computed(() => isAssistant.value && Boolean(props.message.thinking.trim()));
+const hasThinkingDuration = computed(() => isAssistant.value && props.message.thinkingDurationMs > 0);
 const showSourceLoading = computed(
   () =>
     isAssistant.value &&

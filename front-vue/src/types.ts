@@ -122,12 +122,23 @@ export type HealthState = "checking" | "ok" | "error";
 
 export type ThinkingStatus = "idle" | "streaming" | "complete";
 
+export type FileUploadStatus = "uploading" | "complete" | "error";
+
+export interface FileUploadEntry {
+  filename: string;
+  status: FileUploadStatus;
+  progress: UploadProgressEvent | null;
+  errorMessage?: string;
+}
+
 export interface ChatMessage {
   id: string;
   role: "assistant" | "user";
   content: string;
+  imageUrl?: string;
   thinking: string;
   thinkingStatus: ThinkingStatus;
+  thinkingDurationMs: number;
   createdAt: string;
   status: "complete" | "streaming" | "error" | "cancelled";
   sources: SourceReference[];
@@ -137,6 +148,7 @@ export interface ChatMessage {
 export interface AuthUser {
   username: string;
   role: string;
+  roleCode: string;
 }
 
 export interface AuthStatusResponse {

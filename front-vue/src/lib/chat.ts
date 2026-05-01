@@ -19,19 +19,22 @@ export function createStreamingAssistantMessage(id: string): ChatMessage {
     content: "",
     thinking: "",
     thinkingStatus: "idle",
+    thinkingDurationMs: 0,
     createdAt: createTimestamp(),
     status: "streaming",
     sources: []
   };
 }
 
-export function createUserMessage(content: string): ChatMessage {
+export function createUserMessage(content: string, imageUrl?: string): ChatMessage {
   return {
     id: createMessageId("user"),
     role: "user",
     content,
+    imageUrl,
     thinking: "",
     thinkingStatus: "idle",
+    thinkingDurationMs: 0,
     createdAt: createTimestamp(),
     status: "complete",
     sources: []

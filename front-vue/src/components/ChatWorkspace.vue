@@ -31,6 +31,17 @@
             </template>
             清空对话
           </a-button>
+          <!-- Admin button -->
+          <a-button
+            v-if="isAdmin"
+            class="!rounded-full !border-ink-950/10 !bg-white/[0.72] !px-4 !text-ink-700 !shadow-none hover:!border-accent-500/[0.25] hover:!text-accent-500"
+            @click="emit('open-admin')"
+          >
+            <template #icon>
+              <SettingOutlined />
+            </template>
+            管理
+          </a-button>
           <!-- User button -->
           <a-button
             :class="[
@@ -45,7 +56,7 @@
               <UserOutlined />
             </template>
             {{ props.authenticated && props.authUser
-              ? `${props.authUser.username} (${props.authUser.role === 'ADMIN' ? '管理' : '成员'})`
+              ? `${props.authUser.username} (${props.authUser.roleCode === 'ADMIN' || props.authUser.roleCode === 'SUPER_ADMIN' ? '管理' : '成员'})`
               : '用户登录' }}
           </a-button>
         </div>
@@ -55,28 +66,56 @@
         <MessageBubble v-for="entry in props.messages" :key="entry.id" :message="entry" />
       </div>
 
-      <div class="flex items-center gap-1">
-        <a-input
-          :value="props.prompt"
-          placeholder="输入你的问题。"
-          @update:value="handlePromptChange"
-          @pressEnter="handlePressEnter"
-        />
-        <a-button
-          :type="props.streaming ? 'default' : 'primary'"
-          :danger="props.streaming"
-          size="large"
-          :class="props.streaming
-            ? '!rounded-full !px-6 !shadow-none'
-            : '!rounded-full !border-none !bg-accent-500 !px-6 !shadow-none hover:!bg-accent-400'"
-          :disabled="!props.streaming && !props.prompt.trim()"
-          @click="handleAction"
-        >
-          <template #icon>
-            <PauseCircleFilled v-if="props.streaming" />
-            <SendOutlined v-else />
-          </template>
-        </a-button>
+      <div class="flex flex-col gap-2">
+        <!-- Image preview -->
+        <div v-if="imagePreviewUrl" class="flex items-center gap-2">
+          <img :src="imagePreviewUrl" alt="预览" class="h-16 rounded-lg object-cover" />
+          <a-button type="text" size="small" danger @click="clearImage">
+            <template #icon>
+              <CloseOutlined />
+            </template>
+            移除图片
+          </a-button>
+        </div>
+        <div class="flex items-center gap-1">
+          <input
+            ref="imageInputRef"
+            type="file"
+            accept="image/*"
+            class="hidden"
+            @change="handleImageChange"
+          />
+          <a-button
+            type="text"
+            class="!text-ink-500 hover:!text-accent-500"
+            @click="triggerImageUpload"
+          >
+            <template #icon>
+              <PictureOutlined />
+            </template>
+          </a-button>
+          <a-input
+            :value="props.prompt"
+            placeholder="输入你的问题。"
+            @update:value="handlePromptChange"
+            @pressEnter="handlePressEnter"
+          />
+          <a-button
+            :type="props.streaming ? 'default' : 'primary'"
+            :danger="props.streaming"
+            size="large"
+            :class="props.streaming
+              ? '!rounded-full !px-6 !shadow-none'
+              : '!rounded-full !border-none !bg-accent-500 !px-6 !shadow-none hover:!bg-accent-400'"
+            :disabled="!props.streaming && !props.prompt.trim() && !imagePreviewUrl"
+            @click="handleAction"
+          >
+            <template #icon>
+              <PauseCircleFilled v-if="props.streaming" />
+              <SendOutlined v-else />
+            </template>
+          </a-button>
+        </div>
       </div>
     </div>
   </section>
@@ -85,12 +124,16 @@
 <script setup lang="ts">
 import {
   ClearOutlined,
+  CloseOutlined,
   DatabaseOutlined,
   MessageOutlined,
   PauseCircleFilled,
+  PictureOutlined,
   SendOutlined,
+  SettingOutlined,
   UserOutlined
 } from "@ant-design/icons-vue";
+import { computed, ref } from "vue";
 import type { ChatMessage } from "../types";
 import MessageBubble from "./MessageBubble.vue";
 
@@ -100,15 +143,17 @@ const props = defineProps<{
   maxResults: number;
   streaming: boolean;
   authenticated: boolean;
-  authUser: { username: string; role: string } | null;
+  authUser: { username: string; role: string; roleCode: string } | null;
 }>();
 
 const emit = defineEmits<{
   (event: "open-documents"): void;
   (event: "open-auth"): void;
+  (event: "open-admin"): void;
   (event: "update:prompt", value: string): void;
   (event: "update:maxResults", value: number): void;
   (event: "send"): void;
+  (event: "send-with-image", image: File, question: string, previewUrl: string): void;
   (event: "cancel"): void;
   (event: "clear-conversation"): void;
 }>();
@@ -117,6 +162,15 @@ const maxResultOptions = [16, 64, 256, 1024].map((value) => ({
   label: String(value),
   value
 }));
+
+const imageInputRef = ref<HTMLInputElement | null>(null);
+const selectedImageFile = ref<File | null>(null);
+const imagePreviewUrl = ref<string | null>(null);
+
+const isAdmin = computed(() =>
+  props.authenticated &&
+  (props.authUser?.roleCode === "ADMIN" || props.authUser?.roleCode === "SUPER_ADMIN")
+);
 
 function handlePromptChange(value: string) {
   emit("update:prompt", value);
@@ -129,7 +183,7 @@ function handleMaxResultsChange(value: number) {
 function handlePressEnter(event: KeyboardEvent) {
   if (!event.shiftKey && !props.streaming) {
     event.preventDefault();
-    emit("send");
+    handleAction();
   }
 }
 
@@ -139,6 +193,36 @@ function handleAction() {
     return;
   }
 
+  if (selectedImageFile.value && imagePreviewUrl.value) {
+    emit("send-with-image", selectedImageFile.value, props.prompt, imagePreviewUrl.value);
+    clearImage();
+    return;
+  }
+
   emit("send");
+}
+
+function triggerImageUpload() {
+  imageInputRef.value?.click();
+}
+
+function handleImageChange(event: Event) {
+  const input = event.target as HTMLInputElement;
+  const file = input.files?.[0];
+  if (file) {
+    selectedImageFile.value = file;
+    imagePreviewUrl.value = URL.createObjectURL(file);
+  }
+}
+
+function clearImage() {
+  if (imagePreviewUrl.value) {
+    URL.revokeObjectURL(imagePreviewUrl.value);
+  }
+  selectedImageFile.value = null;
+  imagePreviewUrl.value = null;
+  if (imageInputRef.value) {
+    imageInputRef.value.value = "";
+  }
 }
 </script>

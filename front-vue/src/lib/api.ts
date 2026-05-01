@@ -22,6 +22,8 @@ import { consumeSseStream } from "./sse";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "/api";
 
+export { API_BASE_URL };
+
 export class ApiError extends Error {
   readonly status: number;
 
@@ -144,7 +146,8 @@ export function listDocuments() {
 
 export async function uploadDocument(file: File) {
   const formData = new FormData();
-  formData.append("file", file);
+  const baseName = file.name.replace(/^.*[/\\]/, "");
+  formData.append("file", file, baseName);
 
   const response = await fetch(`${API_BASE_URL}/documents/upload`, {
     method: "POST",
@@ -238,10 +241,109 @@ export function getDocumentDownloadUrl(documentId: string) {
   return `${API_BASE_URL}/documents/public/${documentId}/download`;
 }
 
+export interface DownloadUrlResponse {
+  downloadUrl: string;
+  filename: string;
+}
+
+export function getDocumentDownloadLink(documentId: string) {
+  return requestJson<DownloadUrlResponse>(`/documents/public/${documentId}/download-url`, {
+    method: "GET"
+  });
+}
+
 export function getRagHealth() {
   return requestText("/rag/health", {
     method: "GET"
   });
+}
+
+// Admin Document API
+
+export interface AdminSegmentInfo {
+  pointId: string;
+  text: string;
+  chunkIndex: number;
+  title: string;
+  category: string;
+  keywords: string;
+}
+
+export interface AdminSegmentListResponse {
+  documentId: string;
+  segments: AdminSegmentInfo[];
+  total: number;
+}
+
+export function adminListSegments(documentId: string) {
+  return requestJson<AdminSegmentListResponse>(`/admin/documents/${documentId}/segments`, {
+    method: "GET"
+  });
+}
+
+export function adminUpdateSegment(documentId: string, pointId: string, text: string) {
+  return requestJson<AdminSegmentInfo>(`/admin/documents/${documentId}/segments/${pointId}`, {
+    method: "PUT",
+    body: JSON.stringify({ text })
+  });
+}
+
+export function adminDeleteSegment(documentId: string, pointId: string) {
+  return requestJson<{ message: string; pointId: string }>(
+    `/admin/documents/${documentId}/segments/${pointId}`,
+    { method: "DELETE" }
+  );
+}
+
+export function adminReindexDocument(documentId: string) {
+  return requestJson<{ message: string; documentId: string; deletedSegments: number; newSegments: number }>(
+    `/admin/documents/${documentId}/reindex`,
+    { method: "POST" }
+  );
+}
+
+// Prompt Management API
+
+export interface PromptInfo {
+  id: number;
+  promptKey: string;
+  promptContent: string;
+  description: string;
+  updatedAt: string | null;
+  updatedBy: string | null;
+}
+
+export function listPrompts() {
+  return requestJson<PromptInfo[]>("/admin/prompts", { method: "GET" });
+}
+
+export function updatePrompt(key: string, content: string, description?: string) {
+  return requestJson<PromptInfo>(`/admin/prompts/${key}`, {
+    method: "PUT",
+    body: JSON.stringify({ content, description })
+  });
+}
+
+export function resetPrompt(key: string) {
+  return requestJson<PromptInfo>(`/admin/prompts/${key}/reset`, { method: "POST" });
+}
+
+export async function askWithImage(image: File, question: string, conversationId?: string) {
+  const formData = new FormData();
+  formData.append("image", image);
+  formData.append("question", question);
+  if (conversationId) {
+    formData.append("conversationId", conversationId);
+  }
+
+  const response = await fetch(`${API_BASE_URL}/rag/ask/with-image`, {
+    method: "POST",
+    credentials: "include",
+    body: formData
+  });
+
+  await ensureOk(response, "图片问答失败");
+  return response.json();
 }
 
 export function cancelConversation(conversationId: string) {

@@ -1,10 +1,12 @@
-import { onBeforeUnmount, ref } from "vue";
-import { cancelConversation, clearConversation, streamRagAnswer } from "../lib/api";
+import { onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { askWithImage, cancelConversation, clearConversation, streamRagAnswer } from "../lib/api";
 import {
   createAssistantMessageId,
   createStreamingAssistantMessage,
   createUserMessage
 } from "../lib/chat";
+import { clearStoredConversation, loadConversation, saveConversation } from "../lib/chatHistory";
+import { randomUUID } from "../lib/uuid";
 import type { ChatMessage } from "../types";
 
 interface MessageApi {
@@ -15,12 +17,22 @@ interface MessageApi {
 }
 
 export function useRagConversation(messageApi: MessageApi) {
-  const messages = ref<ChatMessage[]>([]);
+  const stored = loadConversation();
+  const messages = ref<ChatMessage[]>(stored?.messages ?? []);
   const prompt = ref("");
-  const conversationId = ref<string | null>(null);
+  const conversationId = ref<string | null>(stored?.conversationId ?? null);
   const maxResults = ref(64);
   const streaming = ref(false);
   const abortController = ref<AbortController | null>(null);
+
+  // Persist conversation on changes
+  watch(
+    [messages, conversationId],
+    () => {
+      saveConversation(messages.value, conversationId.value);
+    },
+    { deep: true }
+  );
 
   onBeforeUnmount(() => {
     abortController.value?.abort();
@@ -50,7 +62,7 @@ export function useRagConversation(messageApi: MessageApi) {
       return;
     }
 
-    const nextConversationId = conversationId.value || `web-${crypto.randomUUID()}`;
+    const nextConversationId = conversationId.value || `web-${randomUUID()}`;
     const assistantId = createAssistantMessageId();
 
     conversationId.value = nextConversationId;
@@ -94,7 +106,10 @@ export function useRagConversation(messageApi: MessageApi) {
           onThinkingEnd(payload) {
             updateMessage(assistantId, (item) => ({
               ...item,
-              thinkingStatus: payload.thinkingEnded ? "complete" : item.thinkingStatus
+              thinkingStatus: payload.thinkingEnded ? "complete" : item.thinkingStatus,
+              thinkingDurationMs: payload.thinkingEnded
+                ? Date.now() - new Date(item.createdAt).getTime()
+                : item.thinkingDurationMs
             }));
           },
           onDelta(payload) {
@@ -114,6 +129,10 @@ export function useRagConversation(messageApi: MessageApi) {
               thinking: payload.thinking ?? item.thinking,
               thinkingStatus:
                 payload.thinking || item.thinking ? "complete" : item.thinkingStatus,
+              thinkingDurationMs:
+                (payload.thinking || item.thinking) && !item.thinkingDurationMs
+                  ? Date.now() - new Date(item.createdAt).getTime()
+                  : item.thinkingDurationMs,
               status: payload.cancelled ? "cancelled" : "complete"
             }));
           },
@@ -173,6 +192,49 @@ export function useRagConversation(messageApi: MessageApi) {
     }
   }
 
+  async function handleSendWithImage(image: File, question: string, previewUrl: string) {
+    if (streaming.value) return;
+
+    const nextConversationId = conversationId.value || `web-${randomUUID()}`;
+    const assistantId = createAssistantMessageId();
+
+    conversationId.value = nextConversationId;
+    prompt.value = "";
+    streaming.value = true;
+    messages.value = [
+      ...messages.value,
+      createUserMessage(question, previewUrl),
+      createStreamingAssistantMessage(assistantId)
+    ];
+
+    try {
+      const response = await askWithImage(image, question, nextConversationId);
+
+      if (response.conversationId) {
+        conversationId.value = response.conversationId;
+      }
+
+      updateMessage(assistantId, (item) => ({
+        ...item,
+        content: response.answer || "未能生成回答",
+        thinking: response.thinking || "",
+        thinkingStatus: response.thinking ? "complete" as const : item.thinkingStatus,
+        status: "complete" as const,
+        sources: response.sources || []
+      }));
+    } catch (error) {
+      const errorText = error instanceof Error ? error.message : "图片问答失败";
+      updateMessage(assistantId, (item) => ({
+        ...item,
+        status: "error" as const,
+        content: errorText
+      }));
+      messageApi.error(errorText);
+    } finally {
+      streaming.value = false;
+    }
+  }
+
   async function handleCancel() {
     if (!conversationId.value) {
       abortController.value?.abort();
@@ -197,7 +259,8 @@ export function useRagConversation(messageApi: MessageApi) {
         await clearConversation(conversationId.value);
       }
 
-      conversationId.value = null;
+      clearStoredConversation();
+      conversationId.value = `web-${randomUUID()}`;
       messages.value = [];
       messageApi.success("会话上下文已清空");
     } catch (error) {
@@ -216,6 +279,7 @@ export function useRagConversation(messageApi: MessageApi) {
     setMaxResults,
     streaming,
     handleSend,
+    handleSendWithImage,
     handleCancel,
     handleClearConversation
   };

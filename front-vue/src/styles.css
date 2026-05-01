@@ -12,6 +12,9 @@
   --color-sky-100: #eef3ff;
   --color-sky-50: #f7fbff;
   --color-canvas: #f6f0e8;
+  --color-sidebar: #111827;
+  --color-sidebar-hover: #1f2937;
+  --color-panel: #ffffff;
 }
 
 @layer base {
@@ -47,5 +50,31 @@
   textarea,
   select {
     font: inherit;
+  }
+
+  /* Admin layout overrides */
+  .ant-layout-sider {
+    background: var(--color-sidebar) !important;
+  }
+
+  .ant-layout-sider .ant-menu-dark {
+    background: transparent !important;
+  }
+
+  .ant-layout-sider .ant-menu-dark .ant-menu-item-selected {
+    background: rgba(255, 255, 255, 0.08) !important;
+    border-left: 3px solid var(--color-accent-500) !important;
+  }
+
+  .ant-layout-sider .ant-menu-dark .ant-menu-item {
+    border-radius: 0 !important;
+    margin-block: 0 !important;
+    margin-inline: 0 !important;
+    padding-left: 20px !important;
+    width: 100% !important;
+  }
+
+  .ant-layout-sider .ant-menu-dark .ant-menu-item:hover {
+    background: var(--color-sidebar-hover) !important;
   }
 }

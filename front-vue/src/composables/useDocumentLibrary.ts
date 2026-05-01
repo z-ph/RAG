@@ -1,10 +1,16 @@
 import { onMounted, ref, watch } from "vue";
-import { ApiError, deleteDocument, getDocumentDownloadUrl, getPublicDocumentDetail, listDocuments, uploadDocumentStream } from "../lib/api";
-import type { DocumentListItem, PublicDocumentDetailResponse, UploadProgressEvent } from "../types";
+import { ApiError, deleteDocument, getDocumentDownloadLink, getPublicDocumentDetail, listDocuments, listPublicDocuments, uploadDocumentStream } from "../lib/api";
+import type { DocumentListItem, FileUploadEntry, PublicDocumentDetailResponse } from "../types";
 
 interface MessageApi {
   error: (content: string) => void;
   success: (content: string) => void;
+}
+
+interface DownloadLinkInfo {
+  documentId: string;
+  filename: string;
+  downloadUrl: string;
 }
 
 export function useDocumentLibrary(
@@ -15,27 +21,24 @@ export function useDocumentLibrary(
   const documents = ref<DocumentListItem[]>([]);
   const documentsLoading = ref(false);
   const uploading = ref(false);
-  const uploadProgress = ref<UploadProgressEvent | null>(null);
+  const fileUploads = ref<FileUploadEntry[]>([]);
   const deletingId = ref<string | null>(null);
   const viewingDocument = ref<PublicDocumentDetailResponse | null>(null);
   const viewingLoading = ref(false);
+  const downloadLinkInfo = ref<DownloadLinkInfo | null>(null);
   let abortController: AbortController | null = null;
 
   onMounted(() => {
-    if (authenticated) {
-      void refreshDocuments();
-    }
+    void refreshDocuments();
   });
 
-  // Watch for auth changes
   watch(() => authenticated, (newAuth) => {
     if (!newAuth) {
       documents.value = [];
       documentsLoading.value = false;
       uploading.value = false;
-      uploadProgress.value = null;
+      fileUploads.value = [];
       deletingId.value = null;
-      // Cancel any ongoing upload
       if (abortController) {
         abortController.abort();
         abortController = null;
@@ -46,16 +49,16 @@ export function useDocumentLibrary(
   });
 
   async function refreshDocuments() {
-    if (!authenticated) {
-      documents.value = [];
-      return;
-    }
-
     documentsLoading.value = true;
 
     try {
-      const response = await listDocuments();
-      documents.value = response.documents;
+      if (authenticated) {
+        const response = await listDocuments();
+        documents.value = response.documents;
+      } else {
+        const response = await listPublicDocuments();
+        documents.value = response.documents;
+      }
     } catch (error) {
       if (error instanceof ApiError && error.status === 401) {
         documents.value = [];
@@ -69,58 +72,77 @@ export function useDocumentLibrary(
     }
   }
 
-  async function handleUpload(file: File) {
+  async function handleUpload(fileOrFiles: File | File[]) {
     if (!authenticated) {
       return;
     }
 
-    // Cancel any previous upload
+    const files = Array.isArray(fileOrFiles) ? fileOrFiles : [fileOrFiles];
+    if (files.length === 0) return;
+
     if (abortController) {
       abortController.abort();
     }
     abortController = new AbortController();
 
+    const initialEntries: FileUploadEntry[] = files.map((f) => ({
+      filename: f.name,
+      status: "uploading" as const,
+      progress: null,
+    }));
+
     uploading.value = true;
-    uploadProgress.value = null;
+    fileUploads.value = initialEntries;
 
-    try {
-      await uploadDocumentStream(
-        file,
-        {
-          onProgress: (event) => {
-            uploadProgress.value = event;
+    let successCount = 0;
+    const signal = abortController.signal;
+
+    await Promise.allSettled(
+      files.map((file, index) =>
+        uploadDocumentStream(
+          file,
+          {
+            onProgress: (event) => {
+              fileUploads.value = fileUploads.value.map((entry, i) =>
+                i === index ? { ...entry, progress: event } : entry
+              );
+            },
+            onComplete: (event) => {
+              successCount++;
+              fileUploads.value = fileUploads.value.map((entry, i) =>
+                i === index ? { ...entry, status: "complete" as const } : entry
+              );
+              messageApi.success(
+                `${event.filename || file.name} 已入库，切分 ${event.segmentCount} 段`
+              );
+            },
+            onError: (errorMessage) => {
+              fileUploads.value = fileUploads.value.map((entry, i) =>
+                i === index ? { ...entry, status: "error" as const, errorMessage } : entry
+              );
+              messageApi.error(`${file.name}: ${errorMessage}`);
+            }
           },
-          onComplete: (event) => {
-            uploadProgress.value = event;
-            messageApi.success(
-              `${event.filename || file.name} 已入库，切分 ${event.segmentCount} 段`
+          signal
+        ).catch((error) => {
+          if (error instanceof ApiError && error.status === 401) {
+            documents.value = [];
+            void onUnauthorized();
+            abortController?.abort();
+          } else if (error instanceof Error && error.name !== "AbortError") {
+            fileUploads.value = fileUploads.value.map((entry, i) =>
+              i === index ? { ...entry, status: "error" as const, errorMessage: "上传失败" } : entry
             );
-            setTimeout(() => {
-              uploading.value = false;
-              uploadProgress.value = null;
-              void refreshDocuments();
-            }, 1000);
-          },
-          onError: (errorMessage) => {
-            messageApi.error(errorMessage);
-            uploading.value = false;
-            uploadProgress.value = null;
+            messageApi.error(`${file.name}: 上传失败`);
           }
-        },
-        abortController.signal
-      );
-    } catch (error) {
-      if (error instanceof ApiError && error.status === 401) {
-        documents.value = [];
-        await onUnauthorized();
-        return;
-      }
+        })
+      )
+    );
 
-      if (error instanceof Error && error.name !== "AbortError") {
-        messageApi.error(error instanceof Error ? error.message : "上传失败");
-      }
-      uploading.value = false;
-      uploadProgress.value = null;
+    uploading.value = false;
+    fileUploads.value = [];
+    if (successCount > 0) {
+      void refreshDocuments();
     }
   }
 
@@ -130,7 +152,7 @@ export function useDocumentLibrary(
       abortController = null;
     }
     uploading.value = false;
-    uploadProgress.value = null;
+    fileUploads.value = [];
   }
 
   async function handleDeleteDocument(documentId: string) {
@@ -172,29 +194,36 @@ export function useDocumentLibrary(
     viewingDocument.value = null;
   }
 
-  function handleDownloadDocument(documentId: string, filename?: string) {
-    const url = getDocumentDownloadUrl(documentId);
-    const link = document.createElement("a");
-    link.href = url;
-    if (filename) link.download = filename;
-    link.style.display = "none";
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+  async function handleShowDownloadLink(documentId: string, filename: string) {
+    try {
+      const response = await getDocumentDownloadLink(documentId);
+      const downloadUrl = response.downloadUrl.startsWith("http")
+        ? response.downloadUrl
+        : `${window.location.origin}${response.downloadUrl}`;
+      downloadLinkInfo.value = { documentId, filename, downloadUrl };
+    } catch (error) {
+      messageApi.error(error instanceof Error ? error.message : "获取下载链接失败");
+    }
+  }
+
+  function handleCloseDownloadLink() {
+    downloadLinkInfo.value = null;
   }
 
   return {
     documents,
     documentsLoading,
     uploading,
-    uploadProgress,
+    fileUploads,
     deletingId,
     refreshDocuments,
     handleUpload,
     cancelUpload,
     handleDeleteDocument,
     handleViewDocument,
-    handleDownloadDocument,
+    handleShowDownloadLink,
+    handleCloseDownloadLink,
+    downloadLinkInfo,
     viewingDocument,
     viewingLoading,
     handleCloseDocumentDetail

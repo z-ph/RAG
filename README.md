@@ -18,7 +18,7 @@
 - 同步问答和流式问答
 - 独立返回并展示模型思考内容，思考结束后前端自动折叠
 - 返回来源片段，支持会话取消和上下文清空
-- 聊天模型和向量模型可分别选择 `ollama` 或 `vllm`
+- 聊天模型和向量模型均使用 OpenAI-compatible provider（`vllm`）
 - 会话上下文使用内存滑动窗口，支持 TTL 自动清理
 - 启动时自动检查 Qdrant collection；若维度不匹配会按配置重建
 
@@ -122,9 +122,7 @@ cd dist && npx serve .
 - Node.js 20+ 与 `pnpm`
 - MySQL 8+
 - Qdrant
-- 至少一个聊天模型 provider 和一个 embedding provider
-  - `ollama`
-  - `vllm` 或其他 OpenAI-compatible endpoint
+- 一个兼容 OpenAI API 的聊天模型和 embedding 模型服务
 
 ### 2. 启动 MySQL
 
@@ -150,21 +148,28 @@ docker run -d --name qdrant -p 6333:6333 -p 6334:6334 qdrant/qdrant
 
 ### 4. 选择模型 provider
 
-#### 方案 A：全部使用 Ollama
+#### 配置模型服务
 
-```bash
-ollama serve
-ollama pull qwen2.5:7b
-ollama pull bge-base-zh
-```
-
-如果你打算使用别的 embedding 模型，需要同时调整 `OLLAMA_EMBEDDING_MODEL` 和 `QDRANT_VECTOR_SIZE`。
-
-#### 方案 B：聊天走 OpenAI-compatible endpoint，向量仍走 Ollama
+`vllm` 在当前代码里表示"OpenAI-compatible provider"，不要求一定是 vLLM，也可以接入兼容接口的云端服务。
 
 ```bash
 LLM_CHAT_PROVIDER=vllm
-LLM_EMBEDDING_PROVIDER=ollama
+LLM_EMBEDDING_PROVIDER=vllm
+VLLM_CHAT_BASE_URL=http://localhost:8000/v1
+VLLM_EMBEDDING_BASE_URL=http://localhost:8000/v1
+VLLM_CHAT_MODEL=Qwen/Qwen2.5-7B-Instruct
+VLLM_EMBEDDING_MODEL=BAAI/bge-base-zh-v1.5
+VLLM_CHAT_API_KEY=
+VLLM_RETURN_THINKING=true
+```
+
+### 5. 配置后端
+
+应用启动时会自动读取根目录 `.env`。推荐以 `.env.example` 为模板创建自己的 `.env`，常用配置如下：
+
+```dotenv
+LLM_CHAT_PROVIDER=vllm
+LLM_EMBEDDING_PROVIDER=vllm
 VLLM_CHAT_BASE_URL=http://localhost:8000/v1
 VLLM_CHAT_MODEL=Qwen/Qwen2.5-7B-Instruct
 VLLM_CHAT_API_KEY=
@@ -178,8 +183,8 @@ VLLM_RETURN_THINKING=true
 应用启动时会自动读取根目录 `.env`。推荐以 `.env.example` 为模板创建自己的 `.env`，常用配置如下：
 
 ```dotenv
-LLM_CHAT_PROVIDER=ollama
-LLM_EMBEDDING_PROVIDER=ollama
+LLM_CHAT_PROVIDER=vllm
+LLM_EMBEDDING_PROVIDER=vllm
 
 MYSQL_URL=jdbc:mysql://localhost:3306/knowledge_rag?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Shanghai&characterEncoding=utf8
 MYSQL_USERNAME=root

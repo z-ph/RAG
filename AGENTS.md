@@ -41,4 +41,4 @@
 提交历史采用带作用域的 Conventional Commits，例如 `feat(frontend): ...`、`refactor(frontend): ...`。提交说明应使用祈使句，并准确标明范围，如 `frontend`、`rag`、`build`。发起 PR 时请附上变更摘要、测试说明、关联问题；涉及界面改动时补充截图。
 
 ## 配置与安全提示
-本地配置从 `.env.example` 和 `frontend/.env.example` 复制，不要提交真实密钥或本地私有配置。联调前先确认 Ollama 和 Qdrant 可用。不要提交 `uploads/` 中的运行数据，也不要提交 `target/` 下的构建产物。
+本地配置从 `.env.example` 和 `frontend/.env.example` 复制，不要提交真实密钥或本地私有配置。联调前先确认模型服务和 Qdrant 可用。不要提交 `uploads/` 中的运行数据，也不要提交 `target/` 下的构建产物。

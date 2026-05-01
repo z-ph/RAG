@@ -38,7 +38,7 @@ E2E 测试要求**真实的全栈容器环境**，包括 MySQL、Qdrant、后端
 | 文件 | 说明 |
 |------|------|
 | `docker-compose.e2e.yml` | E2E 专用编排，使用独立端口避免与开发环境冲突 |
-| `.env.e2e` | 环境变量副本，默认使用 Ollama 本地模型 |
+| `.env.e2e` | 环境变量副本，默认使用 vLLM 本地模型 |
 
 **端口映射（与开发环境隔离）：**
 
@@ -237,7 +237,7 @@ LLM 回答内容不可预测，因此测试只验证：
 A: 首次构建 Docker 镜像耗时较长，请耐心等待。如超过 2 分钟仍未就绪，检查 `docker compose -f docker-compose.e2e.yml logs backend-e2e` 查看报错。
 
 **Q: LLM 不可用导致问答测试失败？**
-A: E2E 环境默认使用 `.env.e2e` 中的 Ollama 配置。确保宿主机已运行 Ollama 且模型已下载，或修改为可用的 vLLM 地址。
+A: E2E 环境默认使用 `.env.e2e` 中的 vLLM 配置。确保宿主机已运行兼容的模型服务，或修改为可用的远程地址。
 
 **Q: 测试在本地通过但在 CI 失败？**
 A: 检查 CI 环境的 Docker 资源限制（内存/CPU）。Playwright 的 `trace` 和 `video` 会在首次重试失败时自动录制，通过报告可定位问题。

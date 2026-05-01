@@ -63,8 +63,6 @@ ENV TZ=Asia/Shanghai \
     QDRANT_HOST=qdrant \
     QDRANT_PORT=6334 \
     QDRANT_HTTP_PORT=6333 \
-    OLLAMA_CHAT_BASE_URL=http://host.docker.internal:11434 \
-    OLLAMA_EMBEDDING_BASE_URL=http://host.docker.internal:11434 \
     VLLM_CHAT_BASE_URL=http://host.docker.internal:8000/v1 \
     VLLM_EMBEDDING_BASE_URL=http://host.docker.internal:8000/v1
 

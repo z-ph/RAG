@@ -20,10 +20,7 @@ RAG Request
    \--> ChatModel / StreamingChatModel <- llm.chat-provider
 ```
 
-支持的 provider 值只有两个：
-
-- `ollama`
-- `vllm`
+当前仅支持的 provider 值为 `vllm`。
 
 其中 `vllm` 在代码里表示 OpenAI-compatible provider。它可以是：
 
@@ -48,15 +45,9 @@ RAG Request
 
 ```yaml
 llm:
-  chat-provider: ${LLM_CHAT_PROVIDER:ollama}
-  embedding-provider: ${LLM_EMBEDDING_PROVIDER:ollama}
+  chat-provider: ${LLM_CHAT_PROVIDER:vllm}
+  embedding-provider: ${LLM_EMBEDDING_PROVIDER:vllm}
   timeout: ${LLM_TIMEOUT:120s}
-  ollama:
-    chat-base-url: ${OLLAMA_CHAT_BASE_URL:http://localhost:11434}
-    embedding-base-url: ${OLLAMA_EMBEDDING_BASE_URL:http://localhost:11434}
-    chat-model: ${OLLAMA_CHAT_MODEL:qwen2.5:7b}
-    embedding-model: ${OLLAMA_EMBEDDING_MODEL:bge-base-zh}
-    think: ${OLLAMA_THINK:false}
   vllm:
     chat-base-url: ${VLLM_CHAT_BASE_URL:http://localhost:8000/v1}
     embedding-base-url: ${VLLM_EMBEDDING_BASE_URL:http://localhost:8000/v1}
@@ -68,46 +59,7 @@ llm:
 
 ## 推荐配置方式
 
-### 方案 1：全部走 Ollama
-
-```dotenv
-LLM_CHAT_PROVIDER=ollama
-LLM_EMBEDDING_PROVIDER=ollama
-
-OLLAMA_CHAT_BASE_URL=http://localhost:11434
-OLLAMA_EMBEDDING_BASE_URL=http://localhost:11434
-OLLAMA_CHAT_MODEL=qwen2.5:7b
-OLLAMA_EMBEDDING_MODEL=bge-base-zh
-OLLAMA_THINK=false
-```
-
-适合：
-
-- 全本地开发
-- 不想依赖远程 API
-- 调试文档解析和检索链路
-
-### 方案 2：聊天走 OpenAI-compatible provider，embedding 走 Ollama
-
-```dotenv
-LLM_CHAT_PROVIDER=vllm
-LLM_EMBEDDING_PROVIDER=ollama
-
-VLLM_CHAT_BASE_URL=http://localhost:8000/v1
-VLLM_CHAT_MODEL=Qwen/Qwen2.5-7B-Instruct
-VLLM_CHAT_API_KEY=
-
-OLLAMA_EMBEDDING_BASE_URL=http://localhost:11434
-OLLAMA_EMBEDDING_MODEL=bge-base-zh
-```
-
-适合：
-
-- 聊天模型放到远端
-- 向量仍保留本地生成
-- 控制远端调用成本
-
-### 方案 3：聊天和 embedding 都走 OpenAI-compatible provider
+### 方案 1：全部走 OpenAI-compatible provider
 
 ```dotenv
 LLM_CHAT_PROVIDER=vllm
@@ -125,7 +77,7 @@ RAG_EMBEDDING_REQUEST_BATCH_SIZE=10
 适合：
 
 - 已有统一的 OpenAI-compatible 网关
-- 不希望本地部署 Ollama
+- 不希望本地部署模型服务
 
 ## 使用兼容接口的云端服务
 
@@ -159,7 +111,7 @@ provider 只在应用启动时读取一次配置。
 
 切换 embedding 模型时，要同步检查：
 
-- `VLLM_EMBEDDING_MODEL` 或 `OLLAMA_EMBEDDING_MODEL`
+- `VLLM_EMBEDDING_MODEL`
 - `QDRANT_VECTOR_SIZE`
 
 如果 collection 已存在但维度不一致，启动时会由 `QdrantInitializer` 删除并重建 collection。
@@ -185,16 +137,9 @@ RAG_EMBEDDING_REQUEST_BATCH_SIZE=10
 
 这个批次只影响 embedding 请求，不影响后续写入 Qdrant 的 `rag.embedding-store.batch-size`。
 
-### 5. `ollama.think` 只对 Ollama chat 生效，`vllm` 使用独立 reasoning 字段
+### 5. `vllm` 使用独立 reasoning 字段
 
-当前代码会把 `llm.ollama.think` 传给：
-
-- `OllamaChatModel`
-- `OllamaStreamingChatModel`
-
-对 `vllm` provider 无效。
-
-`vllm` / OpenAI-compatible chat 现在单独使用：
+`vllm` / OpenAI-compatible chat 现在使用：
 
 - `llm.vllm.return-thinking`，默认 `true`
 
@@ -212,14 +157,6 @@ RAG_EMBEDDING_REQUEST_BATCH_SIZE=10
 查看启动日志，当前实现会输出类似：
 
 ```text
-初始化聊天模型: provider=ollama, baseUrl=http://localhost:11434, model=qwen2.5:7b, think=false
-初始化流式聊天模型: provider=ollama, baseUrl=http://localhost:11434, model=qwen2.5:7b, think=false
-初始化嵌入模型: provider=ollama, baseUrl=http://localhost:11434, model=bge-base-zh
-```
-
-或：
-
-```text
 初始化聊天模型: provider=vllm, baseUrl=http://localhost:8000/v1, model=Qwen/Qwen2.5-7B-Instruct, returnThinking=true
 初始化流式聊天模型: provider=vllm, baseUrl=http://localhost:8000/v1, model=Qwen/Qwen2.5-7B-Instruct, returnThinking=true
 初始化嵌入模型: provider=vllm, baseUrl=http://localhost:8000/v1, model=BAAI/bge-base-zh-v1.5
@@ -234,6 +171,7 @@ RAG_EMBEDDING_REQUEST_BATCH_SIZE=10
 - `DASHSCOPE_API_KEY`
 - `aliyun` / `local` 路由比例配置
 - `BUSINESS_TYPE` 路由表
+- `OLLAMA_*` 系列配置（Ollama 支持已移除）
 
 如果你是从旧文档迁移，请直接改用：
 
@@ -241,4 +179,3 @@ RAG_EMBEDDING_REQUEST_BATCH_SIZE=10
 - `LLM_EMBEDDING_PROVIDER`
 - `VLLM_CHAT_*`
 - `VLLM_EMBEDDING_*`
-- `OLLAMA_*`

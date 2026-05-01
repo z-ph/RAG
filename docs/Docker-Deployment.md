@@ -119,9 +119,8 @@ VITE_API_BASE_URL=http://your-backend-domain:8081/api
 - `MYSQL_ROOT_PASSWORD`：MySQL root 密码
 - `AUTH_BOOTSTRAP_ADMIN_USERNAME`：初始化管理员用户名
 - `AUTH_BOOTSTRAP_ADMIN_PASSWORD`：初始化管理员密码
-- `LLM_CHAT_PROVIDER`：聊天模型 provider，默认 `ollama`
-- `LLM_EMBEDDING_PROVIDER`：向量模型 provider，默认 `ollama`
-- `OLLAMA_CHAT_BASE_URL` / `OLLAMA_EMBEDDING_BASE_URL`：默认指向 `http://host.docker.internal:11434`
+- `LLM_CHAT_PROVIDER`：聊天模型 provider，默认 `vllm`
+- `LLM_EMBEDDING_PROVIDER`：向量模型 provider，默认 `vllm`
 - `VLLM_CHAT_BASE_URL` / `VLLM_EMBEDDING_BASE_URL`：默认指向 `http://host.docker.internal:8000/v1`
 
 ## 数据持久化

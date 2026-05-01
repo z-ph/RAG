@@ -19,15 +19,9 @@ spring:
       max-request-size: ${SPRING_MULTIPART_MAX_REQUEST_SIZE:50MB}
 
 llm:
-  chat-provider: ${LLM_CHAT_PROVIDER:ollama}
-  embedding-provider: ${LLM_EMBEDDING_PROVIDER:ollama}
+  chat-provider: ${LLM_CHAT_PROVIDER:vllm}
+  embedding-provider: ${LLM_EMBEDDING_PROVIDER:vllm}
   timeout: ${LLM_TIMEOUT:120s}
-  ollama:
-    chat-base-url: ${OLLAMA_CHAT_BASE_URL:http://localhost:11434}
-    embedding-base-url: ${OLLAMA_EMBEDDING_BASE_URL:http://localhost:11434}
-    chat-model: ${OLLAMA_CHAT_MODEL:qwen2.5:7b}
-    embedding-model: ${OLLAMA_EMBEDDING_MODEL:bge-base-zh}
-    think: ${OLLAMA_THINK:false}
   vllm:
     chat-base-url: ${VLLM_CHAT_BASE_URL:http://localhost:8000/v1}
     embedding-base-url: ${VLLM_EMBEDDING_BASE_URL:http://localhost:8000/v1}

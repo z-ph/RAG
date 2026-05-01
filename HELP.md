@@ -22,23 +22,17 @@
 docker run -d --name qdrant -p 6333:6333 -p 6334:6334 qdrant/qdrant
 ```
 
-### 2. 启动 Ollama 并准备模型
-
-```bash
-ollama serve
-ollama pull qwen2.5:7b
-ollama pull bge-base-zh
-```
-
-### 3. 配置后端
+### 2. 配置后端
 
 根目录 `.env` 会在启动时自动加载。最小配置示例：
 
 ```dotenv
-LLM_CHAT_PROVIDER=ollama
-LLM_EMBEDDING_PROVIDER=ollama
-OLLAMA_CHAT_MODEL=qwen2.5:7b
-OLLAMA_EMBEDDING_MODEL=bge-base-zh
+LLM_CHAT_PROVIDER=vllm
+LLM_EMBEDDING_PROVIDER=vllm
+VLLM_CHAT_BASE_URL=http://localhost:8000/v1
+VLLM_EMBEDDING_BASE_URL=http://localhost:8000/v1
+VLLM_CHAT_MODEL=Qwen/Qwen2.5-7B-Instruct
+VLLM_EMBEDDING_MODEL=BAAI/bge-base-zh-v1.5
 QDRANT_HOST=localhost
 QDRANT_PORT=6334
 QDRANT_HTTP_PORT=6333
@@ -97,16 +91,11 @@ pnpm dev
 ### provider 选择
 
 ```dotenv
-LLM_CHAT_PROVIDER=ollama
-LLM_EMBEDDING_PROVIDER=ollama
+LLM_CHAT_PROVIDER=vllm
+LLM_EMBEDDING_PROVIDER=vllm
 ```
 
-支持值只有：
-
-- `ollama`
-- `vllm`
-
-这里的 `vllm` 代表 OpenAI-compatible provider，不要求一定是本地 vLLM。
+当前仅支持 `vllm`，代表 OpenAI-compatible provider，不要求一定是本地 vLLM。
 
 ### Qdrant
 

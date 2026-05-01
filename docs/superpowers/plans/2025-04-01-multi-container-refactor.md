@@ -144,8 +144,6 @@ ENV TZ=Asia/Shanghai \
     QDRANT_HOST=qdrant \
     QDRANT_PORT=6334 \
     QDRANT_HTTP_PORT=6333 \
-    OLLAMA_CHAT_BASE_URL=http://host.docker.internal:11434 \
-    OLLAMA_EMBEDDING_BASE_URL=http://host.docker.internal:11434 \
     VLLM_CHAT_BASE_URL=http://host.docker.internal:8000/v1 \
     VLLM_EMBEDDING_BASE_URL=http://host.docker.internal:8000/v1
 
@@ -224,14 +222,9 @@ services:
       AUTH_BOOTSTRAP_ADMIN_USERNAME: ${AUTH_BOOTSTRAP_ADMIN_USERNAME:-admin}
       AUTH_BOOTSTRAP_ADMIN_PASSWORD: ${AUTH_BOOTSTRAP_ADMIN_PASSWORD:-ChangeMe123!}
       # LLM configuration
-      LLM_CHAT_PROVIDER: ${LLM_CHAT_PROVIDER:-ollama}
-      LLM_EMBEDDING_PROVIDER: ${LLM_EMBEDDING_PROVIDER:-ollama}
+      LLM_CHAT_PROVIDER: ${LLM_CHAT_PROVIDER:-vllm}
+      LLM_EMBEDDING_PROVIDER: ${LLM_EMBEDDING_PROVIDER:-vllm}
       LLM_TIMEOUT: ${LLM_TIMEOUT:-120s}
-      OLLAMA_CHAT_BASE_URL: ${OLLAMA_CHAT_BASE_URL:-http://host.docker.internal:11434}
-      OLLAMA_EMBEDDING_BASE_URL: ${OLLAMA_EMBEDDING_BASE_URL:-http://host.docker.internal:11434}
-      OLLAMA_CHAT_MODEL: ${OLLAMA_CHAT_MODEL:-qwen2.5:7b}
-      OLLAMA_EMBEDDING_MODEL: ${OLLAMA_EMBEDDING_MODEL:-bge-base-zh}
-      OLLAMA_THINK: ${OLLAMA_THINK:-false}
       VLLM_CHAT_BASE_URL: ${VLLM_CHAT_BASE_URL:-http://host.docker.internal:8000/v1}
       VLLM_EMBEDDING_BASE_URL: ${VLLM_EMBEDDING_BASE_URL:-http://host.docker.internal:8000/v1}
       VLLM_CHAT_MODEL: ${VLLM_CHAT_MODEL:-Qwen/Qwen2.5-7B-Instruct}

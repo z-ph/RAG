@@ -12,6 +12,7 @@ import com.mark.knowledge.rag.service.DocumentProgressCallback;
 import com.mark.knowledge.rag.service.DocumentService;
 import com.mark.knowledge.rag.service.EmbeddingService;
 import com.mark.knowledge.rag.service.FileStorageService;
+import com.mark.knowledge.rag.service.ImageStorageService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.io.FileSystemResource;
@@ -50,17 +51,20 @@ public class DocumentController {
     private final EmbeddingService embeddingService;
     private final DocumentAdminService documentAdminService;
     private final FileStorageService fileStorageService;
+    private final ImageStorageService imageStorageService;
     private final ExecutorService sseExecutor = Executors.newCachedThreadPool();
 
     public DocumentController(
             DocumentService documentService,
             EmbeddingService embeddingService,
             DocumentAdminService documentAdminService,
-            FileStorageService fileStorageService) {
+            FileStorageService fileStorageService,
+            ImageStorageService imageStorageService) {
         this.documentService = documentService;
         this.embeddingService = embeddingService;
         this.documentAdminService = documentAdminService;
         this.fileStorageService = fileStorageService;
+        this.imageStorageService = imageStorageService;
     }
 
     /**
@@ -349,6 +353,11 @@ public class DocumentController {
                 } catch (Exception e) {
                     log.warn("删除文件失败（非关键）: {}", documentId, e);
                 }
+                try {
+                    imageStorageService.deleteImages(documentId);
+                } catch (Exception e) {
+                    log.warn("删除文档图片失败（非关键）: {}", documentId, e);
+                }
             }
             return ResponseEntity.ok(response);
         } catch (Exception e) {
@@ -366,6 +375,27 @@ public class DocumentController {
     @GetMapping("/health")
     public ResponseEntity<String> health() {
         return ResponseEntity.ok("文档服务运行正常");
+    }
+
+    @GetMapping("/images/{documentId}/{imageId}")
+    public ResponseEntity<?> serveImage(
+            @PathVariable String documentId,
+            @PathVariable String imageId) {
+        try {
+            byte[] imageBytes = imageStorageService.readImage(documentId, imageId);
+            String contentType = imageStorageService.detectContentType(documentId, imageId);
+            return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType(contentType))
+                .header("Cache-Control", "public, max-age=86400")
+                .contentLength(imageBytes.length)
+                .body(imageBytes);
+        } catch (SecurityException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(new ErrorResponse("非法请求", e.getMessage()));
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(new ErrorResponse("图片不存在", e.getMessage()));
+        }
     }
 
     private String resolveContentType(String filename) {

@@ -1,4 +1,5 @@
 import type { Components } from "react-markdown";
+import { Image } from "antd";
 import ReactMarkdown from "react-markdown";
 import remarkBreaks from "remark-breaks";
 import remarkGfm from "remark-gfm";
@@ -110,6 +111,20 @@ const toneClassName: Record<MarkdownTone, string> = {
 const markdownComponents: Components = {
   a({ node, ...props }) {
     return <a {...props} target="_blank" rel="noreferrer" />;
+  },
+  img({ node, src, alt, ...props }) {
+    if (src && src.includes("/api/documents/images/")) {
+      return (
+        <Image
+          src={src}
+          alt={alt || "图片"}
+          style={{ maxWidth: "100%", borderRadius: 4 }}
+          preview={{ mask: "查看大图" }}
+          fallback="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='100'%3E%3Crect fill='%23f0f0f0' width='200' height='100'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='%23999' font-size='12'%3E加载失败%3C/text%3E%3C/svg%3E"
+        />
+      );
+    }
+    return <img src={src} alt={alt} {...props} />;
   },
   table({ node, ...props }) {
     return (

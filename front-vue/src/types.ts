@@ -2,6 +2,7 @@ export interface SourceReference {
   filename: string;
   excerpt: string;
   relevanceScore: number;
+  images?: string[];
 }
 
 export interface RagRequest {

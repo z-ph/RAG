@@ -5,6 +5,7 @@ import {
   CopyOutlined,
   LoadingOutlined
 } from "@ant-design/icons";
+import { Image } from "antd";
 import { useEffect, useRef, useState } from "react";
 import { MarkdownContent } from "./MarkdownContent";
 import type { ChatMessage } from "../types";
@@ -276,6 +277,24 @@ export function MessageBubble({ message }: MessageBubbleProps) {
                     <p className={`mt-1 text-[13px] leading-[1.55] ${sourceExcerptClass}`}>
                       {source.excerpt}
                     </p>
+                    {source.images && source.images.length > 0 ? (
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {source.images.map((imgUrl, imgIdx) => (
+                          <Image
+                            key={imgIdx}
+                            src={imgUrl}
+                            alt={`图片 ${imgIdx + 1}`}
+                            width={120}
+                            height={90}
+                            className="rounded object-cover"
+                            preview={{
+                              mask: "查看大图"
+                            }}
+                            fallback="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='90'%3E%3Crect fill='%23f0f0f0' width='120' height='90'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='%23999' font-size='12'%3E加载失败%3C/text%3E%3C/svg%3E"
+                          />
+                        ))}
+                      </div>
+                    ) : null}
                   </section>
                 ))}
               </div>

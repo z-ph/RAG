@@ -80,6 +80,18 @@
               <p class="mt-1 text-[13px] leading-[1.55]" :class="sourceExcerptClass">
                 {{ source.excerpt }}
               </p>
+              <div v-if="source.images && source.images.length > 0" class="mt-2 flex flex-wrap gap-2">
+                <a-image
+                  v-for="(imgUrl, imgIdx) in source.images"
+                  :key="imgIdx"
+                  :src="imgUrl"
+                  :alt="`图片 ${imgIdx + 1}`"
+                  :width="120"
+                  :height="90"
+                  style="border-radius: 4px; object-fit: cover;"
+                  fallback="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='90'%3E%3Crect fill='%23f0f0f0' width='120' height='90'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='%23999' font-size='12'%3E加载失败%3C/text%3E%3C/svg%3E"
+                />
+              </div>
             </section>
           </div>
         </details>

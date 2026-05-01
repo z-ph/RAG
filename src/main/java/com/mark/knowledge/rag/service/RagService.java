@@ -6,7 +6,10 @@ import com.mark.knowledge.rag.dto.SourceReference;
 import com.mark.knowledge.rag.store.QdrantEmbeddingStoreFactory;
 import dev.langchain4j.data.message.AiMessage;
 import dev.langchain4j.data.message.ChatMessage;
+import dev.langchain4j.data.message.Content;
+import dev.langchain4j.data.message.ImageContent;
 import dev.langchain4j.data.message.SystemMessage;
+import dev.langchain4j.data.message.TextContent;
 import dev.langchain4j.data.message.UserMessage;
 import dev.langchain4j.data.segment.TextSegment;
 import dev.langchain4j.model.chat.ChatModel;
@@ -32,6 +35,7 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
@@ -77,6 +81,12 @@ public class RagService {
     @Value("${rag.chunk-dedup-enabled:true}")
     private boolean chunkDedupEnabled;
 
+    @Value("${rag.image-to-llm-enabled:true}")
+    private boolean imageToLlmEnabled;
+
+    @Value("${rag.image-max-per-request:5}")
+    private int imageMaxPerRequest;
+
     private final ChatModel chatModel;
     private final StreamingChatModel streamingChatModel;
     private final EmbeddingModel embeddingModel;
@@ -84,6 +94,7 @@ public class RagService {
     private final ConversationMemoryService conversationMemoryService;
     private final Bm25Scorer bm25Scorer;
     private final PromptService promptService;
+    private final ImageStorageService imageStorageService;
     private final ConcurrentHashMap<String, InFlightGeneration> inFlightGenerations = new ConcurrentHashMap<>();
 
     public RagService(
@@ -93,7 +104,8 @@ public class RagService {
             QdrantEmbeddingStoreFactory embeddingStoreFactory,
             ConversationMemoryService conversationMemoryService,
             Bm25Scorer bm25Scorer,
-            PromptService promptService) {
+            PromptService promptService,
+            ImageStorageService imageStorageService) {
         this.chatModel = chatModel;
         this.streamingChatModel = streamingChatModel;
         this.embeddingModel = embeddingModel;
@@ -101,6 +113,7 @@ public class RagService {
         this.conversationMemoryService = conversationMemoryService;
         this.bm25Scorer = bm25Scorer;
         this.promptService = promptService;
+        this.imageStorageService = imageStorageService;
     }
 
     public RagResponse ask(RagRequest request) {
@@ -621,7 +634,29 @@ public class RagService {
             }
         }
         if (!newContext.isEmpty()) {
-            toSend.add(UserMessage.from("新增文档上下文：\n" + newContext));
+            List<String> imageUrls = extractImageUrls(newContext);
+            if (imageToLlmEnabled && !imageUrls.isEmpty()) {
+                List<String> limitedUrls = imageUrls.stream().limit(imageMaxPerRequest).toList();
+                List<Content> contentParts = new ArrayList<>();
+                contentParts.add(TextContent.from("新增文档上下文：\n" + newContext));
+                for (String url : limitedUrls) {
+                    try {
+                        byte[] imageBytes = readImageFromUrl(url);
+                        if (imageBytes != null) {
+                            String mimeType = detectImageMimeType(imageBytes);
+                            String base64 = Base64.getEncoder().encodeToString(imageBytes);
+                            String dataUri = "data:" + mimeType + ";base64," + base64;
+                            contentParts.add(ImageContent.from(dataUri));
+                        }
+                    } catch (Exception e) {
+                        log.warn("注入图片到 LLM 上下文失败: {}", url, e);
+                    }
+                }
+                toSend.add(UserMessage.from(contentParts));
+                log.info("注入 {} 张图片到 LLM 上下文", limitedUrls.size());
+            } else {
+                toSend.add(UserMessage.from("新增文档上下文：\n" + newContext));
+            }
         }
         toSend.add(UserMessage.from(question));
 
@@ -689,9 +724,23 @@ public class RagService {
                 String filename = segment.metadata() != null
                     ? segment.metadata().getString("filename")
                     : "unknown";
-                return new SourceReference(filename, segment.text(), match.finalScore());
+                List<String> images = extractImageUrls(segment.text());
+                return new SourceReference(filename, segment.text(), match.finalScore(), images);
             })
             .collect(Collectors.toList());
+    }
+
+    private static final Pattern IMAGE_URL_IN_CHUNK = Pattern.compile(
+        "!\\[.*?\\]\\((/rag/api/documents/images/[^)]+)\\)"
+    );
+
+    private List<String> extractImageUrls(String text) {
+        List<String> urls = new ArrayList<>();
+        Matcher matcher = IMAGE_URL_IN_CHUNK.matcher(text);
+        while (matcher.find()) {
+            urls.add(matcher.group(1));
+        }
+        return urls;
     }
 
     private GeneratedAnswer generateAnswer(List<ChatMessage> messages) {
@@ -1136,5 +1185,23 @@ public class RagService {
         double bm25Score,
         double finalScore
     ) {
+    }
+
+    private byte[] readImageFromUrl(String url) {
+        Matcher m = Pattern.compile("/api/documents/images/([^/]+)/([^/]+)").matcher(url);
+        if (!m.find()) {
+            return null;
+        }
+        return imageStorageService.readImage(m.group(1), m.group(2));
+    }
+
+    private static String detectImageMimeType(byte[] bytes) {
+        if (bytes.length >= 4) {
+            if (bytes[0] == (byte) 0x89 && bytes[1] == (byte) 0x50) return "image/png";
+            if (bytes[0] == (byte) 0xFF && bytes[1] == (byte) 0xD8) return "image/jpeg";
+            if (bytes[0] == (byte) 0x47 && bytes[1] == (byte) 0x49) return "image/gif";
+            if (bytes[0] == (byte) 0x42 && bytes[1] == (byte) 0x4D) return "image/bmp";
+        }
+        return "image/png";
     }
 }

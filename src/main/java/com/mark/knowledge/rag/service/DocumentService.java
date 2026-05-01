@@ -1,7 +1,9 @@
 package com.mark.knowledge.rag.service;
 
 import com.mark.knowledge.rag.dto.DocumentProgressEvent;
+import com.mark.knowledge.rag.service.parsers.DocxParseResult;
 import com.mark.knowledge.rag.service.parsers.DocxParser;
+import com.mark.knowledge.rag.service.parsers.ImageReference;
 import dev.langchain4j.data.document.Metadata;
 import dev.langchain4j.data.segment.TextSegment;
 import org.apache.pdfbox.Loader;
@@ -88,7 +90,10 @@ public class DocumentService {
     @Value("${rag.keyword-count:6}")
     private int keywordCount;
 
-    public DocumentService() {
+    private final ImageStorageService imageStorageService;
+
+    public DocumentService(ImageStorageService imageStorageService) {
+        this.imageStorageService = imageStorageService;
     }
 
     /**
@@ -125,12 +130,21 @@ public class DocumentService {
             long parseStart = System.currentTimeMillis();
 
             String rawContent;
+            List<ImageReference> docImages = List.of();
             String lowerFilename = filename.toLowerCase(Locale.ROOT);
             if (lowerFilename.endsWith(".pdf")) {
                 rawContent = parsePdf(inputStream);
                 log.info("PDF解析成功 ({} 字符)", rawContent.length());
             } else if (lowerFilename.endsWith(".docx")) {
-                rawContent = DocxParser.parse(inputStream);
+                DocxParseResult parseResult = DocxParser.parseWithImages(inputStream, documentId);
+                rawContent = parseResult.text();
+                docImages = parseResult.imageReferences();
+                if (!docImages.isEmpty()) {
+                    for (ImageReference img : docImages) {
+                        imageStorageService.saveImage(img.documentId(), img.imageId(), img.extension(), img.data());
+                    }
+                    log.info("DOCX 提取并保存 {} 张图片", docImages.size());
+                }
                 log.info("DOCX解析成功 ({} 字符)", rawContent.length());
             } else {
                 rawContent = parseText(inputStream);
@@ -173,7 +187,7 @@ public class DocumentService {
                 callback.onProgress(DocumentProgressEvent.segmentStart(0));
             }
 
-            ChunkBuildResult chunkBuildResult = splitText(profile, filename, documentId, chunkSettings);
+            ChunkBuildResult chunkBuildResult = splitText(profile, filename, documentId, chunkSettings, docImages);
             List<TextSegment> segments = chunkBuildResult.segments();
             long splitTime = System.currentTimeMillis() - splitStart;
 
@@ -227,7 +241,8 @@ public class DocumentService {
             DocumentProfile profile,
             String filename,
             String documentId,
-            ChunkSettings chunkSettings) {
+            ChunkSettings chunkSettings,
+            List<ImageReference> docImages) {
         log.debug("开始文本切分过程...");
         log.debug("  文本总长度: {} 字符", profile.bodyText().length());
 
@@ -254,6 +269,7 @@ public class DocumentService {
 
             List<String> chunkKeywords = resolveChunkKeywords(profile, chunk);
             String enhancedText = buildEnhancedText(profile.title(), chunk, chunkKeywords);
+            List<String> chunkImageIds = extractChunkImageIds(chunk, docImages);
             segments.add(createSegment(
                 enhancedText,
                 chunk,
@@ -262,7 +278,8 @@ public class DocumentService {
                 chunkIndex++,
                 normalizedChunk,
                 profile,
-                chunkKeywords
+                chunkKeywords,
+                chunkImageIds
             ));
         }
 
@@ -470,7 +487,8 @@ public class DocumentService {
             int index,
             String normalizedChunk,
             DocumentProfile profile,
-            List<String> chunkKeywords) {
+            List<String> chunkKeywords,
+            List<String> imageIds) {
         Metadata metadata = new Metadata();
         metadata.put("filename", sanitizeUtf16(filename));
         metadata.put("documentId", sanitizeUtf16(documentId));
@@ -484,7 +502,35 @@ public class DocumentService {
         metadata.put("ingestedAt", sanitizeUtf16(profile.ingestedAt()));
         metadata.put("keywords", sanitizeUtf16(String.join(",", chunkKeywords)));
         metadata.put("documentKeywords", sanitizeUtf16(String.join(",", profile.keywords())));
+        if (!imageIds.isEmpty()) {
+            metadata.put("imageIds", sanitizeUtf16(String.join(",", imageIds)));
+        }
         return TextSegment.from(sanitizeUtf16(enhancedText), metadata);
+    }
+
+    private static final Pattern IMAGE_URL_PATTERN = Pattern.compile(
+        "!\\[.*?\\]\\(/rag/api/documents/images/([^/]+)/([^)]+?)\\)"
+    );
+
+    private List<String> extractChunkImageIds(String chunk, List<ImageReference> docImages) {
+        if (docImages.isEmpty()) {
+            return List.of();
+        }
+        Set<String> allImageIds = docImages.stream()
+            .map(ImageReference::imageId)
+            .collect(Collectors.toSet());
+        Set<String> found = new HashSet<>();
+        Matcher matcher = IMAGE_URL_PATTERN.matcher(chunk);
+        while (matcher.find()) {
+            String imageFileName = matcher.group(2);
+            for (String id : allImageIds) {
+                if (imageFileName.startsWith(id + ".")) {
+                    found.add(id);
+                    break;
+                }
+            }
+        }
+        return found.isEmpty() ? List.of() : List.copyOf(found);
     }
 
     private String buildEnhancedText(String title, String chunk, List<String> chunkKeywords) {

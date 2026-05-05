@@ -19,6 +19,7 @@ import type {
   UploadCompleteEvent
 } from "../types";
 import { consumeSseStream } from "./sse";
+import { clearTokens, getAccessToken, getRefreshToken, setTokens } from "./tokenStorage";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "/api";
 
@@ -57,15 +58,74 @@ async function ensureOk(response: Response, fallbackMessage: string) {
   throw await parseError(response, fallbackMessage);
 }
 
+function authHeaders(): Record<string, string> {
+  const token = getAccessToken();
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+// Concurrent refresh mutex: only one refresh request in flight at a time
+let refreshPromise: Promise<boolean> | null = null;
+
+async function refreshAccessToken(): Promise<boolean> {
+  if (refreshPromise) {
+    return refreshPromise;
+  }
+
+  refreshPromise = (async () => {
+    try {
+      const refreshToken = getRefreshToken();
+      if (!refreshToken) return false;
+
+      const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ refreshToken })
+      });
+
+      if (!response.ok) {
+        clearTokens();
+        return false;
+      }
+
+      const data = await response.json() as { accessToken: string; refreshToken: string };
+      setTokens(data.accessToken, data.refreshToken);
+      return true;
+    } catch {
+      clearTokens();
+      return false;
+    } finally {
+      refreshPromise = null;
+    }
+  })();
+
+  return refreshPromise;
+}
+
 async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${API_BASE_URL}${path}`, {
-    credentials: "include",
     ...init,
     headers: {
       "Content-Type": "application/json",
+      ...authHeaders(),
       ...(init?.headers || {})
     }
   });
+
+  if (response.status === 401 && getRefreshToken()) {
+    const refreshed = await refreshAccessToken();
+    if (refreshed) {
+      const retryResponse = await fetch(`${API_BASE_URL}${path}`, {
+        ...init,
+        headers: {
+          "Content-Type": "application/json",
+          ...authHeaders(),
+          ...(init?.headers || {})
+        }
+      });
+      await ensureOk(retryResponse, `请求失败: HTTP ${retryResponse.status}`);
+      return retryResponse.json() as Promise<T>;
+    }
+  }
 
   await ensureOk(response, `请求失败: HTTP ${response.status}`);
   return response.json() as Promise<T>;
@@ -73,9 +133,27 @@ async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
 
 async function requestText(path: string, init?: RequestInit) {
   const response = await fetch(`${API_BASE_URL}${path}`, {
-    credentials: "include",
-    ...init
+    ...init,
+    headers: {
+      ...authHeaders(),
+      ...(init?.headers || {})
+    }
   });
+
+  if (response.status === 401 && getRefreshToken()) {
+    const refreshed = await refreshAccessToken();
+    if (refreshed) {
+      const retryResponse = await fetch(`${API_BASE_URL}${path}`, {
+        ...init,
+        headers: {
+          ...authHeaders(),
+          ...(init?.headers || {})
+        }
+      });
+      await ensureOk(retryResponse, `请求失败: HTTP ${retryResponse.status}`);
+      return retryResponse.text();
+    }
+  }
 
   await ensureOk(response, `请求失败: HTTP ${response.status}`);
   return response.text();
@@ -149,7 +227,7 @@ export async function uploadDocument(file: File) {
 
   const response = await fetch(`${API_BASE_URL}/documents/upload`, {
     method: "POST",
-    credentials: "include",
+    headers: authHeaders(),
     body: formData
   });
 
@@ -282,7 +360,7 @@ export async function askWithImage(image: File, question: string, conversationId
 
   const response = await fetch(`${API_BASE_URL}/rag/ask/with-image`, {
     method: "POST",
-    credentials: "include",
+    headers: authHeaders(),
     body: formData
   });
 
@@ -317,7 +395,7 @@ export async function uploadDocumentStream(
 
   const response = await fetch(`${API_BASE_URL}/documents/upload/stream`, {
     method: "POST",
-    credentials: "include",
+    headers: authHeaders(),
     body: formData,
     signal
   });
@@ -372,10 +450,10 @@ export async function streamRagAnswer(
 ) {
   const response = await fetch(`${API_BASE_URL}/rag/ask/stream`, {
     method: "POST",
-    credentials: "include",
     headers: {
       Accept: "text/event-stream",
-      "Content-Type": "application/json"
+      "Content-Type": "application/json",
+      ...authHeaders()
     },
     body: JSON.stringify(request),
     signal

@@ -160,6 +160,8 @@ export interface AuthStatusResponse {
 export interface AuthSuccessResponse {
   message: string;
   user: AuthUser;
+  accessToken: string;
+  refreshToken: string;
 }
 
 export interface RegistrationCode {

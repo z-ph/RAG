@@ -47,6 +47,9 @@ public class UserAccount {
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
 
+    @Column(name = "refresh_token_jti", length = 64)
+    private String refreshTokenJti;
+
     protected UserAccount() {
     }
 
@@ -107,6 +110,14 @@ public class UserAccount {
 
     public void setEnabled(boolean enabled) {
         this.enabled = enabled;
+    }
+
+    public String getRefreshTokenJti() {
+        return refreshTokenJti;
+    }
+
+    public void setRefreshTokenJti(String refreshTokenJti) {
+        this.refreshTokenJti = refreshTokenJti;
     }
 
     public LocalDateTime getCreatedAt() {

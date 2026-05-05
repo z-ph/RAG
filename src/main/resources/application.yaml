@@ -67,6 +67,10 @@ auth:
   bootstrap-admin:
     username: ${AUTH_BOOTSTRAP_ADMIN_USERNAME:admin}
     password: ${AUTH_BOOTSTRAP_ADMIN_PASSWORD:ChangeMe123!}
+  jwt:
+    secret: ${AUTH_JWT_SECRET:dGhpc0lzQVZlcnlMb25nU2VjcmV0S2V5Rm9ySFMyNTZBbGdvcml0aG1BdExlYXN0MjU2Qml0cw==}
+    access-expiration: ${AUTH_JWT_ACCESS_EXPIRATION:1800000}
+    refresh-expiration: ${AUTH_JWT_REFRESH_EXPIRATION:604800000}
 
 logging:
   level:

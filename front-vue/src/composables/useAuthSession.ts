@@ -10,6 +10,7 @@ import {
   logout,
   register
 } from "../lib/api";
+import { clearTokens, hasToken, setTokens } from "../lib/tokenStorage";
 import type { AuthStatusResponse, RegistrationCode } from "../types";
 
 interface MessageApi {
@@ -50,12 +51,19 @@ export function useAuthSession(messageApi: MessageApi) {
       authLoading.value = true;
     }
 
+    if (!hasToken()) {
+      authStatus.value = ANONYMOUS_STATUS;
+      authLoading.value = false;
+      return;
+    }
+
     try {
       const response = await getAuthStatus();
       authStatus.value = response;
       watchAuthForRegistrationCodes();
     } catch (error) {
       authStatus.value = ANONYMOUS_STATUS;
+      clearTokens();
       if (!silent) {
         messageApi.error(error instanceof Error ? error.message : "鉴权状态检查失败");
       }
@@ -69,6 +77,7 @@ export function useAuthSession(messageApi: MessageApi) {
 
     try {
       const response = await login(username, password);
+      setTokens(response.accessToken, response.refreshToken);
       authStatus.value = { authenticated: true, user: response.user };
       messageApi.success(response.message);
     } catch (error) {
@@ -83,6 +92,7 @@ export function useAuthSession(messageApi: MessageApi) {
 
     try {
       const response = await register(username, password, registrationCodeValue);
+      setTokens(response.accessToken, response.refreshToken);
       authStatus.value = { authenticated: true, user: response.user };
       messageApi.success(response.message);
     } catch (error) {
@@ -97,10 +107,14 @@ export function useAuthSession(messageApi: MessageApi) {
 
     try {
       const response = await logout();
+      clearTokens();
       authStatus.value = ANONYMOUS_STATUS;
       registrationCodes.value = [];
       messageApi.success(response.message);
     } catch (error) {
+      clearTokens();
+      authStatus.value = ANONYMOUS_STATUS;
+      registrationCodes.value = [];
       messageApi.error(error instanceof Error ? error.message : "退出失败");
     } finally {
       authSubmitting.value = false;
@@ -192,6 +206,7 @@ export function useAuthSession(messageApi: MessageApi) {
   }
 
   async function handleUnauthorized(showMessage = true) {
+    clearTokens();
     authStatus.value = ANONYMOUS_STATUS;
     registrationCodes.value = [];
     if (showMessage) {

@@ -108,6 +108,11 @@ public class UserAccountService implements UserDetailsService {
     }
 
     @Transactional
+    public UserAccount save(UserAccount userAccount) {
+        return userAccountRepository.save(userAccount);
+    }
+
+    @Transactional
     public UserAccount updateUser(Long id, Role role, Boolean enabled) {
         UserAccount user = userAccountRepository.findById(id)
             .orElseThrow(() -> new IllegalArgumentException("用户不存在"));

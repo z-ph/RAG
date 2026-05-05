@@ -10,18 +10,17 @@ import com.mark.knowledge.auth.dto.RegisterRequest;
 import com.mark.knowledge.auth.dto.RegistrationCodeCreateRequest;
 import com.mark.knowledge.auth.dto.RegistrationCodeListResponse;
 import com.mark.knowledge.auth.dto.RegistrationCodeResponse;
+import com.mark.knowledge.auth.dto.TokenResponse;
 import com.mark.knowledge.auth.entity.RegistrationCode;
 import com.mark.knowledge.auth.entity.UserAccount;
 import com.mark.knowledge.auth.service.AuthService;
 import com.mark.knowledge.auth.service.RegistrationCodeService;
 import com.mark.knowledge.auth.service.UserAccountService;
 import com.mark.knowledge.rag.dto.ErrorResponse;
-import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.authentication.AuthenticationServiceException;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -34,10 +33,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
+import java.util.Map;
 
-/**
- * 登录、注册和注册码管理接口。
- */
 @RestController
 @RequestMapping("/api/auth")
 public class AuthController {
@@ -55,11 +52,17 @@ public class AuthController {
     }
 
     @PostMapping("/login")
-    public ResponseEntity<?> login(@RequestBody LoginRequest request, HttpServletRequest httpServletRequest) {
+    public ResponseEntity<?> login(@RequestBody LoginRequest request) {
         try {
-            UserAccount userAccount = authService.login(request, httpServletRequest);
-            return ResponseEntity.ok(new AuthSuccessResponse("登录成功", AuthUserResponse.from(userAccount)));
-        } catch (BadCredentialsException | AuthenticationServiceException e) {
+            TokenResponse tokens = authService.login(request);
+            UserAccount userAccount = userAccountService.getRequiredByUsername(
+                userAccountService.normalizeUsername(request.username()));
+            return ResponseEntity.ok(new AuthSuccessResponse(
+                "登录成功", AuthUserResponse.from(userAccount), tokens.accessToken(), tokens.refreshToken()));
+        } catch (BadCredentialsException e) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                .body(new ErrorResponse("登录失败", "用户名或密码错误"));
+        } catch (org.springframework.security.authentication.AuthenticationServiceException e) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                 .body(new ErrorResponse("登录失败", "用户名或密码错误"));
         } catch (IllegalArgumentException e) {
@@ -68,19 +71,22 @@ public class AuthController {
     }
 
     @PostMapping("/register")
-    public ResponseEntity<?> register(@RequestBody RegisterRequest request, HttpServletRequest httpServletRequest) {
+    public ResponseEntity<?> register(@RequestBody RegisterRequest request) {
         try {
-            UserAccount userAccount = authService.register(request, httpServletRequest);
+            TokenResponse tokens = authService.register(request);
+            UserAccount userAccount = userAccountService.getRequiredByUsername(
+                userAccountService.normalizeUsername(request.username()));
             return ResponseEntity.status(HttpStatus.CREATED)
-                .body(new AuthSuccessResponse("注册成功", AuthUserResponse.from(userAccount)));
+                .body(new AuthSuccessResponse(
+                    "注册成功", AuthUserResponse.from(userAccount), tokens.accessToken(), tokens.refreshToken()));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(new ErrorResponse("注册失败", e.getMessage()));
         }
     }
 
     @PostMapping("/logout")
-    public ResponseEntity<MessageResponse> logout(HttpServletRequest httpServletRequest) {
-        authService.logout(httpServletRequest);
+    public ResponseEntity<MessageResponse> logout() {
+        authService.logout();
         return ResponseEntity.ok(new MessageResponse("已退出登录"));
     }
 
@@ -96,6 +102,21 @@ public class AuthController {
             return ResponseEntity.ok(new MessageResponse("密码已修改"));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(new ErrorResponse("修改失败", e.getMessage()));
+        }
+    }
+
+    @PostMapping("/refresh")
+    public ResponseEntity<?> refresh(@RequestBody Map<String, String> body) {
+        try {
+            String refreshToken = body.get("refreshToken");
+            if (refreshToken == null || refreshToken.isBlank()) {
+                return ResponseEntity.badRequest().body(new ErrorResponse("无效请求", "缺少 refreshToken"));
+            }
+            TokenResponse tokens = authService.refresh(refreshToken);
+            return ResponseEntity.ok(tokens);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                .body(new ErrorResponse("刷新失败", e.getMessage()));
         }
     }
 

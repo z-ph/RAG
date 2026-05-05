@@ -1,8 +1,6 @@
 package com.mark.knowledge.auth.dto;
 
-public record AuthSuccessResponse(
-    String message,
-    AuthUserResponse user,
+public record TokenResponse(
     String accessToken,
     String refreshToken
 ) {

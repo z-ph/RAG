@@ -6,6 +6,7 @@ import {
   logout,
   register
 } from "../lib/api";
+import { clearTokens, hasToken, setTokens } from "../lib/tokenStorage";
 import type { AuthStatusResponse } from "../types";
 
 interface MessageApi {
@@ -32,11 +33,18 @@ export function useAuthSession(messageApi: MessageApi) {
       setAuthLoading(true);
     }
 
+    if (!hasToken()) {
+      setAuthStatus(ANONYMOUS_STATUS);
+      setAuthLoading(false);
+      return;
+    }
+
     try {
       const response = await getAuthStatus();
       setAuthStatus(response);
     } catch (error) {
       setAuthStatus(ANONYMOUS_STATUS);
+      clearTokens();
       if (!silent) {
         messageApi.error(error instanceof Error ? error.message : "鉴权状态检查失败");
       }
@@ -50,6 +58,7 @@ export function useAuthSession(messageApi: MessageApi) {
 
     try {
       const response = await login(username, password);
+      setTokens(response.accessToken, response.refreshToken);
       setAuthStatus({ authenticated: true, user: response.user });
       messageApi.success(response.message);
     } catch (error) {
@@ -64,6 +73,7 @@ export function useAuthSession(messageApi: MessageApi) {
 
     try {
       const response = await register(username, password, registrationCodeValue);
+      setTokens(response.accessToken, response.refreshToken);
       setAuthStatus({ authenticated: true, user: response.user });
       messageApi.success(response.message);
     } catch (error) {
@@ -78,9 +88,12 @@ export function useAuthSession(messageApi: MessageApi) {
 
     try {
       const response = await logout();
+      clearTokens();
       setAuthStatus(ANONYMOUS_STATUS);
       messageApi.success(response.message);
     } catch (error) {
+      clearTokens();
+      setAuthStatus(ANONYMOUS_STATUS);
       messageApi.error(error instanceof Error ? error.message : "退出失败");
     } finally {
       setAuthSubmitting(false);
@@ -88,6 +101,7 @@ export function useAuthSession(messageApi: MessageApi) {
   }
 
   async function handleUnauthorized(showMessage = true) {
+    clearTokens();
     setAuthStatus(ANONYMOUS_STATUS);
     if (showMessage) {
       messageApi.error("登录状态已失效，请重新登录");

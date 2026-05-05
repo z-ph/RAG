@@ -4,24 +4,22 @@ import com.mark.knowledge.auth.dto.AuthStatusResponse;
 import com.mark.knowledge.auth.dto.AuthUserResponse;
 import com.mark.knowledge.auth.dto.LoginRequest;
 import com.mark.knowledge.auth.dto.RegisterRequest;
+import com.mark.knowledge.auth.dto.TokenResponse;
 import com.mark.knowledge.auth.entity.Role;
 import com.mark.knowledge.auth.entity.UserAccount;
 import com.mark.knowledge.auth.repository.RoleRepository;
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpSession;
+import io.jsonwebtoken.Claims;
 import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContext;
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * 认证服务。
- */
+import java.util.ArrayList;
+import java.util.List;
+
 @Service
 public class AuthService {
 
@@ -29,32 +27,36 @@ public class AuthService {
     private final UserAccountService userAccountService;
     private final RegistrationCodeService registrationCodeService;
     private final RoleRepository roleRepository;
+    private final JwtUtil jwtUtil;
 
     public AuthService(
             AuthenticationManager authenticationManager,
             UserAccountService userAccountService,
             RegistrationCodeService registrationCodeService,
-            RoleRepository roleRepository) {
+            RoleRepository roleRepository,
+            JwtUtil jwtUtil) {
         this.authenticationManager = authenticationManager;
         this.userAccountService = userAccountService;
         this.registrationCodeService = registrationCodeService;
         this.roleRepository = roleRepository;
-    }
-
-    public UserAccount login(LoginRequest request, HttpServletRequest httpServletRequest) {
-        String normalizedUsername = userAccountService.normalizeUsername(request.username());
-        userAccountService.validatePassword(request.password());
-
-        Authentication authentication = authenticationManager.authenticate(
-            UsernamePasswordAuthenticationToken.unauthenticated(normalizedUsername, request.password())
-        );
-        storeAuthentication(authentication, httpServletRequest);
-
-        return userAccountService.getRequiredByUsername(normalizedUsername);
+        this.jwtUtil = jwtUtil;
     }
 
     @Transactional
-    public UserAccount register(RegisterRequest request, HttpServletRequest httpServletRequest) {
+    public TokenResponse login(LoginRequest request) {
+        String normalizedUsername = userAccountService.normalizeUsername(request.username());
+        userAccountService.validatePassword(request.password());
+
+        authenticationManager.authenticate(
+            UsernamePasswordAuthenticationToken.unauthenticated(normalizedUsername, request.password())
+        );
+
+        UserAccount userAccount = userAccountService.getRequiredByUsername(normalizedUsername);
+        return generateAndStoreTokens(userAccount);
+    }
+
+    @Transactional
+    public TokenResponse register(RegisterRequest request) {
         String normalizedUsername = userAccountService.normalizeUsername(request.username());
         userAccountService.validatePassword(request.password());
         userAccountService.ensureUsernameAvailable(normalizedUsername);
@@ -63,21 +65,13 @@ public class AuthService {
         Role defaultUserRole = roleRepository.findByCode("USER")
             .orElseThrow(() -> new IllegalStateException("系统未配置默认用户角色"));
 
-        UserAccount userAccount = userAccountService.createUser(normalizedUsername, request.password(), defaultUserRole);
-
-        Authentication authentication = authenticationManager.authenticate(
-            UsernamePasswordAuthenticationToken.unauthenticated(normalizedUsername, request.password())
-        );
-        storeAuthentication(authentication, httpServletRequest);
-        return userAccount;
+        userAccountService.createUser(normalizedUsername, request.password(), defaultUserRole);
+        UserAccount userAccount = userAccountService.getRequiredByUsername(normalizedUsername);
+        return generateAndStoreTokens(userAccount);
     }
 
-    public void logout(HttpServletRequest httpServletRequest) {
-        HttpSession session = httpServletRequest.getSession(false);
-        if (session != null) {
-            session.invalidate();
-        }
-        SecurityContextHolder.clearContext();
+    public void logout() {
+        // Stateless JWT — server-side no-op. Frontend clears localStorage.
     }
 
     public AuthStatusResponse getCurrentUser(Authentication authentication) {
@@ -91,13 +85,55 @@ public class AuthService {
         return new AuthStatusResponse(true, AuthUserResponse.from(userAccount));
     }
 
-    private void storeAuthentication(Authentication authentication, HttpServletRequest httpServletRequest) {
-        SecurityContext securityContext = SecurityContextHolder.createEmptyContext();
-        securityContext.setAuthentication(authentication);
-        SecurityContextHolder.setContext(securityContext);
+    @Transactional
+    public TokenResponse refresh(String refreshToken) {
+        Claims claims = jwtUtil.parseToken(refreshToken);
 
-        HttpSession session = httpServletRequest.getSession(true);
-        httpServletRequest.changeSessionId();
-        session.setAttribute(HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY, securityContext);
+        if (!jwtUtil.isRefreshToken(claims)) {
+            throw new IllegalArgumentException("无效的 Refresh Token");
+        }
+
+        String username = claims.getSubject();
+        String jti = jwtUtil.getJti(claims);
+
+        UserAccount userAccount = userAccountService.getRequiredByUsername(username);
+
+        if (!jti.equals(userAccount.getRefreshTokenJti())) {
+            throw new IllegalArgumentException("Refresh Token 已失效");
+        }
+
+        return generateAndStoreTokens(userAccount);
+    }
+
+    private TokenResponse generateAndStoreTokens(UserAccount userAccount) {
+        List<String> authorities = buildAuthorityStrings(userAccount);
+
+        String accessToken = jwtUtil.generateAccessToken(
+            userAccount.getUsername(),
+            userAccount.getId(),
+            userAccount.getRole(),
+            authorities
+        );
+        String refreshToken = jwtUtil.generateRefreshToken(userAccount.getUsername());
+
+        // Store jti for Refresh Token Rotation
+        Claims refreshClaims = jwtUtil.parseToken(refreshToken);
+        userAccount.setRefreshTokenJti(jwtUtil.getJti(refreshClaims));
+        userAccountService.save(userAccount);
+
+        return new TokenResponse(accessToken, refreshToken);
+    }
+
+    private List<String> buildAuthorityStrings(UserAccount userAccount) {
+        List<String> authorities = new ArrayList<>();
+        if (userAccount.getAssignedRole() != null) {
+            authorities.add("ROLE_" + userAccount.getAssignedRole().getCode());
+            userAccount.getAssignedRole().getPermissions().forEach(p ->
+                authorities.add(p.getCode())
+            );
+        } else if (userAccount.getRole() != null) {
+            authorities.add("ROLE_" + userAccount.getRole());
+        }
+        return authorities;
     }
 }

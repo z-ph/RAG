@@ -2,6 +2,7 @@ package com.mark.knowledge.auth.config;
 
 import com.mark.knowledge.rag.dto.ErrorResponse;
 import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -17,6 +18,7 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -25,13 +27,17 @@ import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.List;
 
-/**
- * 接口安全配置。
- */
 @Configuration
 @EnableWebSecurity
 @EnableMethodSecurity
+@EnableConfigurationProperties(JwtProperties.class)
 public class SecurityConfig {
+
+    private final JwtAuthenticationFilter jwtAuthenticationFilter;
+
+    public SecurityConfig(JwtAuthenticationFilter jwtAuthenticationFilter) {
+        this.jwtAuthenticationFilter = jwtAuthenticationFilter;
+    }
 
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
@@ -39,7 +45,7 @@ public class SecurityConfig {
         configuration.setAllowedOriginPatterns(List.of("*"));
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("*"));
-        configuration.setAllowCredentials(true);
+        configuration.setAllowCredentials(false);
         configuration.setMaxAge(3600L);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
@@ -55,19 +61,21 @@ public class SecurityConfig {
             .httpBasic(AbstractHttpConfigurer::disable)
             .formLogin(AbstractHttpConfigurer::disable)
             .logout(AbstractHttpConfigurer::disable)
-            .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED))
+            .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(authorize -> authorize
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                 .requestMatchers("/api/rag/**").permitAll()
                 .requestMatchers("/api/documents/health").permitAll()
                 .requestMatchers("/api/documents/images/**").permitAll()
                 .requestMatchers("/api/documents/public/**").permitAll()
-                .requestMatchers("/api/auth/login", "/api/auth/register", "/api/auth/logout", "/api/auth/me", "/api/auth/change-password").permitAll()
+                .requestMatchers("/api/auth/login", "/api/auth/register", "/api/auth/logout", "/api/auth/refresh").permitAll()
+                .requestMatchers("/api/auth/me", "/api/auth/change-password").authenticated()
                 .requestMatchers("/api/auth/registration-codes/**").hasAnyRole("ADMIN", "SUPER_ADMIN")
                 .requestMatchers("/api/admin/**").authenticated()
                 .requestMatchers("/api/documents/**").authenticated()
                 .anyRequest().permitAll()
             )
+            .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
             .exceptionHandling(exceptionHandling -> exceptionHandling
                 .authenticationEntryPoint((request, response, exception) ->
                     writeJsonError(response, HttpServletResponse.SC_UNAUTHORIZED, "未登录", "请先登录后再访问该接口"))

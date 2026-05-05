@@ -1,32 +1,23 @@
-# Dockerfile without BuildKit syntax directive for compatibility in China
+# syntax=docker/dockerfile:1
 
 # 阶段1：前端构建（产物最终存放在 /app/dist，可通过 volume 挂载导出）
 FROM docker.1ms.run/node:20-alpine AS frontend-builder
 WORKDIR /workspace/frontend
 COPY frontend/package.json frontend/pnpm-lock.yaml ./
-RUN corepack enable && pnpm install --frozen-lockfile
+RUN --mount=type=cache,target=/root/.local/share/pnpm/store \
+    corepack enable && pnpm install --frozen-lockfile
 COPY frontend/ ./
 RUN pnpm build
 
-# 阶段2：使用单独的依赖下载阶段，利用 Docker 层缓存
-FROM docker.m.daocloud.io/maven:3.9.9-eclipse-temurin-21 AS deps-downloader
-WORKDIR /workspace
-COPY pom.xml ./
-# 预下载所有依赖（包括插件），不编译代码
-RUN mvn dependency:go-offline -B && \
-    mvn dependency:resolve-plugins -B
-
-# 阶段3：后端构建
+# 阶段2：后端构建
 FROM docker.m.daocloud.io/maven:3.9.9-eclipse-temurin-21 AS backend-builder
 WORKDIR /workspace
-
-# 从 deps-downloader 阶段复制已下载的依赖（利用层缓存）
-COPY --from=deps-downloader /root/.m2 /root/.m2
 COPY pom.xml ./
 COPY src ./src
 
-# 编译时依赖已存在，无需重新下载
-RUN mvn -B -DskipTests package && \
+# 使用 BuildKit cache mount 持久化 .m2 仓库，依赖变更时只下载增量
+RUN --mount=type=cache,target=/root/.m2/repository \
+    mvn -B -DskipTests package && \
     find target -maxdepth 1 -type f -name '*.jar' ! -name '*.jar.original' -exec cp {} /workspace/app.jar \;
 
 # 阶段4：最终运行镜像（仅运行 Spring Boot，不托管前端静态资源）

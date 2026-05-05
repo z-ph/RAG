@@ -42,3 +42,6 @@
 
 ## 配置与安全提示
 本地配置从 `.env.example` 和 `frontend/.env.example` 复制，不要提交真实密钥或本地私有配置。联调前先确认模型服务和 Qdrant 可用。不要提交 `uploads/` 中的运行数据，也不要提交 `target/` 下的构建产物。
+
+
+用户的需求优先考虑多subagent并行加速

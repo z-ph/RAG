@@ -269,7 +269,7 @@ pnpm build
 | 方法 | 路径 | 说明 |
 |------|------|------|
 | `POST` | `/documents/upload` | 上传并处理 `PDF/TXT/DOC/DOCX` 文档 |
-| `GET` | `/api/documents` | 列出当前 Qdrant collection 中的文档 |
+| `GET` | `/documents` | 列出当前 Qdrant collection 中的文档 |
 | `DELETE` | `/documents/{documentId}` | 删除指定文档对应的全部向量片段 |
 | `GET` | `/documents/health` | 文档服务健康检查 |
 

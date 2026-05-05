@@ -68,14 +68,14 @@
           <div
             v-for="segment in detail.segments"
             :key="segment.chunkIndex"
-            class="rounded-[12px] bg-white/[0.72] px-4 py-3 shadow-[inset_0_0_0_1px_rgba(19,34,56,0.08)]"
+            class="min-w-0 rounded-[12px] bg-white/[0.72] px-4 py-3 shadow-[inset_0_0_0_1px_rgba(19,34,56,0.08)]"
           >
             <div class="mb-2 flex items-center gap-2">
               <span class="inline-flex rounded-full bg-ink-950/6 px-2 py-0.5 text-[10px] font-medium text-ink-500">
                 #{{ segment.chunkIndex }}
               </span>
             </div>
-            <p class="text-sm leading-relaxed text-ink-900 whitespace-pre-wrap">
+            <p class="text-sm leading-relaxed text-ink-900 whitespace-pre-wrap break-words">
               {{ segment.text }}
             </p>
           </div>

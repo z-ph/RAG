@@ -99,14 +99,14 @@ export function DocumentDetail(props: DocumentDetailProps) {
           {detail.segments.map((segment) => (
             <div
               key={segment.chunkIndex}
-              className="border border-ink-300 bg-white px-4 py-3"
+              className="min-w-0 border border-ink-300 bg-white px-4 py-3"
             >
               <div className="mb-2 flex items-center gap-2">
                 <span className="inline-flex bg-ink-950/6 px-2 py-0.5 text-[10px] font-medium text-ink-500">
                   #{segment.chunkIndex}
                 </span>
               </div>
-              <p className="text-sm leading-relaxed text-ink-900 whitespace-pre-wrap">
+              <p className="text-sm leading-relaxed text-ink-900 whitespace-pre-wrap break-words">
                 {segment.text}
               </p>
             </div>

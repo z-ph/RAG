@@ -234,9 +234,7 @@ public class RagService {
             completeGeneration(generation);
         });
 
-        sendEvent(generation, "start", Map.of("conversationId", conversationId));
-
-        CompletableFuture.runAsync(() -> processStreamRequest(request, generation));
+        submitStreamTask(() -> processStreamRequest(request, generation));
         return emitter;
     }
 
@@ -245,6 +243,11 @@ public class RagService {
         long pipelineStart = System.nanoTime();
 
         try {
+            if (shouldAbort(generation)) {
+                return;
+            }
+
+            emitStartEvent(generation, conversationId);
             if (shouldAbort(generation)) {
                 return;
             }
@@ -393,6 +396,10 @@ public class RagService {
         });
     }
 
+    protected void emitStartEvent(Object generationRef, String conversationId) {
+        sendEvent((InFlightGeneration) generationRef, "start", Map.of("conversationId", conversationId));
+    }
+
     private void sendEvent(InFlightGeneration generation, String eventName, Object data) {
         if (generation.isCompleted()) {
             return;
@@ -406,6 +413,10 @@ public class RagService {
             generation.cancelHandle();
             completeGeneration(generation);
         }
+    }
+
+    protected CompletableFuture<Void> submitStreamTask(Runnable task) {
+        return CompletableFuture.runAsync(task);
     }
 
     private boolean shouldAbort(InFlightGeneration generation) {

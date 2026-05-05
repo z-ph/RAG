@@ -18,7 +18,7 @@ import java.util.List;
 import java.util.Map;
 
 @RestController
-@RequestMapping("/api/admin/documents")
+@RequestMapping("/admin/documents")
 public class AdminDocumentController {
 
     private static final Logger log = LoggerFactory.getLogger(AdminDocumentController.class);

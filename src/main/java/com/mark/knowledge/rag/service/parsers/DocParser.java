@@ -131,7 +131,7 @@ public class DocParser {
         String imageId = UUID.randomUUID().toString().replace("-", "").substring(0, 16);
         String ext = resolveExtension(picture.suggestFileExtension());
         String publicUrl = documentId != null
-            ? String.format("/rag/api/documents/images/%s/%s.%s", documentId, imageId, ext)
+            ? String.format("/rag/documents/images/%s/%s.%s", documentId, imageId, ext)
             : "";
         imageReferences.add(new ImageReference(
             imageId,

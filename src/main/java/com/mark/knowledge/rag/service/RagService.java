@@ -731,7 +731,7 @@ public class RagService {
     }
 
     private static final Pattern IMAGE_URL_IN_CHUNK = Pattern.compile(
-        "!\\[.*?\\]\\((/rag/api/documents/images/[^)]+)\\)"
+        "!\\[.*?\\]\\((/rag/documents/images/[^)]+)\\)"
     );
 
     private List<String> extractImageUrls(String text) {
@@ -1188,7 +1188,7 @@ public class RagService {
     }
 
     private byte[] readImageFromUrl(String url) {
-        Matcher m = Pattern.compile("/api/documents/images/([^/]+)/([^/]+)").matcher(url);
+        Matcher m = Pattern.compile("/documents/images/([^/]+)/([^/]+)").matcher(url);
         if (!m.find()) {
             return null;
         }

@@ -30,7 +30,7 @@ import java.util.List;
  * @author mark
  */
 @RestController
-@RequestMapping("/api/rag")
+@RequestMapping("/rag")
 public class RagController {
 
     private static final Logger log = LoggerFactory.getLogger(RagController.class);

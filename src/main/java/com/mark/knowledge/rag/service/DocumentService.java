@@ -511,7 +511,7 @@ public class DocumentService {
     }
 
     private static final Pattern IMAGE_URL_PATTERN = Pattern.compile(
-        "!\\[.*?\\]\\(/rag/api/documents/images/([^/]+)/([^)]+?)\\)"
+        "!\\[.*?\\]\\(/rag/documents/images/([^/]+)/([^)]+?)\\)"
     );
 
     private List<String> extractChunkImageIds(String chunk, List<ImageReference> docImages) {

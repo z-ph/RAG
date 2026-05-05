@@ -17,7 +17,7 @@ import java.util.List;
  * 管理员后台接口：用户管理、角色管理、权限管理。
  */
 @RestController
-@RequestMapping("/api/admin")
+@RequestMapping("/admin")
 public class AdminController {
 
     private final UserAccountService userAccountService;

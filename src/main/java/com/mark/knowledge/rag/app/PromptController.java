@@ -13,7 +13,7 @@ import java.util.List;
 import java.util.Map;
 
 @RestController
-@RequestMapping("/api/admin/prompts")
+@RequestMapping("/admin/prompts")
 public class PromptController {
 
     private static final Logger log = LoggerFactory.getLogger(PromptController.class);

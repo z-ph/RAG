@@ -4,6 +4,8 @@
     <property name="LOG_PATTERN" value="%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n" />
     <property name="MAX_HISTORY" value="30" />
     <property name="MAX_FILE_SIZE" value="100MB" />
+    <property name="ASYNC_QUEUE_SIZE" value="8192" />
+    <property name="ASYNC_DISCARDING_THRESHOLD" value="0" />
 
     <!-- Console -->
     <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
@@ -11,6 +13,13 @@
             <pattern>${LOG_PATTERN}</pattern>
             <charset>UTF-8</charset>
         </encoder>
+    </appender>
+
+    <appender name="ASYNC_CONSOLE" class="ch.qos.logback.classic.AsyncAppender">
+        <queueSize>${ASYNC_QUEUE_SIZE}</queueSize>
+        <discardingThreshold>${ASYNC_DISCARDING_THRESHOLD}</discardingThreshold>
+        <neverBlock>true</neverBlock>
+        <appender-ref ref="CONSOLE" />
     </appender>
 
     <!-- ==================== Layer: network ==================== -->
@@ -45,6 +54,20 @@
         </filter>
     </appender>
 
+    <appender name="ASYNC_NETWORK_FILE" class="ch.qos.logback.classic.AsyncAppender">
+        <queueSize>${ASYNC_QUEUE_SIZE}</queueSize>
+        <discardingThreshold>${ASYNC_DISCARDING_THRESHOLD}</discardingThreshold>
+        <neverBlock>true</neverBlock>
+        <appender-ref ref="NETWORK_FILE" />
+    </appender>
+
+    <appender name="ASYNC_NETWORK_ERROR_FILE" class="ch.qos.logback.classic.AsyncAppender">
+        <queueSize>${ASYNC_QUEUE_SIZE}</queueSize>
+        <discardingThreshold>${ASYNC_DISCARDING_THRESHOLD}</discardingThreshold>
+        <neverBlock>true</neverBlock>
+        <appender-ref ref="NETWORK_ERROR_FILE" />
+    </appender>
+
     <!-- ==================== Layer: database ==================== -->
     <appender name="DATABASE_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
         <file>${LOG_PATH}/database/app.log</file>
@@ -75,6 +98,20 @@
             <onMatch>ACCEPT</onMatch>
             <onMismatch>DENY</onMismatch>
         </filter>
+    </appender>
+
+    <appender name="ASYNC_DATABASE_FILE" class="ch.qos.logback.classic.AsyncAppender">
+        <queueSize>${ASYNC_QUEUE_SIZE}</queueSize>
+        <discardingThreshold>${ASYNC_DISCARDING_THRESHOLD}</discardingThreshold>
+        <neverBlock>true</neverBlock>
+        <appender-ref ref="DATABASE_FILE" />
+    </appender>
+
+    <appender name="ASYNC_DATABASE_ERROR_FILE" class="ch.qos.logback.classic.AsyncAppender">
+        <queueSize>${ASYNC_QUEUE_SIZE}</queueSize>
+        <discardingThreshold>${ASYNC_DISCARDING_THRESHOLD}</discardingThreshold>
+        <neverBlock>true</neverBlock>
+        <appender-ref ref="DATABASE_ERROR_FILE" />
     </appender>
 
     <!-- ==================== Layer: model-session ==================== -->
@@ -109,6 +146,20 @@
         </filter>
     </appender>
 
+    <appender name="ASYNC_MODEL_SESSION_FILE" class="ch.qos.logback.classic.AsyncAppender">
+        <queueSize>${ASYNC_QUEUE_SIZE}</queueSize>
+        <discardingThreshold>${ASYNC_DISCARDING_THRESHOLD}</discardingThreshold>
+        <neverBlock>true</neverBlock>
+        <appender-ref ref="MODEL_SESSION_FILE" />
+    </appender>
+
+    <appender name="ASYNC_MODEL_SESSION_ERROR_FILE" class="ch.qos.logback.classic.AsyncAppender">
+        <queueSize>${ASYNC_QUEUE_SIZE}</queueSize>
+        <discardingThreshold>${ASYNC_DISCARDING_THRESHOLD}</discardingThreshold>
+        <neverBlock>true</neverBlock>
+        <appender-ref ref="MODEL_SESSION_ERROR_FILE" />
+    </appender>
+
     <!-- ==================== Layer: app (general) ==================== -->
     <appender name="APP_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
         <file>${LOG_PATH}/app/app.log</file>
@@ -141,35 +192,49 @@
         </filter>
     </appender>
 
+    <appender name="ASYNC_APP_FILE" class="ch.qos.logback.classic.AsyncAppender">
+        <queueSize>${ASYNC_QUEUE_SIZE}</queueSize>
+        <discardingThreshold>${ASYNC_DISCARDING_THRESHOLD}</discardingThreshold>
+        <neverBlock>true</neverBlock>
+        <appender-ref ref="APP_FILE" />
+    </appender>
+
+    <appender name="ASYNC_APP_ERROR_FILE" class="ch.qos.logback.classic.AsyncAppender">
+        <queueSize>${ASYNC_QUEUE_SIZE}</queueSize>
+        <discardingThreshold>${ASYNC_DISCARDING_THRESHOLD}</discardingThreshold>
+        <neverBlock>true</neverBlock>
+        <appender-ref ref="APP_ERROR_FILE" />
+    </appender>
+
     <!-- ==================== Layer loggers ==================== -->
     <logger name="network" level="INFO" additivity="false">
-        <appender-ref ref="NETWORK_FILE" />
-        <appender-ref ref="NETWORK_ERROR_FILE" />
+        <appender-ref ref="ASYNC_NETWORK_FILE" />
+        <appender-ref ref="ASYNC_NETWORK_ERROR_FILE" />
     </logger>
 
     <logger name="database" level="INFO" additivity="false">
-        <appender-ref ref="DATABASE_FILE" />
-        <appender-ref ref="DATABASE_ERROR_FILE" />
+        <appender-ref ref="ASYNC_DATABASE_FILE" />
+        <appender-ref ref="ASYNC_DATABASE_ERROR_FILE" />
     </logger>
 
     <logger name="model-session" level="INFO" additivity="false">
-        <appender-ref ref="MODEL_SESSION_FILE" />
-        <appender-ref ref="MODEL_SESSION_ERROR_FILE" />
+        <appender-ref ref="ASYNC_MODEL_SESSION_FILE" />
+        <appender-ref ref="ASYNC_MODEL_SESSION_ERROR_FILE" />
     </logger>
 
     <!-- Root logger — everything else goes to app layer -->
     <springProfile name="default">
         <root level="${LOG_LEVEL_ROOT:-INFO}">
-            <appender-ref ref="CONSOLE" />
-            <appender-ref ref="APP_FILE" />
-            <appender-ref ref="APP_ERROR_FILE" />
+            <appender-ref ref="ASYNC_CONSOLE" />
+            <appender-ref ref="ASYNC_APP_FILE" />
+            <appender-ref ref="ASYNC_APP_ERROR_FILE" />
         </root>
     </springProfile>
 
     <springProfile name="docker">
         <root level="${LOG_LEVEL_ROOT:-INFO}">
-            <appender-ref ref="APP_FILE" />
-            <appender-ref ref="APP_ERROR_FILE" />
+            <appender-ref ref="ASYNC_APP_FILE" />
+            <appender-ref ref="ASYNC_APP_ERROR_FILE" />
         </root>
     </springProfile>
 </configuration>

@@ -1,8 +1,11 @@
 package com.mark.knowledge.config;
 
 import com.mark.knowledge.config.structuredlogging.StructuredLog;
+import jakarta.servlet.AsyncEvent;
+import jakarta.servlet.AsyncListener;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
+import jakarta.servlet.ServletResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.slf4j.Logger;
@@ -10,10 +13,8 @@ import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
-import org.springframework.web.util.ContentCachingResponseWrapper;
 
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.util.Set;
 
 @Component
@@ -23,6 +24,8 @@ public class LoggingFilter extends OncePerRequestFilter {
     private static final Logger networkLog = StructuredLog.logger("network");
     private static final Set<String> EXCLUDED_PATHS = Set.of("/rag/health");
     private static final int MAX_BODY_SUMMARY = 500;
+    private static final String ASYNC_LOG_ATTACHED_ATTR = LoggingFilter.class.getName() + ".ASYNC_LOG_ATTACHED";
+    private static final String ASYNC_LOGGED_ATTR = LoggingFilter.class.getName() + ".ASYNC_LOGGED";
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
@@ -35,17 +38,62 @@ public class LoggingFilter extends OncePerRequestFilter {
         }
 
         long start = System.currentTimeMillis();
-        ContentCachingResponseWrapper responseWrapper = new ContentCachingResponseWrapper(response);
         try {
-            filterChain.doFilter(request, responseWrapper);
+            filterChain.doFilter(request, response);
         } finally {
-            long elapsed = System.currentTimeMillis() - start;
-            logRequest(request, responseWrapper, elapsed);
-            responseWrapper.copyBodyToResponse();
+            if (request.isAsyncStarted()) {
+                attachAsyncLogging(request, response, start);
+            } else {
+                logRequest(request, response, System.currentTimeMillis() - start);
+            }
         }
     }
 
-    private void logRequest(HttpServletRequest request, ContentCachingResponseWrapper response, long elapsed) {
+    private void attachAsyncLogging(HttpServletRequest request, HttpServletResponse response, long start) {
+        if (Boolean.TRUE.equals(request.getAttribute(ASYNC_LOG_ATTACHED_ATTR))) {
+            return;
+        }
+        request.setAttribute(ASYNC_LOG_ATTACHED_ATTR, Boolean.TRUE);
+
+        try {
+            request.getAsyncContext().addListener(new AsyncListener() {
+                @Override
+                public void onComplete(AsyncEvent event) {
+                    logAsyncRequest(request, event.getSuppliedResponse(), start);
+                }
+
+                @Override
+                public void onTimeout(AsyncEvent event) {
+                    logAsyncRequest(request, event.getSuppliedResponse(), start);
+                }
+
+                @Override
+                public void onError(AsyncEvent event) {
+                    logAsyncRequest(request, event.getSuppliedResponse(), start);
+                }
+
+                @Override
+                public void onStartAsync(AsyncEvent event) {
+                    event.getAsyncContext().addListener(this);
+                }
+            });
+        } catch (IllegalStateException ignored) {
+            logRequest(request, response, System.currentTimeMillis() - start);
+        }
+    }
+
+    private void logAsyncRequest(HttpServletRequest request, ServletResponse response, long start) {
+        if (!(response instanceof HttpServletResponse httpResponse)) {
+            return;
+        }
+        if (Boolean.TRUE.equals(request.getAttribute(ASYNC_LOGGED_ATTR))) {
+            return;
+        }
+        request.setAttribute(ASYNC_LOGGED_ATTR, Boolean.TRUE);
+        logRequest(request, httpResponse, System.currentTimeMillis() - start);
+    }
+
+    private void logRequest(HttpServletRequest request, HttpServletResponse response, long elapsed) {
         String query = request.getQueryString();
         String uri = query != null ? request.getRequestURI() + "?" + query : request.getRequestURI();
         int status = response.getStatus();
@@ -60,14 +108,6 @@ public class LoggingFilter extends OncePerRequestFilter {
         String requestBody = extractBody(request);
         if (requestBody != null) {
             entry.put("requestBody", StructuredLog.truncate(requestBody, MAX_BODY_SUMMARY));
-        }
-
-        if (status >= 400) {
-            byte[] responseBytes = response.getContentAsByteArray();
-            if (responseBytes.length > 0) {
-                String responseBody = new String(responseBytes, StandardCharsets.UTF_8);
-                entry.put("responseBody", StructuredLog.truncate(responseBody, MAX_BODY_SUMMARY));
-            }
         }
 
         String json = StructuredLog.json(entry);

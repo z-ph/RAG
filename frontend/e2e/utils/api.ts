@@ -2,9 +2,12 @@
  * E2E 测试 API 辅助工具
  *
  * 直接调用后端 REST API 来准备/清理测试数据，绕过前端 UI。
+ * 使用 JWT Bearer token 认证。
  */
 
 const apiURL = process.env.PLAYWRIGHT_API_URL || "http://localhost:8082";
+
+let accessToken: string | null = null;
 
 export interface ApiAuthUser {
   username: string;
@@ -28,19 +31,21 @@ export interface ApiRegistrationCode {
   status: string;
 }
 
+function authHeaders(): Record<string, string> {
+  return accessToken ? { Authorization: `Bearer ${accessToken}` } : {};
+}
+
 async function apiRequest<T>(
   path: string,
-  init?: RequestInit,
-  cookies?: string
+  init?: RequestInit
 ): Promise<T> {
   const response = await fetch(`${apiURL}/api${path}`, {
     ...init,
     headers: {
       "Content-Type": "application/json",
-      ...(cookies ? { Cookie: cookies } : {}),
+      ...authHeaders(),
       ...(init?.headers || {}),
     },
-    credentials: "include",
   });
 
   if (!response.ok) {
@@ -51,33 +56,39 @@ async function apiRequest<T>(
   return response.json() as Promise<T>;
 }
 
-export async function getAuthStatus(cookies?: string): Promise<ApiAuthStatus> {
-  return apiRequest<ApiAuthStatus>("/auth/me", { method: "GET" }, cookies);
+export async function getAuthStatus(): Promise<ApiAuthStatus> {
+  return apiRequest<ApiAuthStatus>("/auth/me", { method: "GET" });
 }
 
 export async function login(
   username: string,
   password: string
-): Promise<{ user: ApiAuthUser } & { message: string }> {
-  return apiRequest("/auth/login", {
+): Promise<{ user: ApiAuthUser; message: string; accessToken: string; refreshToken: string }> {
+  const result = await apiRequest<{ user: ApiAuthUser; message: string; accessToken: string; refreshToken: string }>("/auth/login", {
     method: "POST",
     body: JSON.stringify({ username, password }),
   });
+  accessToken = result.accessToken;
+  return result;
 }
 
 export async function logout(): Promise<{ message: string }> {
-  return apiRequest("/auth/logout", { method: "POST" });
+  const result = await apiRequest<{ message: string }>("/auth/logout", { method: "POST" });
+  accessToken = null;
+  return result;
 }
 
 export async function register(
   username: string,
   password: string,
   registrationCode: string
-): Promise<{ user: ApiAuthUser } & { message: string }> {
-  return apiRequest("/auth/register", {
+): Promise<{ user: ApiAuthUser; message: string; accessToken: string; refreshToken: string }> {
+  const result = await apiRequest<{ user: ApiAuthUser; message: string; accessToken: string; refreshToken: string }>("/auth/register", {
     method: "POST",
     body: JSON.stringify({ username, password, registrationCode }),
   });
+  accessToken = result.accessToken;
+  return result;
 }
 
 export async function listRegistrationCodes(): Promise<{
@@ -129,7 +140,7 @@ export async function uploadDocument(
 
   const response = await fetch(`${apiURL}/api/documents/upload`, {
     method: "POST",
-    credentials: "include",
+    headers: authHeaders(),
     body: formData,
   });
 

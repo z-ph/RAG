@@ -10,13 +10,19 @@ import type {
   ResetPasswordRequest
 } from "../types/admin";
 import { API_BASE_URL, ApiError } from "./api";
+import { getAccessToken } from "./tokenStorage";
+
+function authHeaders(): Record<string, string> {
+  const token = getAccessToken();
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
 
 async function adminRequest<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${API_BASE_URL}${path}`, {
-    credentials: "include",
     ...init,
     headers: {
       "Content-Type": "application/json",
+      ...authHeaders(),
       ...(init?.headers || {})
     }
   });

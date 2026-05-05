@@ -10,13 +10,19 @@ import type {
   ResetPasswordRequest
 } from "../types/admin";
 import { API_BASE_URL, ApiError } from "./api";
+import { getAccessToken } from "./tokenStorage";
+
+function authHeaders(): Record<string, string> {
+  const token = getAccessToken();
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
 
 async function adminRequest<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${API_BASE_URL}${path}`, {
-    credentials: "include",
     ...init,
     headers: {
       "Content-Type": "application/json",
+      ...authHeaders(),
       ...(init?.headers || {})
     }
   });
@@ -104,4 +110,37 @@ export function changePassword(request: ChangePasswordRequest) {
     method: "POST",
     body: JSON.stringify(request)
   });
+}
+
+// --- Logs ---
+
+export interface LogPage {
+  items: Record<string, unknown>[];
+  total: number;
+  page: number;
+  size: number;
+}
+
+export function queryLogs(params: {
+  layer?: string;
+  date?: string;
+  level?: string;
+  keyword?: string;
+  timeFrom?: string;
+  timeTo?: string;
+  sort?: string;
+  page?: number;
+  size?: number;
+}) {
+  const searchParams = new URLSearchParams();
+  if (params.layer) searchParams.set("layer", params.layer);
+  if (params.date) searchParams.set("date", params.date);
+  if (params.level) searchParams.set("level", params.level);
+  if (params.keyword) searchParams.set("keyword", params.keyword);
+  if (params.timeFrom) searchParams.set("timeFrom", params.timeFrom);
+  if (params.timeTo) searchParams.set("timeTo", params.timeTo);
+  if (params.sort) searchParams.set("sort", params.sort);
+  if (params.page) searchParams.set("page", String(params.page));
+  if (params.size) searchParams.set("size", String(params.size));
+  return adminRequest<LogPage>(`/admin/logs?${searchParams.toString()}`, { method: "GET" });
 }

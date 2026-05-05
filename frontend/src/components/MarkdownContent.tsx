@@ -113,7 +113,7 @@ const markdownComponents: Components = {
     return <a {...props} target="_blank" rel="noreferrer" />;
   },
   img({ node, src, alt, ...props }) {
-    if (src && src.includes("/api/documents/images/")) {
+    if (src && src.includes("/documents/images/")) {
       return (
         <Image
           src={src}

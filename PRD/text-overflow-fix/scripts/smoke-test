@@ -1,0 +1,105 @@
+#!/usr/bin/env bash
+# smoke-test -- verify text-overflow-fix PRD checkpoints
+# Usage:
+#   ./scripts/smoke-test            # run all checkpoints
+#   ./scripts/smoke-test checkpoint-1   # run a single checkpoint
+#   ./scripts/smoke-test 1              # shorthand (same as checkpoint-1)
+set -euo pipefail
+
+REACT_FILE="frontend/src/components/DocumentDetail.tsx"
+VUE_FILE="front-vue/src/components/DocumentDetail.vue"
+
+# -- helpers ----------------------------------------------------------------
+red()  { printf '\033[31m%s\033[0m\n' "$*"; }
+green(){ printf '\033[32m%s\033[0m\n' "$*"; }
+fail() { red "FAIL: $*"; exit 1; }
+pass() { green "PASS: $*"; }
+
+# -- checkpoints ------------------------------------------------------------
+
+checkpoint-1() {
+  # break-words present on <p> in both frontends
+  grep -qP 'whitespace-pre-wrap.*break-words|break-words.*whitespace-pre-wrap' "$REACT_FILE" \
+    || fail "checkpoint-1: break-words not found alongside whitespace-pre-wrap in $REACT_FILE"
+  grep -qP 'whitespace-pre-wrap.*break-words|break-words.*whitespace-pre-wrap' "$VUE_FILE" \
+    || fail "checkpoint-1: break-words not found alongside whitespace-pre-wrap in $VUE_FILE"
+  pass "checkpoint-1: break-words on <p> in both frontends"
+}
+
+checkpoint-2() {
+  # min-w-0 on the segment card div (the one with border/rounded + px-4 py-3)
+  # React: the div whose className includes "border border-ink-300"
+  grep -qP 'min-w-0.*border border-ink-300|border border-ink-300.*min-w-0' "$REACT_FILE" \
+    || fail "checkpoint-2: min-w-0 not on segment card div in $REACT_FILE"
+  # Vue: the div whose class includes "rounded-[12px]"
+  grep -qP 'min-w-0.*rounded-\[12px\]|rounded-\[12px\].*min-w-0' "$VUE_FILE" \
+    || fail "checkpoint-2: min-w-0 not on segment card div in $VUE_FILE"
+  pass "checkpoint-2: min-w-0 on segment card div in both frontends"
+}
+
+checkpoint-3() {
+  # React frontend builds and output contains the new classes
+  (cd frontend && pnpm build) \
+    || fail "checkpoint-3: React frontend build failed"
+  grep -rq 'break-words' frontend/dist/ 2>/dev/null || fail "checkpoint-3: break-words not found in React build output"
+  grep -rq 'min-w-0'   frontend/dist/ 2>/dev/null || fail "checkpoint-3: min-w-0 not found in React build output"
+  pass "checkpoint-3: React build succeeds with new Tailwind classes"
+}
+
+checkpoint-4() {
+  # Vue frontend builds and output contains the new classes
+  (cd front-vue && pnpm build) \
+    || fail "checkpoint-4: Vue frontend build failed"
+  grep -rq 'break-words' front-vue/dist/ 2>/dev/null || fail "checkpoint-4: break-words not found in Vue build output"
+  grep -rq 'min-w-0'   front-vue/dist/ 2>/dev/null || fail "checkpoint-4: min-w-0 not found in Vue build output"
+  pass "checkpoint-4: Vue build succeeds with new Tailwind classes"
+}
+
+checkpoint-5() {
+  # No unintended class removals or duplicates
+  for f in "$REACT_FILE" "$VUE_FILE"; do
+    local base
+    base="$(basename "$f")"
+    # original classes still present
+    grep -q 'whitespace-pre-wrap' "$f" || fail "checkpoint-5: whitespace-pre-wrap missing in $base"
+    grep -q 'text-sm'             "$f" || fail "checkpoint-5: text-sm missing in $base"
+    grep -q 'leading-relaxed'     "$f" || fail "checkpoint-5: leading-relaxed missing in $base"
+    # no duplicates of the new classes on the <p> element
+    local bw_count mw_count
+    bw_count=$(grep -o 'break-words' "$f" 2>/dev/null | wc -l || true)
+    mw_count=$(grep -cP 'min-w-0.*(border border-ink-300|rounded-\[12px\])|(border border-ink-300|rounded-\[12px\]).*min-w-0' "$f" || true)
+    [ "$bw_count" -le 1 ] || fail "checkpoint-5: break-words appears $bw_count times in $base (expected 1)"
+    [ "$mw_count" -le 1 ] || fail "checkpoint-5: min-w-0 appears $mw_count times on segment card in $base (expected 1)"
+  done
+  pass "checkpoint-5: no missing originals, no duplicate additions"
+}
+
+# -- dispatcher --------------------------------------------------------------
+
+ALL=("checkpoint-1" "checkpoint-2" "checkpoint-3" "checkpoint-4" "checkpoint-5")
+
+run_one() {
+  local name="$1"
+  # accept "1" as shorthand for "checkpoint-1"
+  if [[ "$name" =~ ^[0-9]+$ ]]; then
+    name="checkpoint-$name"
+  fi
+  declare -F "$name" > /dev/null || fail "unknown checkpoint: $name"
+  "$name"
+}
+
+if [ $# -eq 0 ]; then
+  for cp in "${ALL[@]}"; do
+    run_one "$cp"
+  done
+elif [ "$1" = "all" ]; then
+  for cp in "${ALL[@]}"; do
+    run_one "$cp"
+  done
+else
+  for arg in "$@"; do
+    run_one "$arg"
+  done
+fi
+
+green "All requested checkpoints passed."

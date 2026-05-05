@@ -6,7 +6,7 @@
 
 **Test first:** 验证应用启动后 `logs/network/`、`logs/database/`、`logs/model-session/`、`logs/app/` 目录存在，且各层 logger 写入正确文件。
 **Acceptance:** 发送 HTTP 请求后 `logs/network/{date}.log` 出现对应日志行；通用日志写入 `logs/app/{date}.log`；error 日志写入各层 `error-{date}.log`。
-**Hash:** ``
+**Hash:** `ce36612`
 
 ---
 
@@ -16,7 +16,7 @@
 
 **Test first:** 发送 `GET /api/documents`，验证 `logs/network/{date}.log` 包含 JSON 行含 `ver:1`、`layer:"network"`、`method:"GET"`、`uri`、`status`、`elapsedMs` 字段。
 **Acceptance:** 健康检查路径不产生日志；请求体/响应体摘要不超过 500 字符；JSON 格式合法可解析。
-**Hash:** ``
+**Hash:** `ce36612`
 
 ---
 
@@ -26,7 +26,7 @@
 
 **Test first:** 调用任意 Repository 方法（如 `UserAccountRepository.findAll()`），验证 `logs/database/{date}.log` 包含 JSON 行含 `layer:"database"`、`method`、`elapsedMs`、`success` 字段。
 **Acceptance:** 敏感字段（password/token/secret）脱敏为 `***`；参数和返回值摘要不超过 200 字符；异常时记录 `error` 字段且 `success:false`。
-**Hash:** ``
+**Hash:** `ce36612`
 
 ---
 
@@ -36,7 +36,7 @@
 
 **Test first:** 发送 RAG 问询请求，验证 `logs/model-session/{date}.log` 包含多个 JSON 行，覆盖 `step:"question_rewrite"`、`step:"vector_search"`、`step:"bm25_rerank"`、`step:"model_generate"` 等节点，每条含 `conversationId`、`input`、`output`、`elapsedMs`、`success`。
 **Acceptance:** 各节点日志按 pipeline 顺序出现；失败节点含 `error` 字段且 `success:false`；输入输出摘要不超过 500 字符。
-**Hash:** ``
+**Hash:** `ce36612`
 
 ---
 
@@ -56,7 +56,7 @@
 
 **Test first:** 管理员登录后点击"日志管理"，页面加载并展示日志列表；切换层/级别/日期后列表更新；关键词搜索返回匹配结果。
 **Acceptance:** 日志列表显示时间戳、级别（带颜色标签）、层名、消息内容（JSON 展开查看）；分页控件工作正常；非管理员无法访问。
-**Hash:** ``
+**Hash:** `ce36612`
 
 ---
 

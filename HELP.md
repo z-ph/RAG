@@ -71,18 +71,18 @@ pnpm dev
 
 ### 文档管理
 
-- `POST /api/documents/upload`
+- `POST /documents/upload`
 - `GET /api/documents`
-- `DELETE /api/documents/{documentId}`
-- `GET /api/documents/health`
+- `DELETE /documents/{documentId}`
+- `GET /documents/health`
 
 ### RAG
 
-- `POST /api/rag/ask`
-- `POST /api/rag/ask/stream`
-- `POST /api/rag/conversations/{conversationId}/cancel`
-- `DELETE /api/rag/conversations/{conversationId}`
-- `GET /api/rag/health`
+- `POST /rag/ask`
+- `POST /rag/ask/stream`
+- `POST /rag/conversations/{conversationId}/cancel`
+- `DELETE /rag/conversations/{conversationId}`
+- `GET /rag/health`
 
 完整规范见 [docs/openapi.yaml](docs/openapi.yaml)。
 

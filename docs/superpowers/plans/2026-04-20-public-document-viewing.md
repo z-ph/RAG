@@ -575,7 +575,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
             FilterChain filterChain) throws ServletException, IOException {
         String path = request.getRequestURI();
-        if (!path.startsWith("/api/documents/public")) {
+        if (!path.startsWith("/documents/public")) {
             filterChain.doFilter(request, response);
             return;
         }
@@ -766,7 +766,7 @@ git commit -m "feat: add public document viewing and download endpoints"
 In `SecurityConfig.securityFilterChain`, add a new `requestMatchers` line before the authenticated documents rule:
 
 ```java
-.requestMatchers("/api/documents/public/**").permitAll()
+.requestMatchers("/documents/public/**").permitAll()
 ```
 
 The authorize block should become:
@@ -774,12 +774,12 @@ The authorize block should become:
 ```java
 .authorizeHttpRequests(authorize -> authorize
     .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-    .requestMatchers("/api/rag/**").permitAll()
-    .requestMatchers("/api/documents/health").permitAll()
-    .requestMatchers("/api/documents/public/**").permitAll()
-    .requestMatchers("/api/auth/login", "/api/auth/register", "/api/auth/logout", "/api/auth/me").permitAll()
-    .requestMatchers("/api/auth/registration-codes/**").hasRole("ADMIN")
-    .requestMatchers("/api/documents/**").authenticated()
+    .requestMatchers("/rag/**").permitAll()
+    .requestMatchers("/documents/health").permitAll()
+    .requestMatchers("/documents/public/**").permitAll()
+    .requestMatchers("/auth/login", "/auth/register", "/auth/logout", "/auth/me").permitAll()
+    .requestMatchers("/auth/registration-codes/**").hasRole("ADMIN")
+    .requestMatchers("/documents/**").authenticated()
     .anyRequest().permitAll()
 )
 ```

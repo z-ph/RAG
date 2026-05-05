@@ -22,7 +22,7 @@
 - 增强 `LoggingFilter`（`config/LoggingFilter.java`），记录：请求方法、URI、查询参数、状态码、耗时、请求体摘要（可选）、响应体摘要（可选）。
 - 请求/响应体摘要最大 500 字符，超出截断并追加 `...[truncated]`。文件上传请求跳过请求体记录。
 - 使用 JSON 格式写入日志，便于解析。
-- 排除健康检查路径（`/api/rag/health`）。
+- 排除健康检查路径（`/rag/health`）。
 
 ### AC-3: 数据库层日志
 - 通过 AOP 切面拦截带 `@Repository` 注解的类，覆盖包：`auth.repository`、`rag.repository`。Pointcut 目标为 Spring Data 生成的代理方法调用。

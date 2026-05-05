@@ -4,7 +4,7 @@
 
 set -euo pipefail
 
-BASE_URL="${API_BASE_URL:-http://localhost:8080/api}"
+BASE_URL="${API_BASE_URL:-http://localhost:8080}"
 LOG_DIR="${LOG_DIR:-./logs}"
 TODAY=$(date +%Y-%m-%d)
 PASS=0
@@ -52,7 +52,7 @@ test_checkpoint_2() {
 
   # Health check should NOT appear in logs
   if [ -f "$LOG_DIR/network/$TODAY.log" ]; then
-    if grep -q "/api/rag/health" "$LOG_DIR/network/$TODAY.log" 2>/dev/null; then
+    if grep -q "/rag/health" "$LOG_DIR/network/$TODAY.log" 2>/dev/null; then
       fail "health check path should be excluded"
     else
       pass "health check path excluded"

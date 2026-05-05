@@ -7,9 +7,9 @@
 **实现要点**：
 - 新增 `JwtUtil` 工具类：生成/解析/验证 Access Token 和 Refresh Token
 - 新增 `JwtAuthenticationFilter`（OncePerRequestFilter）：从 `Authorization` 头提取 token，解析用户身份和权限，填充 `SecurityContext`
-- 修改 `SecurityConfig`：session 策略改为 `STATELESS`，注册 JWT Filter 在 `UsernamePasswordAuthenticationFilter` 之前，`allowCredentials` 改为 `false`，`/api/auth/me` 和 `/api/auth/change-password` 从 `permitAll` 移至 `authenticated`
+- 修改 `SecurityConfig`：session 策略改为 `STATELESS`，注册 JWT Filter 在 `UsernamePasswordAuthenticationFilter` 之前，`allowCredentials` 改为 `false`，`/auth/me` 和 `/auth/change-password` 从 `permitAll` 移至 `authenticated`
 - 修改 `AuthService.login()` 和 `AuthService.register()`：返回 token 对而非依赖 session
-- 新增 `POST /api/auth/refresh` 端点：用 Refresh Token 换新 token 对（Refresh Token Rotation：每次刷新后旧 token 失效）
+- 新增 `POST /auth/refresh` 端点：用 Refresh Token 换新 token 对（Refresh Token Rotation：每次刷新后旧 token 失效）
 - 前端：`localStorage` 存储 token，fetch 拦截器自动附加 token 和处理 401 刷新（含并发刷新互斥：多个请求同时 401 时只发一个 refresh，其余复用结果）
 
 **优点**：

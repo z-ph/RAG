@@ -19,12 +19,12 @@
 
 ## 验收标准
 
-1. `POST /api/auth/login` 成功后返回 Access Token 和 Refresh Token，不再依赖 JSESSIONID
+1. `POST /auth/login` 成功后返回 Access Token 和 Refresh Token，不再依赖 JSESSIONID
 2. 后续请求通过 `Authorization: Bearer <access_token>` 认证，不再使用 Cookie session
-3. Access Token 过期后，`POST /api/auth/refresh` 可用 Refresh Token 换取新的 token 对
+3. Access Token 过期后，`POST /auth/refresh` 可用 Refresh Token 换取新的 token 对
 4. Refresh Token 过期后，前端自动跳转到登录页
-5. `GET /api/auth/me` 和 `/api/auth/change-password` 必须携带有效 token（从 `permitAll` 移至 `authenticated`）
-6. `GET /api/auth/me` 从 JWT 中解析用户身份，行为与现有一致
+5. `GET /auth/me` 和 `/auth/change-password` 必须携带有效 token（从 `permitAll` 移至 `authenticated`）
+6. `GET /auth/me` 从 JWT 中解析用户身份，行为与现有一致
 7. 现有 RBAC 权限校验（`@PreAuthorize` 方法级 + `requestMatchers` URL 级）全部正常工作
 8. 前端（React + Vue）自动在请求头附加 token，token 过期时自动刷新（含并发刷新互斥锁）
 9. 现有的注册、修改密码、注册码等功能不受影响

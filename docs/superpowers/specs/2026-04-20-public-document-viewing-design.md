@@ -6,13 +6,13 @@ Allow unauthenticated users to view document listings, full document details, an
 
 ## Background
 
-Currently all document APIs (`/api/documents/**`) require authentication. Uploaded files are processed in-memory and discarded — only text segments and vectors persist in Qdrant. No file download capability exists.
+Currently all document APIs (`/documents/**`) require authentication. Uploaded files are processed in-memory and discarded — only text segments and vectors persist in Qdrant. No file download capability exists.
 
 ## Design
 
 ### 1. File Persistence on Upload
 
-When a document is uploaded via `POST /api/documents/upload` or the SSE variant:
+When a document is uploaded via `POST /documents/upload` or the SSE variant:
 
 - Generate a UUID `documentId`
 - Save the original file to `/app/uploads/{documentId}/{filename}`
@@ -25,7 +25,7 @@ The `/app/uploads` directory is already configured as a Docker volume in `docker
 
 All three endpoints are `permitAll` in `SecurityConfig`.
 
-#### GET /api/documents/public
+#### GET /documents/public
 
 Returns a list of all documents with metadata.
 
@@ -48,7 +48,7 @@ Response:
 
 Implementation: Query Qdrant via scroll API, group by `documentId`, aggregate metadata. Reuse existing `DocumentAdminService.listDocuments()` logic.
 
-#### GET /api/documents/public/{documentId}
+#### GET /documents/public/{documentId}
 
 Returns full document details including all text segments.
 
@@ -73,7 +73,7 @@ Response:
 
 Implementation: Query Qdrant filtered by `documentId`, return all segments sorted by `chunkIndex`.
 
-#### GET /api/documents/public/{documentId}/download
+#### GET /documents/public/{documentId}/download
 
 Downloads the original file.
 
@@ -90,8 +90,8 @@ IP-based token bucket rate limiter implemented as a Spring filter:
 
 | Endpoint group | Limit |
 |----------------|-------|
-| Public listing & detail (`/api/documents/public/**` except download) | 30 requests/IP/minute |
-| File download (`/api/documents/public/*/download`) | 10 requests/IP/minute |
+| Public listing & detail (`/documents/public/**` except download) | 30 requests/IP/minute |
+| File download (`/documents/public/*/download`) | 10 requests/IP/minute |
 
 Excess requests return HTTP 429 with JSON body `{"error": "请求过于频繁，请稍后再试"}`.
 
@@ -114,7 +114,7 @@ Implementation: Simple in-memory `ConcurrentHashMap<String, TokenBucket>` with s
 
 | File | Change |
 |------|--------|
-| `SecurityConfig.java` | Add `/api/documents/public/**` to `permitAll` |
+| `SecurityConfig.java` | Add `/documents/public/**` to `permitAll` |
 | `DocumentController.java` | Add 3 public endpoints |
 | `DocumentService.java` | Modify upload to save original file to disk |
 | New: `RateLimitFilter.java` | IP-based rate limiting filter |

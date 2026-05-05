@@ -66,7 +66,7 @@ logs/
 
 日志格式（JSON 单行，含版本号）：
 ```json
-{"ver":1,"timestamp":"2026-05-05T14:30:00.123","level":"INFO","layer":"network","method":"GET","uri":"/api/documents","status":200,"elapsedMs":45}
+{"ver":1,"timestamp":"2026-05-05T14:30:00.123","level":"INFO","layer":"network","method":"GET","uri":"/documents","status":200,"elapsedMs":45}
 ```
 
 ```json

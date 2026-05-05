@@ -110,7 +110,7 @@ docker compose down
 ./mvnw spring-boot:run
 
 # 步骤 3：从另一台机器（或本机另一个终端）直接 curl 宿主机 :8080
-curl -sS -N http://<宿主机IP>:8080/api/rag/ask/stream \
+curl -sS -N http://<宿主机IP>:8080/rag/ask/stream \
   -H 'Content-Type: application/json' \
   -d '{"question":"后端学习路线"}' \
   | perl -MTime::HiRes=time -MPOSIX=strftime -ne '...'

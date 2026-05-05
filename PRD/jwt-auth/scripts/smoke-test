@@ -18,7 +18,7 @@ test_checkpoint_1() {
     info "=== Checkpoint 1: JWT Util + Login Endpoint ==="
 
     # 1.1 Login returns tokens
-    LOGIN_RESP=$(curl -s -w "\n%{http_code}" -X POST "$BASE_URL/api/auth/login" \
+    LOGIN_RESP=$(curl -s -w "\n%{http_code}" -X POST "$BASE_URL/auth/login" \
         -H "Content-Type: application/json" \
         -d '{"username":"admin","password":"admin123"}')
 
@@ -45,7 +45,7 @@ test_checkpoint_1() {
     fi
 
     # 1.4 No JSESSIONID cookie set
-    HEADERS=$(curl -s -D - -o /dev/null -X POST "$BASE_URL/api/auth/login" \
+    HEADERS=$(curl -s -D - -o /dev/null -X POST "$BASE_URL/auth/login" \
         -H "Content-Type: application/json" \
         -d '{"username":"admin","password":"admin123"}')
 
@@ -61,7 +61,7 @@ test_checkpoint_2() {
     info "=== Checkpoint 2: JWT Filter + SecurityConfig ==="
 
     # Get tokens first
-    LOGIN_RESP=$(curl -s -X POST "$BASE_URL/api/auth/login" \
+    LOGIN_RESP=$(curl -s -X POST "$BASE_URL/auth/login" \
         -H "Content-Type: application/json" \
         -d '{"username":"admin","password":"admin123"}')
 
@@ -74,20 +74,20 @@ test_checkpoint_2() {
     fi
 
     # 2.1 Authenticated request with Bearer token
-    ME_RESP=$(curl -s -w "\n%{http_code}" "$BASE_URL/api/auth/me" \
+    ME_RESP=$(curl -s -w "\n%{http_code}" "$BASE_URL/auth/me" \
         -H "Authorization: Bearer $ACCESS_TOKEN")
 
     ME_CODE=$(echo "$ME_RESP" | tail -1)
     ME_BODY=$(echo "$ME_RESP" | sed '$d')
 
     if [[ "$ME_CODE" == "200" ]] && echo "$ME_BODY" | grep -q '"authenticated":true'; then
-        green "2.1 GET /api/auth/me returns authenticated user with Bearer token"
+        green "2.1 GET /auth/me returns authenticated user with Bearer token"
     else
-        red "2.1 GET /api/auth/me failed (HTTP $ME_CODE)"
+        red "2.1 GET /auth/me failed (HTTP $ME_CODE)"
     fi
 
     # 2.2 Protected endpoint without token returns 401
-    NO_AUTH_RESP=$(curl -s -w "\n%{http_code}" "$BASE_URL/api/documents")
+    NO_AUTH_RESP=$(curl -s -w "\n%{http_code}" "$BASE_URL/documents")
     NO_AUTH_CODE=$(echo "$NO_AUTH_RESP" | tail -1)
 
     if [[ "$NO_AUTH_CODE" == "401" ]] || [[ "$NO_AUTH_CODE" == "403" ]]; then
@@ -97,7 +97,7 @@ test_checkpoint_2() {
     fi
 
     # 2.3 Protected endpoint with token returns 200
-    DOCS_RESP=$(curl -s -w "\n%{http_code}" "$BASE_URL/api/documents" \
+    DOCS_RESP=$(curl -s -w "\n%{http_code}" "$BASE_URL/documents" \
         -H "Authorization: Bearer $ACCESS_TOKEN")
     DOCS_CODE=$(echo "$DOCS_RESP" | tail -1)
 
@@ -109,7 +109,7 @@ test_checkpoint_2() {
 
     # 2.4 Refresh token endpoint works
     if [[ -n "$REFRESH_TOKEN" ]]; then
-        REFRESH_RESP=$(curl -s -w "\n%{http_code}" -X POST "$BASE_URL/api/auth/refresh" \
+        REFRESH_RESP=$(curl -s -w "\n%{http_code}" -X POST "$BASE_URL/auth/refresh" \
             -H "Content-Type: application/json" \
             -d "{\"refreshToken\":\"$REFRESH_TOKEN\"}")
 
@@ -126,7 +126,7 @@ test_checkpoint_2() {
     fi
 
     # 2.5 Invalid token returns 401
-    INVALID_RESP=$(curl -s -w "\n%{http_code}" "$BASE_URL/api/auth/me" \
+    INVALID_RESP=$(curl -s -w "\n%{http_code}" "$BASE_URL/auth/me" \
         -H "Authorization: Bearer invalid.token.here")
     INVALID_CODE=$(echo "$INVALID_RESP" | tail -1)
 

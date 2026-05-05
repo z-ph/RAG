@@ -8,7 +8,7 @@
 
 ## 1. 问题现象
 
-浏览器 DevTools Network 面板观察 SSE 流式接口 `POST /api/rag/ask/stream` 的响应，发现所有 `thinking_delta` 和 `delta` 事件**成块到达**——几十个事件共享同一个毫秒级时间戳，块与块之间间隔数秒。用户感知为：文本"一顿一顿"地出现，而非平滑的逐 token 流式渲染。
+浏览器 DevTools Network 面板观察 SSE 流式接口 `POST /rag/ask/stream` 的响应，发现所有 `thinking_delta` 和 `delta` 事件**成块到达**——几十个事件共享同一个毫秒级时间戳，块与块之间间隔数秒。用户感知为：文本"一顿一顿"地出现，而非平滑的逐 token 流式渲染。
 
 curl 直接请求同样出现分块拥塞，排除了浏览器端问题的可能。
 
@@ -122,16 +122,16 @@ Tomcat buffer + Docker TCP buffer + Nginx proxy_buffering 三层叠加，每层�
 ```bash
 # 测试 1：容器内部直接请求（绕过 Docker 网络和 Nginx）
 docker exec knowledge-rag-app curl -sS -N \
-  -X POST http://localhost:8080/api/rag/ask/stream \
+  -X POST http://localhost:8080/rag/ask/stream \
   -H "Content-Type: application/json" \
   -d '{"question":"后端学习路线"}' \
   | perl -MTime::HiRes=time -MPOSIX=strftime -pe '...'
 
 # 测试 2：宿主机直连容器端口（经过 Docker NAT，绕过 Nginx）
-curl -sS -N http://222.200.112.60:8081/api/rag/ask/stream ...
+curl -sS -N http://222.200.112.60:8081/rag/ask/stream ...
 
 # 测试 3：通过 Nginx 请求（完整链路）
-curl -sS -N http://222.200.112.60/rag-back/api/rag/ask/stream ...
+curl -sS -N http://222.200.112.60/rag-back/rag/ask/stream ...
 ```
 
 - 若测试 1 已逐 token 到达 → 根因是 Tomcat buffer，`flushBuffer()` 修复有效

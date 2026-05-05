@@ -29,9 +29,9 @@ frontend (React + Vite)
         |
         v
 Spring Boot API
-  |- /api/auth/*        <- Session 登录、注册码管理
-  |- /api/documents/*   <- 需要登录
-  |- /api/rag/*         <- 匿名可访问
+  |- /auth/*        <- Session 登录、注册码管理
+  |- /documents/*   <- 需要登录
+  |- /rag/*         <- 匿名可访问
   |
   |- MySQL              <- 用户、注册码，JPA 自动建表
   |- Qdrant             <- 文档向量与 metadata
@@ -253,25 +253,25 @@ pnpm build
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
-| `POST` | `/api/auth/login` | 登录并建立 Session |
-| `POST` | `/api/auth/register` | 使用一次性注册码注册并自动登录 |
-| `POST` | `/api/auth/logout` | 退出登录 |
-| `GET` | `/api/auth/me` | 查看当前登录状态 |
-| `GET` | `/api/auth/registration-codes` | 管理员查看注册码列表 |
-| `POST` | `/api/auth/registration-codes` | 管理员创建注册码 |
-| `PATCH` | `/api/auth/registration-codes/{id}/disable` | 管理员禁用注册码 |
-| `DELETE` | `/api/auth/registration-codes/{id}` | 管理员删除注册码 |
+| `POST` | `/auth/login` | 登录并建立 Session |
+| `POST` | `/auth/register` | 使用一次性注册码注册并自动登录 |
+| `POST` | `/auth/logout` | 退出登录 |
+| `GET` | `/auth/me` | 查看当前登录状态 |
+| `GET` | `/auth/registration-codes` | 管理员查看注册码列表 |
+| `POST` | `/auth/registration-codes` | 管理员创建注册码 |
+| `PATCH` | `/auth/registration-codes/{id}/disable` | 管理员禁用注册码 |
+| `DELETE` | `/auth/registration-codes/{id}` | 管理员删除注册码 |
 
 ### 文档接口
 
-除 `/api/documents/health` 外，以下接口均要求已登录：
+除 `/documents/health` 外，以下接口均要求已登录：
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
-| `POST` | `/api/documents/upload` | 上传并处理 `PDF/TXT/DOC/DOCX` 文档 |
+| `POST` | `/documents/upload` | 上传并处理 `PDF/TXT/DOC/DOCX` 文档 |
 | `GET` | `/api/documents` | 列出当前 Qdrant collection 中的文档 |
-| `DELETE` | `/api/documents/{documentId}` | 删除指定文档对应的全部向量片段 |
-| `GET` | `/api/documents/health` | 文档服务健康检查 |
+| `DELETE` | `/documents/{documentId}` | 删除指定文档对应的全部向量片段 |
+| `GET` | `/documents/health` | 文档服务健康检查 |
 
 ### RAG 接口
 
@@ -279,16 +279,16 @@ pnpm build
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
-| `POST` | `/api/rag/ask` | 同步返回答案和来源片段 |
-| `POST` | `/api/rag/ask/stream` | SSE 流式返回答案 |
-| `POST` | `/api/rag/conversations/{conversationId}/cancel` | 取消进行中的流式生成 |
-| `DELETE` | `/api/rag/conversations/{conversationId}` | 清空会话上下文 |
-| `GET` | `/api/rag/health` | RAG 服务健康检查 |
-| `POST` | `/api/rag/health` | RAG 服务健康检查（POST，可用于验证请求体转发） |
+| `POST` | `/rag/ask` | 同步返回答案和来源片段 |
+| `POST` | `/rag/ask/stream` | SSE 流式返回答案 |
+| `POST` | `/rag/conversations/{conversationId}/cancel` | 取消进行中的流式生成 |
+| `DELETE` | `/rag/conversations/{conversationId}` | 清空会话上下文 |
+| `GET` | `/rag/health` | RAG 服务健康检查 |
+| `POST` | `/rag/health` | RAG 服务健康检查（POST，可用于验证请求体转发） |
 
 ### SSE 事件
 
-`/api/rag/ask/stream` 可能输出以下事件：
+`/rag/ask/stream` 可能输出以下事件：
 
 - `start`
 - `sources`

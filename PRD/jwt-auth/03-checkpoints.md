@@ -11,15 +11,15 @@
   - 生成的 token 能被正确解析，提取出 username、userId、authorities
   - 过期 token 解析时抛出 `ExpiredJwtException`
   - 无效签名 token 解析时抛出异常
-  - `POST /api/auth/login` 返回 `accessToken` 和 `refreshToken` 字段
-  - `POST /api/auth/register` 同样返回 token 对（不再依赖 session）
+  - `POST /auth/login` 返回 `accessToken` 和 `refreshToken` 字段
+  - `POST /auth/register` 同样返回 token 对（不再依赖 session）
   - 登录/注册成功后不再创建 HTTP session
 - 前置条件：无
 
 **验收标准：**
 1. `JwtUtil` 可生成和解析两种 token（access / refresh），Refresh Token 包含 `jti`
-2. `POST /api/auth/login` 返回 `{ accessToken, refreshToken, user }` 而非依赖 session
-3. `POST /api/auth/register` 同样返回 token 对
+2. `POST /auth/login` 返回 `{ accessToken, refreshToken, user }` 而非依赖 session
+3. `POST /auth/register` 同样返回 token 对
 4. Access Token 包含 `sub`（username）、`userId`、`roleCode`、`authorities` claims
 5. 上述所有测试通过
 
@@ -37,13 +37,13 @@
 - 目标：`JwtAuthenticationFilterTest` 单元测试 + 集成测试
 - 验证：
   - 携带有效 `Authorization: Bearer <token>` 的请求能通过认证
-  - 不携带 token 的请求到受保护端点返回 401（包括 `/api/auth/me`）
+  - 不携带 token 的请求到受保护端点返回 401（包括 `/auth/me`）
   - 携带过期 token 的请求返回 401
   - 携带无效 token 的请求返回 401
   - `@PreAuthorize("hasAuthority('user:read')")` 方法级权限校验基于 JWT 中的 authorities 正常工作
   - `requestMatchers(...).hasAnyRole(...)` URL 级权限校验正常工作
-  - `GET /api/auth/me` 从 JWT 中解析用户信息返回正确结果
-  - `POST /api/auth/refresh` 能用 Refresh Token 换取新 token 对
+  - `GET /auth/me` 从 JWT 中解析用户信息返回正确结果
+  - `POST /auth/refresh` 能用 Refresh Token 换取新 token 对
   - 用过的 Refresh Token 不能再次使用（Rotation 防重放）
   - 用 Access Token 调用 refresh 端点应返回 401
   - SecurityConfig session 策略为 `STATELESS`，不再创建 session
@@ -52,7 +52,7 @@
 **验收标准：**
 1. `JwtAuthenticationFilter` 正确提取并验证 Bearer token
 2. RBAC 权限校验（`@PreAuthorize`, URL 规则）从 JWT authorities 中生效
-3. `POST /api/auth/refresh` 端点正常工作
+3. `POST /auth/refresh` 端点正常工作
 4. Session 不再被创建（`STATELESS`）
 5. 现有注册、修改密码功能不受影响
 
@@ -83,7 +83,7 @@
 1. React 前端完整 JWT 生命周期正常工作
 2. Vue 前端完整 JWT 生命周期正常工作
 3. 不再发送 `credentials: "include"`（不再依赖 Cookie）
-4. `GET /api/auth/me` 改为基于 JWT 而非 session
+4. `GET /auth/me` 改为基于 JWT 而非 session
 
 **Git hash:** ``
 

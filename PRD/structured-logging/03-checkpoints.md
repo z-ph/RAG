@@ -14,7 +14,7 @@
 
 **What:** 增强 `LoggingFilter`，以 JSON 格式记录 HTTP 请求（方法、URI、状态码、耗时），使用 `network` logger 写入。
 
-**Test first:** 发送 `GET /api/documents`，验证 `logs/network/{date}.log` 包含 JSON 行含 `ver:1`、`layer:"network"`、`method:"GET"`、`uri`、`status`、`elapsedMs` 字段。
+**Test first:** 发送 `GET /documents`，验证 `logs/network/{date}.log` 包含 JSON 行含 `ver:1`、`layer:"network"`、`method:"GET"`、`uri`、`status`、`elapsedMs` 字段。
 **Acceptance:** 健康检查路径不产生日志；请求体/响应体摘要不超过 500 字符；JSON 格式合法可解析。
 **Hash:** `ce36612`
 

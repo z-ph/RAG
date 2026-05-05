@@ -11,7 +11,8 @@ import {
   LockOutlined,
   MenuFoldOutlined,
   MenuUnfoldOutlined,
-  CommentOutlined
+  CommentOutlined,
+  FileSearchOutlined
 } from "@ant-design/icons";
 import { Outlet, useLocation, useNavigate, Link } from "react-router-dom";
 import type { AuthStatusResponse } from "../../types";
@@ -36,6 +37,7 @@ export function AdminLayout({ authStatus, onLogout }: AdminLayoutProps) {
     { key: "/admin/permissions", icon: <KeyOutlined />, label: "权限管理" },
     { key: "/admin/registration-codes", icon: <FileTextOutlined />, label: "注册码管理" },
     { key: "/admin/prompts", icon: <SettingOutlined />, label: "提示词管理" },
+    { key: "/admin/logs", icon: <FileSearchOutlined />, label: "日志管理" },
   ];
 
   const selectedKey = menuItems.find(item => location.pathname === item.key)?.key

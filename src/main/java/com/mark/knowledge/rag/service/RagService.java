@@ -4,6 +4,7 @@ import com.mark.knowledge.rag.dto.RagRequest;
 import com.mark.knowledge.rag.dto.RagResponse;
 import com.mark.knowledge.rag.dto.SourceReference;
 import com.mark.knowledge.rag.store.QdrantEmbeddingStoreFactory;
+import com.mark.knowledge.config.structuredlogging.PipelineLogger;
 import dev.langchain4j.data.message.AiMessage;
 import dev.langchain4j.data.message.ChatMessage;
 import dev.langchain4j.data.message.Content;
@@ -126,7 +127,9 @@ public class RagService {
             }
 
             List<ChatMessage> history = conversationMemoryService.getMessages(conversationId);
+            long rewriteStart = System.nanoTime();
             String rewrittenQuestion = rewriteQuestion(request.question(), history);
+            PipelineLogger.logStep(conversationId, "question_rewrite", request.question(), rewrittenQuestion, elapsedMillis(rewriteStart));
             int requestedMaxResults = resolveRequestedMaxResults(request);
 
             long questionEmbeddingStart = System.nanoTime();
@@ -141,8 +144,10 @@ public class RagService {
 
             log.info("问题向量维度: {}", questionEmbedding.dimension());
 
+            long searchStart = System.nanoTime();
             EmbeddingSearchResult<TextSegment> searchResult = searchEmbeddingStore(searchRequest);
             List<EmbeddingMatch<TextSegment>> vectorMatches = searchResult.matches();
+            PipelineLogger.logStep(conversationId, "vector_search", "dim=" + questionEmbedding.dimension(), "matches=" + vectorMatches.size(), elapsedMillis(searchStart));
 
             log.info("向量检索召回 {} 条候选片段，最小分数阈值: {}", vectorMatches.size(), minScore);
 
@@ -159,9 +164,11 @@ public class RagService {
 
             long rerankStart = System.nanoTime();
             List<HybridMatch> matches = rerankMatches(rewrittenQuestion, vectorMatches, requestedMaxResults);
+            PipelineLogger.logStep(conversationId, "bm25_rerank", "candidates=" + vectorMatches.size(), "retained=" + matches.size(), elapsedMillis(rerankStart));
             log.info("BM25 重排耗时: {} ms，最终保留 {} 条片段", elapsedMillis(rerankStart), matches.size());
 
             matches = enrichWithCrossDocumentResults(request, matches, requestedMaxResults);
+            PipelineLogger.logStep(conversationId, "cross_document", "initialMatches=" + matches.size(), "finalMatches=" + matches.size(), 0);
 
             String newContext = buildNewContext(conversationId, matches);
             extractAndRecordChunkHashes(conversationId, matches);
@@ -169,6 +176,7 @@ public class RagService {
             List<ChatMessage> toSend = buildMessagesToSend(history, newContext, request.question());
             long answerStart = System.nanoTime();
             GeneratedAnswer generatedAnswer = generateAnswer(toSend);
+            PipelineLogger.logStep(conversationId, "model_generate", "msgCount=" + toSend.size(), "answerLen=" + (generatedAnswer.answer() != null ? generatedAnswer.answer().length() : 0), elapsedMillis(answerStart));
             log.info("AI 基于知识库生成答案耗时: {} ms", elapsedMillis(answerStart));
 
             if (!newContext.isEmpty()) {
@@ -248,6 +256,7 @@ public class RagService {
 
             long rewriteStart = System.nanoTime();
             String rewrittenQuestion = rewriteQuestion(request.question(), history);
+            PipelineLogger.logStep(conversationId, "question_rewrite", request.question(), rewrittenQuestion, elapsedMillis(rewriteStart));
             log.info("[TTFT-DETAIL] 改写问题: conversationId={}, stepMs={}, originalLen={}, rewrittenLen={}, totalMs={}",
                 conversationId, elapsedMillis(rewriteStart),
                 request.question().length(), rewrittenQuestion.length(), elapsedMillis(pipelineStart));
@@ -273,16 +282,19 @@ public class RagService {
 
             EmbeddingSearchResult<TextSegment> searchResult = searchEmbeddingStore(searchRequest);
             List<EmbeddingMatch<TextSegment>> vectorMatches = searchResult.matches();
+            PipelineLogger.logStep(conversationId, "vector_search", "dim=" + questionEmbedding.dimension(), "matches=" + vectorMatches.size(), elapsedMillis(searchStart));
             log.info("[TTFT-DETAIL] 向量检索: conversationId={}, stepMs={}, matches={}, totalMs={}",
                 conversationId, elapsedMillis(searchStart), vectorMatches.size(), elapsedMillis(pipelineStart));
 
             long rerankStart = System.nanoTime();
             List<HybridMatch> matches = rerankMatches(rewrittenQuestion, vectorMatches, requestedMaxResults);
+            PipelineLogger.logStep(conversationId, "bm25_rerank", "candidates=" + vectorMatches.size(), "retained=" + matches.size(), elapsedMillis(rerankStart));
             log.info("[TTFT-DETAIL] BM25重排: conversationId={}, stepMs={}, retained={}, totalMs={}",
                 conversationId, elapsedMillis(rerankStart), matches.size(), elapsedMillis(pipelineStart));
 
             long crossStart = System.nanoTime();
             matches = enrichWithCrossDocumentResults(request, matches, requestedMaxResults);
+            PipelineLogger.logStep(conversationId, "cross_document", "initialMatches=" + matches.size(), "finalMatches=" + matches.size(), elapsedMillis(crossStart));
             log.info("[TTFT-DETAIL] 跨文档检索: conversationId={}, stepMs={}, total={}, totalMs={}",
                 conversationId, elapsedMillis(crossStart), matches.size(), elapsedMillis(pipelineStart));
 
@@ -306,6 +318,7 @@ public class RagService {
             }
 
             List<ChatMessage> toSend = buildMessagesToSend(history, newContext, request.question());
+            PipelineLogger.logStep(conversationId, "model_generate", "msgCount=" + toSend.size() + ", contextChunks=" + matches.size(), "streaming", elapsedMillis(pipelineStart));
             log.info("[TTFT-DETAIL] 调用模型: conversationId={}, messageCount={}, contextChunks={}, pipelineMs={}",
                 conversationId, toSend.size(), matches.size(), elapsedMillis(pipelineStart));
             streamingChatModel.chat(toSend, new RagStreamingResponseHandler(generation, conversationId, pipelineStart, newContext));

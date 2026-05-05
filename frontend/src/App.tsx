@@ -13,6 +13,7 @@ import { PermissionManagement } from "./components/admin/PermissionManagement";
 import { RegistrationCodeManagement } from "./components/admin/RegistrationCodeManagement";
 import { PromptManagement } from "./components/admin/PromptManagement";
 import { ChangePassword } from "./components/ChangePassword";
+import { LogViewer } from "./components/admin/LogViewer";
 import { CopyOutlined, DownloadOutlined, LinkOutlined } from "@ant-design/icons";
 import { useAuthSession } from "./hooks/useAuthSession";
 import { useDocumentLibrary } from "./hooks/useDocumentLibrary";
@@ -256,6 +257,7 @@ function App() {
           <Route path="/admin/permissions" element={<PermissionManagement />} />
           <Route path="/admin/registration-codes" element={<RegistrationCodeManagement />} />
           <Route path="/admin/prompts" element={<PromptManagement />} />
+          <Route path="/admin/logs" element={<LogViewer />} />
           <Route path="/admin/change-password" element={<ChangePassword />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />

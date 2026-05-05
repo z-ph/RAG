@@ -1,0 +1,174 @@
+#!/usr/bin/env bash
+# Smoke test for structured-logging PRD
+# Usage: ./scripts/smoke-test [checkpoint-N|all]
+
+set -euo pipefail
+
+BASE_URL="${API_BASE_URL:-http://localhost:8080/api}"
+LOG_DIR="${LOG_DIR:-./logs}"
+TODAY=$(date +%Y-%m-%d)
+PASS=0
+FAIL=0
+
+pass() { echo "  PASS: $1"; ((PASS++)); }
+fail() { echo "  FAIL: $1"; ((FAIL++)); }
+
+check_file_exists() {
+  if [ -f "$1" ]; then pass "$1 exists"; else fail "$1 missing"; fi
+}
+
+check_json_log() {
+  local file="$1" layer="$2"
+  if [ ! -f "$file" ]; then fail "$file missing"; return; fi
+  if grep -q "\"layer\":\"$layer\"" "$file" 2>/dev/null; then
+    pass "$file contains layer=$layer"
+  else
+    fail "$file missing layer=$layer entries"
+  fi
+  if grep -q '"ver":1' "$file" 2>/dev/null; then
+    pass "$file has ver field"
+  else
+    fail "$file missing ver field"
+  fi
+}
+
+# --- Checkpoint 1: Logback directory structure ---
+test_checkpoint_1() {
+  echo "=== Checkpoint 1: Logback directory structure ==="
+  for layer in network database model-session app; do
+    check_file_exists "$LOG_DIR/$layer/$TODAY.log"
+  done
+  echo ""
+}
+
+# --- Checkpoint 2: Network layer JSON logs ---
+test_checkpoint_2() {
+  echo "=== Checkpoint 2: Network layer JSON logs ==="
+  # Trigger an HTTP request
+  HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "$BASE_URL/documents" 2>/dev/null || echo "000")
+  echo "  GET /documents → HTTP $HTTP_CODE"
+
+  check_json_log "$LOG_DIR/network/$TODAY.log" "network"
+
+  # Health check should NOT appear in logs
+  if [ -f "$LOG_DIR/network/$TODAY.log" ]; then
+    if grep -q "/api/rag/health" "$LOG_DIR/network/$TODAY.log" 2>/dev/null; then
+      fail "health check path should be excluded"
+    else
+      pass "health check path excluded"
+    fi
+  fi
+  echo ""
+}
+
+# --- Checkpoint 3: Database layer AOP ---
+test_checkpoint_3() {
+  echo "=== Checkpoint 3: Database layer AOP ==="
+  # Trigger a repository call via documents API
+  curl -s -o /dev/null "$BASE_URL/documents" 2>/dev/null || true
+
+  if [ -f "$LOG_DIR/database/$TODAY.log" ]; then
+    check_json_log "$LOG_DIR/database/$TODAY.log" "database"
+    if grep -q '"method"' "$LOG_DIR/database/$TODAY.log" 2>/dev/null; then
+      pass "database log contains method field"
+    else
+      fail "database log missing method field"
+    fi
+  else
+    fail "$LOG_DIR/database/$TODAY.log missing"
+  fi
+  echo ""
+}
+
+# --- Checkpoint 4: Model session layer ---
+test_checkpoint_4() {
+  echo "=== Checkpoint 4: Model session layer ==="
+  if [ -f "$LOG_DIR/model-session/$TODAY.log" ]; then
+    check_json_log "$LOG_DIR/model-session/$TODAY.log" "model-session"
+    for step in question_rewrite vector_search bm25_rerank model_generate; do
+      if grep -q "\"step\":\"$step\"" "$LOG_DIR/model-session/$TODAY.log" 2>/dev/null; then
+        pass "found step=$step"
+      else
+        fail "missing step=$step"
+      fi
+    done
+  else
+    fail "$LOG_DIR/model-session/$TODAY.log missing (send a RAG query first)"
+  fi
+  echo ""
+}
+
+# --- Checkpoint 5: Log query API ---
+test_checkpoint_5() {
+  echo "=== Checkpoint 5: Log query API ==="
+  # Test unauthenticated access → 401 or 403
+  UNAUTH_CODE=$(curl -s -o /dev/null -w "%{http_code}" "$BASE_URL/admin/logs" 2>/dev/null || echo "000")
+  if [ "$UNAUTH_CODE" = "401" ] || [ "$UNAUTH_CODE" = "403" ]; then
+    pass "unauthenticated access rejected ($UNAUTH_CODE)"
+  else
+    fail "unauthenticated access not rejected (HTTP $UNAUTH_CODE)"
+  fi
+
+  # Test authenticated access (requires admin JWT token)
+  if [ -n "${ADMIN_TOKEN:-}" ]; then
+    RESP=$(curl -s -H "Authorization: Bearer $ADMIN_TOKEN" "$BASE_URL/admin/logs?layer=network&date=$TODAY&page=1&size=10" 2>/dev/null || echo "")
+    if echo "$RESP" | grep -q '"items"' 2>/dev/null; then
+      pass "API returns paginated response with items"
+    else
+      fail "API response missing items field"
+    fi
+    if echo "$RESP" | grep -q '"total"' 2>/dev/null; then
+      pass "API returns total count"
+    else
+      fail "API response missing total field"
+    fi
+  else
+    fail "ADMIN_TOKEN not set, skipping authenticated API tests"
+  fi
+  echo ""
+}
+
+# --- Checkpoint 6: Frontend (manual) ---
+test_checkpoint_6() {
+  echo "=== Checkpoint 6: Frontend (manual verification required) ==="
+  echo "  Open admin panel → Logs page and verify:"
+  echo "  - Sidebar shows '日志管理' menu item"
+  echo "  - Log list displays with layer/level/timestamp columns"
+  echo "  - Layer/level/date filters work"
+  echo "  - Pagination works"
+  echo ""
+}
+
+# --- Main ---
+CASE="${1:-all}"
+
+echo "Structured Logging Smoke Test"
+echo "Log dir: $LOG_DIR, Date: $TODAY, Target: $CASE"
+echo ""
+
+case "$CASE" in
+  checkpoint-1) test_checkpoint_1 ;;
+  checkpoint-2) test_checkpoint_2 ;;
+  checkpoint-3) test_checkpoint_3 ;;
+  checkpoint-4) test_checkpoint_4 ;;
+  checkpoint-5) test_checkpoint_5 ;;
+  checkpoint-6) test_checkpoint_6 ;;
+  all)
+    test_checkpoint_1
+    test_checkpoint_2
+    test_checkpoint_3
+    test_checkpoint_4
+    test_checkpoint_5
+    test_checkpoint_6
+    ;;
+  *)
+    echo "Usage: $0 [checkpoint-1|checkpoint-2|...|all]"
+    exit 1
+    ;;
+esac
+
+echo "=============================="
+echo "Results: $PASS passed, $FAIL failed"
+if [ "$FAIL" -gt 0 ]; then
+  exit 1
+fi

@@ -31,7 +31,7 @@ export default defineConfig(({ mode }) => {
       port: 5174,
       proxy: {
         [process.env.VITE_API_BASE_URL || "/api"]: {
-          target: process.env.VITE_PROXY_TARGET || "http://localhost:8080",
+          target: process.env.VITE_BACKEND_URL || "http://localhost:8080",
           changeOrigin: true,
           rewrite: (path) => path.replace(new RegExp(`^${process.env.VITE_API_BASE_URL || "/api"}`), ""),
           configure: (proxy) => {

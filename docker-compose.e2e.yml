@@ -124,8 +124,7 @@ services:
     working_dir: /app
     command: sh -c "corepack enable && pnpm install && pnpm build && pnpm preview --host --port 5174"
     environment:
-      VITE_API_BASE_URL: /api
-      VITE_PROXY_TARGET: http://backend-e2e:8080
+      VITE_BACKEND_URL: http://backend-e2e:8080
     volumes:
       - ./frontend:/app
       - frontend-e2e-node-modules:/app/node_modules

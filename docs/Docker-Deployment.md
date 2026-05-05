@@ -106,10 +106,10 @@ docker run -d \
 前端构建前请确保环境变量指向正确的后端地址。生产环境需要在 `frontend/.env.production` 中配置：
 
 ```dotenv
-VITE_API_BASE_URL=http://your-backend-domain:8081/api
+VITE_BACKEND_URL=http://your-backend-domain:8081
 ```
 
-本地开发时继续使用 `frontend/.env`（默认代理到 `http://localhost:8080`）。
+如需通过反向代理前缀访问后端，例如 `/rag-back`，这里填写 `/rag-back` 或完整根地址 `http://your-backend-domain:8081/rag-back`，不要手动包含 `/api`，前端会自动追加。本地开发时继续使用 `frontend/.env`（默认代理到 `http://localhost:8080`）。
 
 ## 常用环境变量
 

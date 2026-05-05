@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { API_BASE_URL, ApiError, deleteDocument, getDocumentDownloadLink, getPublicDocumentDetail, listDocuments, listPublicDocuments, uploadDocumentStream } from "../lib/api";
+import { ApiError, deleteDocument, getDocumentDownloadLink, getPublicDocumentDetail, listDocuments, listPublicDocuments, uploadDocumentStream } from "../lib/api";
 import type { DocumentListItem, FileUploadEntry, PublicDocumentDetailResponse } from "../types";
 
 interface MessageApi {
@@ -186,10 +186,7 @@ export function useDocumentLibrary(
   async function handleShowDownloadLink(documentId: string, filename: string) {
     try {
       const response = await getDocumentDownloadLink(documentId);
-      // 拼接完整 URL（当前 host + 后端返回的路径）
-      const downloadUrl = response.downloadUrl.startsWith("http")
-        ? response.downloadUrl
-        : `${window.location.origin}${response.downloadUrl}`;
+      const downloadUrl = import.meta.env.VITE_BACKEND_URL + response.downloadUrl;
       setDownloadLinkInfo({ documentId, filename, downloadUrl });
     } catch (error) {
       messageApi.error(error instanceof Error ? error.message : "获取下载链接失败");

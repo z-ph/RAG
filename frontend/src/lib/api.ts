@@ -21,7 +21,7 @@ import type {
 import { consumeSseStream } from "./sse";
 import { clearTokens, getAccessToken, getRefreshToken, setTokens } from "./tokenStorage";
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "/api";
+const API_BASE_URL = import.meta.env.VITE_BACKEND_URL
 
 export { API_BASE_URL };
 

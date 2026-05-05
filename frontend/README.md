@@ -37,14 +37,18 @@ pnpm build
 
 | 变量名 | 说明 | 默认值 |
 |--------|------|--------|
-| `VITE_API_BASE_URL` | 后端 API 基础路径 | `/api` |
-| `VITE_PROXY_TARGET` | Vite 开发代理目标地址 | `http://localhost:8080` |
+| `VITE_BACKEND_URL` | 后端根地址，可带反向代理前缀，但不要包含 `/api` | 空，表示同源 |
+| `VITE_PROXY_TARGET` | Vite 开发代理目标根地址，仅本地开发需要，不要包含 `/api` | `http://localhost:8080` |
 
 生产部署前，请在 `frontend/.env.production` 中设置实际的后端地址：
 
 ```dotenv
-VITE_API_BASE_URL=http://your-backend-domain:8081/api
+VITE_BACKEND_URL=http://your-backend-domain:8081
 ```
+
+如果后端通过反向代理挂在子路径，例如 `/rag-back`，这里填写 `/rag-back` 或完整根地址 `http://your-backend-domain:8081/rag-back`，前端会自动拼接 `/api`。旧的 `VITE_API_BASE_URL` 仍兼容，但同样不建议再把 `/api` 写进环境变量。
+
+本地开发如果 `VITE_BACKEND_URL` 使用相对路径（例如 `/rag-back`），同时设置 `VITE_PROXY_TARGET=http://localhost:8080/rag-back`，Vite 会把 `/rag-back/api` 代理到对应后端。
 
 ## 功能
 

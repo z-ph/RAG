@@ -27,7 +27,7 @@ pnpm dev
 |--------|------|--------|
 | `VITE_BASE_ROUTE` | 前端基础路径 | `/rag` |
 | `VITE_API_BASE_URL` | 后端 API 基础路径 | `/rag-back/api` |
-| `VITE_PROXY_TARGET` | Vite 开发代理目标地址 | `http://localhost:8080/rag-back/api` |
+| `VITE_BACKEND_URL` | Vite 开发代理目标地址 | `http://localhost:8080/rag-back/api` |
 
 ## 功能
 

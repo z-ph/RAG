@@ -52,8 +52,8 @@ function Start-Services {
     while ($true) {
         $attempts++
         try {
-            $rag = Invoke-RestMethod -Uri "$env:PLAYWRIGHT_API_URL/api/rag/health" -Method GET -ErrorAction Stop
-            $doc = Invoke-RestMethod -Uri "$env:PLAYWRIGHT_API_URL/api/documents/health" -Method GET -ErrorAction Stop
+            $rag = Invoke-RestMethod -Uri "$env:PLAYWRIGHT_API_URL/rag/health" -Method GET -ErrorAction Stop
+            $doc = Invoke-RestMethod -Uri "$env:PLAYWRIGHT_API_URL/documents/health" -Method GET -ErrorAction Stop
             Write-Host "==> Backend is ready!"
             break
         } catch {

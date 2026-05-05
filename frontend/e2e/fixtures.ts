@@ -23,7 +23,7 @@ async function createAuthenticatedPage(
   const page = await context.newPage();
 
   // 通过 Playwright 的 request API 登录，cookie 会自动保存到 browser context
-  const response = await page.request.post("/api/auth/login", {
+  const response = await page.request.post("/auth/login", {
     data: { username, password },
   });
   if (!response.ok()) {

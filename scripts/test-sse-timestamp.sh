@@ -5,7 +5,7 @@
 # 输出每个 SSE 事件的精确时间戳，用于诊断事件是否成块返回。
 # 如果大量事件聚集在同一毫秒，说明存在缓冲问题。
 
-BASE_URL="${SSE_BASE_URL:-http://localhost:8080/api/rag/ask/stream}"
+BASE_URL="${SSE_BASE_URL:-http://localhost:8080/rag/ask/stream}"
 QUESTION="${1:-introduce Spring Boot in Chinese}"
 SESSION_ID="${2:-JSESSIONID=123123123}"
 MAX_RESULTS="${SSE_MAX_RESULTS:-3}"

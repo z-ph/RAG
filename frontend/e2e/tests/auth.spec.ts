@@ -10,7 +10,7 @@ const ADMIN_USER = process.env.PLAYWRIGHT_ADMIN_USER || "admin";
 const ADMIN_PASSWORD = process.env.PLAYWRIGHT_ADMIN_PASSWORD || "ChangeMe123!";
 
 async function verifyAuthStatus(page: import("@playwright/test").Page, expectedAuthenticated: boolean, expectedUsername?: string) {
-  const response = await page.request.get("/api/auth/me");
+  const response = await page.request.get("/auth/me");
   const status = await response.json();
   expect(status.authenticated).toBe(expectedAuthenticated);
   if (expectedUsername) {

@@ -1,14 +1,14 @@
 # SSE 流式响应时间戳测试脚本 (PowerShell)
 # 用法: .\test-sse-timestamp.ps1 [-BaseUrl <url>] [-Question <question>] [-MaxResults <n>] [-Timeout <seconds>]
 # 示例:
-#   .\test-sse-timestamp.ps1 -BaseUrl "http://localhost:8081/api/rag/ask/stream" -Question "hi"
-#   .\test-sse-timestamp.ps1 -BaseUrl "http://localhost:8080/api/rag/ask/stream" -Question "hi"
+#   .\test-sse-timestamp.ps1 -BaseUrl "http://localhost:8081/rag/ask/stream" -Question "hi"
+#   .\test-sse-timestamp.ps1 -BaseUrl "http://localhost:8080/rag/ask/stream" -Question "hi"
 #
 # 输出每个 SSE 事件的精确时间戳，用于诊断事件是否成块返回。
 # 如果大量事件聚集在同一毫秒，说明存在缓冲问题。
 
 param(
-    [string]$BaseUrl = "http://localhost:8081/api/rag/ask/stream",
+    [string]$BaseUrl = "http://localhost:8081/rag/ask/stream",
     [string]$Question = "你好，请介绍一下 Spring Boot",
     [int]$MaxResults = 3,
     [int]$Timeout = 60

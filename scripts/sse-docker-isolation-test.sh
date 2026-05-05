@@ -189,7 +189,7 @@ echo ""
 EXP_B_FILE="/tmp/sse-expB-tomcat-internal.txt"
 
 docker exec "$CONTAINER_NAME" sh -c "
-  curl -sS -N http://localhost:$CONTAINER_PORT/api/rag/ask/stream \\
+  curl -sS -N http://localhost:$CONTAINER_PORT/rag/ask/stream \\
     -H 'Accept: text/event-stream' \\
     -H 'Content-Type: application/json' \\
     -H 'Cache-Control: no-cache' \\
@@ -216,7 +216,7 @@ echo "  目的: 验证 Java 发出的 SSE 经过 Docker NAT 映射后是否被 c
 echo ""
 
 EXP_C_FILE="/tmp/sse-expC-docker-outbound.txt"
-run_sse_curl "http://$HOST:$DOCKER_PORT/api/rag/ask/stream" "Docker outbound" "$EXP_C_FILE" \
+run_sse_curl "http://$HOST:$DOCKER_PORT/rag/ask/stream" "Docker outbound" "$EXP_C_FILE" \
   -b "$SESSION_ID" \
   --data-raw "{\"question\":\"$QUESTION\",\"conversationId\":\"$CONV_ID-c\",\"maxResults\":$MAX_RESULTS}"
 
@@ -231,7 +231,7 @@ echo "  链路: 宿主机 curl → Nginx → localhost:$DOCKER_PORT → 容器"
 echo ""
 
 EXP_D_FILE="/tmp/sse-expD-nginx.txt"
-run_sse_curl "$NGINX_URL/api/rag/ask/stream" "Nginx 链路" "$EXP_D_FILE" \
+run_sse_curl "$NGINX_URL/rag/ask/stream" "Nginx 链路" "$EXP_D_FILE" \
   -b "$SESSION_ID" \
   --data-raw "{\"question\":\"$QUESTION\",\"conversationId\":\"$CONV_ID-d\",\"maxResults\":$MAX_RESULTS}"
 
@@ -335,7 +335,7 @@ echo "  步骤 1: 在宿主机启动 Spring Boot"
 echo "    ./mvnw spring-boot:run"
 echo ""
 echo "  步骤 2: 从外部网络直接 curl 宿主机 :8080"
-echo "    curl http://<宿主机IP>:8080/api/rag/ask/stream ..."
+echo "    curl http://<宿主机IP>:8080/rag/ask/stream ..."
 echo ""
 echo "  判定："
 echo "    ✅ 如果宿主机直接运行正常 → 根因 100% 在 Docker（inbound/outbound）"

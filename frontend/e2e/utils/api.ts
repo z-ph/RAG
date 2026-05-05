@@ -39,7 +39,7 @@ async function apiRequest<T>(
   path: string,
   init?: RequestInit
 ): Promise<T> {
-  const response = await fetch(`${apiURL}/api${path}`, {
+  const response = await fetch(`${apiURL}${path}`, {
     ...init,
     headers: {
       "Content-Type": "application/json",
@@ -138,7 +138,7 @@ export async function uploadDocument(
   const blob = new Blob([file]);
   formData.append("file", blob, filename);
 
-  const response = await fetch(`${apiURL}/api/documents/upload`, {
+  const response = await fetch(`${apiURL}/documents/upload`, {
     method: "POST",
     headers: authHeaders(),
     body: formData,
@@ -153,14 +153,14 @@ export async function uploadDocument(
 }
 
 export async function getRagHealth(): Promise<string> {
-  const response = await fetch(`${apiURL}/api/rag/health`, {
+  const response = await fetch(`${apiURL}/rag/health`, {
     method: "GET",
   });
   return response.text();
 }
 
 export async function getDocumentHealth(): Promise<string> {
-  const response = await fetch(`${apiURL}/api/documents/health`, {
+  const response = await fetch(`${apiURL}/documents/health`, {
     method: "GET",
   });
   return response.text();

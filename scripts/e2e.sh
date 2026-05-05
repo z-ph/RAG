@@ -44,8 +44,8 @@ start_services() {
   local attempts=0
   while true; do
     attempts=$((attempts + 1))
-    if curl -sf "${PLAYWRIGHT_API_URL}/api/rag/health" >/dev/null 2>&1 && \
-       curl -sf "${PLAYWRIGHT_API_URL}/api/documents/health" >/dev/null 2>&1; then
+    if curl -sf "${PLAYWRIGHT_API_URL}/rag/health" >/dev/null 2>&1 && \
+       curl -sf "${PLAYWRIGHT_API_URL}/documents/health" >/dev/null 2>&1; then
       echo "==> Backend is ready!"
       break
     fi

@@ -6,6 +6,6 @@ echo "=== 宿主机测试 Spring Boot SSE (localhost:8081) ==="
 } | curl -N -s -w "\n---TIMING---\nTTFB: %{time_starttransfer}s | Total: %{time_total}s\n" \
   -H "Content-Type: application/json" \
   -d @- \
-  http://localhost:8081/api/rag/ask/stream | while IFS= read -r line; do
+  http://localhost:8081/rag/ask/stream | while IFS= read -r line; do
   printf '%s %s\n' "$(date +%H:%M:%S.%3N)" "$line"
 done

@@ -14,6 +14,7 @@ import {
   StopOutlined
 } from "@ant-design/icons";
 import {
+  Alert,
   Button,
   Empty,
   Modal,
@@ -95,34 +96,43 @@ export function DocumentSidebar(props: DocumentSidebarProps) {
       </div>
 
       {props.authenticated && (
-        <div className="mt-4 flex flex-wrap items-center gap-2">
-          <Upload {...uploadProps}>
+        <div className="mt-4 space-y-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <Upload {...uploadProps}>
+              <Button
+                type="primary"
+                icon={props.uploading ? <LoadingOutlined /> : <CloudUploadOutlined />}
+                loading={props.uploading}
+                disabled={props.uploading}
+              >
+                {props.uploading ? batchLabel : "上传文档"}
+              </Button>
+            </Upload>
+            <Upload {...folderUploadProps}>
+              <Button
+                icon={props.uploading ? <LoadingOutlined /> : <FolderOpenOutlined />}
+                loading={props.uploading}
+                disabled={props.uploading}
+              >
+                {props.uploading ? batchLabel : "上传文件夹"}
+              </Button>
+            </Upload>
             <Button
-              type="primary"
-              icon={props.uploading ? <LoadingOutlined /> : <CloudUploadOutlined />}
-              loading={props.uploading}
+              icon={<ReloadOutlined />}
+              onClick={() => void props.onRefreshDocuments()}
+              loading={props.documentsLoading}
               disabled={props.uploading}
             >
-              {props.uploading ? batchLabel : "上传文档"}
+              刷新
             </Button>
-          </Upload>
-          <Upload {...folderUploadProps}>
-            <Button
-              icon={props.uploading ? <LoadingOutlined /> : <FolderOpenOutlined />}
-              loading={props.uploading}
-              disabled={props.uploading}
-            >
-              {props.uploading ? batchLabel : "上传文件夹"}
-            </Button>
-          </Upload>
-          <Button
-            icon={<ReloadOutlined />}
-            onClick={() => void props.onRefreshDocuments()}
-            loading={props.documentsLoading}
-            disabled={props.uploading}
-          >
-            刷新
-          </Button>
+          </div>
+          <Alert
+            type="warning"
+            showIcon
+            className="!border-amber-200 !bg-amber-50"
+            message="Word 文档建议优先上传 DOCX"
+            description="如果是 DOC 文件，建议先转换为 DOCX 后再上传，以获得更好的兼容性和检索效果。"
+          />
         </div>
       )}
 

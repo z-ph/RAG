@@ -1,6 +1,7 @@
 package com.mark.knowledge.rag.service;
 
 import com.mark.knowledge.rag.dto.DocumentProgressEvent;
+import com.mark.knowledge.rag.service.parsers.DocParser;
 import com.mark.knowledge.rag.service.parsers.DocxParseResult;
 import com.mark.knowledge.rag.service.parsers.DocxParser;
 import com.mark.knowledge.rag.service.parsers.ImageReference;
@@ -146,6 +147,9 @@ public class DocumentService {
                     log.info("DOCX 提取并保存 {} 张图片", docImages.size());
                 }
                 log.info("DOCX解析成功 ({} 字符)", rawContent.length());
+            } else if (lowerFilename.endsWith(".doc")) {
+                rawContent = DocParser.parse(inputStream);
+                log.info("DOC解析成功 ({} 字符)", rawContent.length());
             } else {
                 rawContent = parseText(inputStream);
                 log.info("文本解析成功 ({} 字符)", rawContent.length());

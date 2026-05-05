@@ -42,19 +42,11 @@ interface DocumentSidebarProps {
   onShowDownloadLink: (documentId: string, filename: string) => void;
 }
 
-const ALLOWED_EXTENSIONS = [".pdf", ".txt", ".docx"];
-
-function isAllowedFile(filename: string): boolean {
-  const lower = filename.toLowerCase();
-  return ALLOWED_EXTENSIONS.some((ext) => lower.endsWith(ext));
-}
-
 export function DocumentSidebar(props: DocumentSidebarProps) {
   const fileQueue = useRef<File[]>([]);
   const batchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   function handleBeforeUpload(file: File) {
-    if (!isAllowedFile(file.name)) return false;
     fileQueue.current.push(file);
     if (batchTimer.current != null) clearTimeout(batchTimer.current);
     batchTimer.current = setTimeout(() => {
@@ -66,7 +58,6 @@ export function DocumentSidebar(props: DocumentSidebarProps) {
   }
 
   const uploadProps: UploadProps = {
-    accept: ".pdf,.txt,.docx",
     multiple: true,
     showUploadList: false,
     beforeUpload: handleBeforeUpload,
@@ -105,7 +96,6 @@ export function DocumentSidebar(props: DocumentSidebarProps) {
 
       {props.authenticated && (
         <div className="mt-4 flex flex-wrap items-center gap-2">
-          <p className="w-full text-xs text-ink-400">支持 PDF、TXT、DOCX 格式</p>
           <Upload {...uploadProps}>
             <Button
               type="primary"

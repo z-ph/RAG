@@ -19,9 +19,7 @@
     </div>
 
     <div v-if="authenticated" class="mt-4 flex flex-wrap items-center gap-2">
-      <p class="w-full text-xs text-ink-400">支持 PDF、TXT、DOCX 格式</p>
       <a-upload
-        accept=".pdf,.txt,.docx"
         :multiple="true"
         :show-upload-list="false"
         :before-upload="handleBeforeUpload"
@@ -236,10 +234,6 @@ const batchLabel = computed(() => {
 });
 
 const handleBeforeUpload: UploadProps["beforeUpload"] = (file) => {
-  const ALLOWED_EXTENSIONS = [".pdf", ".txt", ".docx"];
-  const lower = (file as File).name.toLowerCase();
-  if (!ALLOWED_EXTENSIONS.some((ext) => lower.endsWith(ext))) return false;
-
   fileQueue.value.push(file as File);
   if (batchTimer != null) clearTimeout(batchTimer);
   batchTimer = setTimeout(() => {

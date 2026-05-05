@@ -44,7 +44,7 @@ public class DocumentController {
 
     private static final Logger log = LoggerFactory.getLogger(DocumentController.class);
     private static final Set<String> ALLOWED_EXTENSIONS = Set.of(
-        ".pdf", ".txt", ".docx"
+        ".pdf", ".txt", ".docx", ".doc", ".md"
     );
 
     private final DocumentService documentService;
@@ -403,6 +403,8 @@ public class DocumentController {
         if (lower.endsWith(".pdf")) return MediaType.APPLICATION_PDF_VALUE;
         if (lower.endsWith(".txt")) return MediaType.TEXT_PLAIN_VALUE;
         if (lower.endsWith(".docx")) return "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+        if (lower.endsWith(".doc")) return "application/msword";
+        if (lower.endsWith(".md")) return "text/markdown";
         if (lower.endsWith(".xlsx")) return "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
         if (lower.endsWith(".pptx")) return "application/vnd.openxmlformats-officedocument.presentationml.presentation";
         if (lower.endsWith(".jpg") || lower.endsWith(".jpeg")) return MediaType.IMAGE_JPEG_VALUE;

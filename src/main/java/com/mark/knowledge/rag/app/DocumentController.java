@@ -70,7 +70,7 @@ public class DocumentController {
     /**
      * 上传并处理文档
      *
-     * @param file 文档文件（PDF 或 TXT 格式）
+     * @param file 文档文件
      * @return 处理结果
      */
     @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -91,7 +91,7 @@ public class DocumentController {
 
             if (!isAllowedExtension(filename)) {
                 return ResponseEntity.badRequest()
-                    .body(new ErrorResponse("不支持的文件类型", "支持 PDF, TXT, DOCX, XLSX, PPTX, JPG, PNG 文件"));
+                    .body(new ErrorResponse("不支持的文件类型", "支持 PDF, TXT, DOC, DOCX, XLSX, PPTX, JPG, PNG 文件"));
             }
 
             byte[] fileBytes = file.getBytes();
@@ -160,7 +160,7 @@ public class DocumentController {
                 if (!isAllowedExtension(filename)) {
                     emitter.send(SseEmitter.event()
                         .name("error")
-                        .data("{\"message\": \"支持 PDF, TXT, DOCX, XLSX, PPTX, JPG, PNG 文件\", \"error\": \"不支持的文件类型\"}"));
+                        .data("{\"message\": \"支持 PDF, TXT, DOC, DOCX, XLSX, PPTX, JPG, PNG 文件\", \"error\": \"不支持的文件类型\"}"));
                     emitter.complete();
                     return;
                 }

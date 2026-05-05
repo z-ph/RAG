@@ -263,7 +263,7 @@ paths:
                 file:
                   type: string
                   format: binary
-                  description: 仅支持 `.pdf` 和 `.txt`
+                  description: 支持 `.pdf`、`.txt`、`.doc`、`.docx`
       responses:
         '200':
           description: 文档处理成功
@@ -405,7 +405,7 @@ paths:
         - Public Documents
       summary: 下载文档原文件
       operationId: downloadPublicDocument
-      description: 下载文档原始文件（PDF 或 TXT），无需鉴权。受 IP 限流保护（10 次/分钟）。
+      description: 下载文档原始文件（如 PDF、TXT、DOC、DOCX），无需鉴权。受 IP 限流保护（10 次/分钟）。
       parameters:
         - $ref: '#/components/parameters/DocumentId'
       responses:

@@ -9,7 +9,7 @@
 
 ## 当前能力
 
-- 上传 `PDF` / `TXT` 文档并自动清洗、分块、去重
+- 上传 `PDF` / `TXT` / `DOC` / `DOCX` 文档并自动清洗、分块、去重
 - 文档上传、列表、删除接口采用登录鉴权；RAG 问答接口保持匿名可用
 - 启动时自动创建 MySQL 表，并自动初始化一个管理员账号
 - 管理员可创建一次性注册码，支持设置有效期、手动禁用和删除
@@ -268,7 +268,7 @@ pnpm build
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
-| `POST` | `/api/documents/upload` | 上传并处理 `PDF/TXT` 文档 |
+| `POST` | `/api/documents/upload` | 上传并处理 `PDF/TXT/DOC/DOCX` 文档 |
 | `GET` | `/api/documents` | 列出当前 Qdrant collection 中的文档 |
 | `DELETE` | `/api/documents/{documentId}` | 删除指定文档对应的全部向量片段 |
 | `GET` | `/api/documents/health` | 文档服务健康检查 |

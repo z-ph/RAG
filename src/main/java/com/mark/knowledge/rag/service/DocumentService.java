@@ -1,6 +1,7 @@
 package com.mark.knowledge.rag.service;
 
 import com.mark.knowledge.rag.dto.DocumentProgressEvent;
+import com.mark.knowledge.rag.service.parsers.DocParseResult;
 import com.mark.knowledge.rag.service.parsers.DocParser;
 import com.mark.knowledge.rag.service.parsers.DocxParseResult;
 import com.mark.knowledge.rag.service.parsers.DocxParser;
@@ -140,15 +141,13 @@ public class DocumentService {
                 DocxParseResult parseResult = DocxParser.parseWithImages(inputStream, documentId);
                 rawContent = parseResult.text();
                 docImages = parseResult.imageReferences();
-                if (!docImages.isEmpty()) {
-                    for (ImageReference img : docImages) {
-                        imageStorageService.saveImage(img.documentId(), img.imageId(), img.extension(), img.data());
-                    }
-                    log.info("DOCX 提取并保存 {} 张图片", docImages.size());
-                }
+                saveImages(documentId, "DOCX", docImages);
                 log.info("DOCX解析成功 ({} 字符)", rawContent.length());
             } else if (lowerFilename.endsWith(".doc")) {
-                rawContent = DocParser.parse(inputStream);
+                DocParseResult parseResult = DocParser.parseWithImages(inputStream, documentId);
+                rawContent = parseResult.text();
+                docImages = parseResult.imageReferences();
+                saveImages(documentId, "DOC", docImages);
                 log.info("DOC解析成功 ({} 字符)", rawContent.length());
             } else {
                 rawContent = parseText(inputStream);
@@ -159,9 +158,8 @@ public class DocumentService {
             log.info("  解析完成，耗时: {} ms", parseTime);
 
             if (rawContent.isBlank()) {
-                log.warn("PDF 文件可能是扫描版或图片格式，没有内嵌文本层");
-                log.warn("建议使用包含可复制文本的 PDF 文件");
-                throw new IllegalArgumentException("文档内容为空，该 PDF 可能是扫描版/图片格式，不支持 OCR 识别");
+                log.warn("文档内容为空，可能是扫描版、图片格式或解析未提取到文本");
+                throw new IllegalArgumentException("文档内容为空，可能是扫描版/图片格式，不支持 OCR 识别");
             }
 
             if (callback != null) {
@@ -978,6 +976,17 @@ public class DocumentService {
             log.error("文本文档解析失败", e);
             throw new RuntimeException("文本解析失败: " + e.getMessage(), e);
         }
+    }
+
+    private void saveImages(String documentId, String formatLabel, List<ImageReference> docImages) {
+        if (docImages.isEmpty()) {
+            return;
+        }
+
+        for (ImageReference img : docImages) {
+            imageStorageService.saveImage(img.documentId(), img.imageId(), img.extension(), img.data());
+        }
+        log.info("{} 提取并保存 {} 张图片", formatLabel, docImages.size());
     }
 
     private String decodeTextBytes(byte[] bytes) throws CharacterCodingException {

@@ -1,56 +1,134 @@
-import { useEffect, useState } from "react";
+import { useEffect, useSyncExternalStore } from "react";
 import {
-  ApiError,
   getAuthStatus,
   login,
   logout,
   register
 } from "../lib/api";
-import { clearTokens, hasToken, setTokens } from "../lib/tokenStorage";
-import type { AuthStatusResponse } from "../types";
+import {
+  ANONYMOUS_AUTH_STATUS,
+  getAuthSessionSnapshot,
+  hasInitializedAuthSession,
+  setAnonymousAuthSession,
+  setAuthLoading,
+  setAuthSessionStatus,
+  setAuthSubmitting,
+  subscribeAuthSession
+} from "../lib/authStore";
+import { refreshStoredAccessToken } from "../lib/httpClient";
+import {
+  clearTokens,
+  getAccessToken,
+  getRefreshToken,
+  hasStoredTokens,
+  setTokens
+} from "../lib/tokenStorage";
 
 interface MessageApi {
   error: (content: string) => void;
   success: (content: string) => void;
 }
 
-const ANONYMOUS_STATUS: AuthStatusResponse = {
-  authenticated: false,
-  user: null
-};
+let bootstrapPromise: Promise<void> | null = null;
 
-export function useAuthSession(messageApi: MessageApi) {
-  const [authStatus, setAuthStatus] = useState<AuthStatusResponse>(ANONYMOUS_STATUS);
-  const [authLoading, setAuthLoading] = useState(true);
-  const [authSubmitting, setAuthSubmitting] = useState(false);
+function getErrorMessage(error: unknown, fallbackMessage: string) {
+  return error instanceof Error ? error.message : fallbackMessage;
+}
 
-  useEffect(() => {
-    void refreshSession(true);
-  }, []);
+async function syncAuthStatus(messageApi: MessageApi, silent = false) {
+  if (!silent) {
+    setAuthLoading(true);
+  }
 
-  async function refreshSession(silent = false) {
-    if (!silent) {
-      setAuthLoading(true);
+  const accessToken = getAccessToken();
+  const refreshToken = getRefreshToken();
+
+  if (!accessToken && !refreshToken) {
+    setAnonymousAuthSession({
+      authLoading: false,
+      initialized: true
+    });
+    return;
+  }
+
+  try {
+    if (!accessToken && refreshToken) {
+      const refreshed = await refreshStoredAccessToken();
+
+      if (!refreshed && !getAccessToken()) {
+        setAnonymousAuthSession({
+          authLoading: false,
+          initialized: true
+        });
+
+        if (!silent) {
+          messageApi.error("登录状态检查失败");
+        }
+        return;
+      }
     }
 
-    if (!hasToken()) {
-      setAuthStatus(ANONYMOUS_STATUS);
-      setAuthLoading(false);
+    const response = await getAuthStatus();
+
+    if (response.authenticated && response.user) {
+      setAuthSessionStatus(response, {
+        authLoading: false,
+        initialized: true
+      });
       return;
     }
 
-    try {
-      const response = await getAuthStatus();
-      setAuthStatus(response);
-    } catch (error) {
-      setAuthStatus(ANONYMOUS_STATUS);
-      clearTokens();
-      if (!silent) {
-        messageApi.error(error instanceof Error ? error.message : "鉴权状态检查失败");
-      }
-    } finally {
-      setAuthLoading(false);
+    clearTokens();
+    setAnonymousAuthSession({
+      authLoading: false,
+      initialized: true
+    });
+  } catch (error) {
+    clearTokens();
+    setAnonymousAuthSession({
+      authLoading: false,
+      initialized: true
+    });
+    if (!silent) {
+      messageApi.error(getErrorMessage(error, "鉴权状态检查失败"));
     }
+  }
+}
+
+async function ensureAuthSessionInitialized(messageApi: MessageApi) {
+  if (hasInitializedAuthSession()) {
+    return;
+  }
+
+  if (!bootstrapPromise) {
+    bootstrapPromise = syncAuthStatus(messageApi, true).finally(() => {
+      bootstrapPromise = null;
+    });
+  }
+
+  await bootstrapPromise;
+}
+
+export function useAuthSession(messageApi: MessageApi) {
+  const { authStatus, authLoading, authSubmitting } = useSyncExternalStore(
+    subscribeAuthSession,
+    getAuthSessionSnapshot
+  );
+
+  useEffect(() => {
+    void ensureAuthSessionInitialized(messageApi);
+  }, [messageApi]);
+
+  async function refreshSession(silent = false) {
+    if (!hasStoredTokens()) {
+      setAnonymousAuthSession({
+        authLoading: false,
+        initialized: true
+      });
+      return;
+    }
+
+    await syncAuthStatus(messageApi, silent);
   }
 
   async function handleLogin(username: string, password: string) {
@@ -59,10 +137,14 @@ export function useAuthSession(messageApi: MessageApi) {
     try {
       const response = await login(username, password);
       setTokens(response.accessToken, response.refreshToken);
-      setAuthStatus({ authenticated: true, user: response.user });
+      setAuthSessionStatus({ authenticated: true, user: response.user }, {
+        authLoading: false,
+        authSubmitting: true,
+        initialized: true
+      });
       messageApi.success(response.message);
     } catch (error) {
-      messageApi.error(error instanceof Error ? error.message : "登录失败");
+      messageApi.error(getErrorMessage(error, "登录失败"));
     } finally {
       setAuthSubmitting(false);
     }
@@ -74,10 +156,14 @@ export function useAuthSession(messageApi: MessageApi) {
     try {
       const response = await register(username, password, registrationCodeValue);
       setTokens(response.accessToken, response.refreshToken);
-      setAuthStatus({ authenticated: true, user: response.user });
+      setAuthSessionStatus({ authenticated: true, user: response.user }, {
+        authLoading: false,
+        authSubmitting: true,
+        initialized: true
+      });
       messageApi.success(response.message);
     } catch (error) {
-      messageApi.error(error instanceof Error ? error.message : "注册失败");
+      messageApi.error(getErrorMessage(error, "注册失败"));
     } finally {
       setAuthSubmitting(false);
     }
@@ -89,12 +175,20 @@ export function useAuthSession(messageApi: MessageApi) {
     try {
       const response = await logout();
       clearTokens();
-      setAuthStatus(ANONYMOUS_STATUS);
+      setAnonymousAuthSession({
+        authLoading: false,
+        authSubmitting: true,
+        initialized: true
+      });
       messageApi.success(response.message);
     } catch (error) {
       clearTokens();
-      setAuthStatus(ANONYMOUS_STATUS);
-      messageApi.error(error instanceof Error ? error.message : "退出失败");
+      setAnonymousAuthSession({
+        authLoading: false,
+        authSubmitting: true,
+        initialized: true
+      });
+      messageApi.error(getErrorMessage(error, "退出失败"));
     } finally {
       setAuthSubmitting(false);
     }
@@ -102,7 +196,11 @@ export function useAuthSession(messageApi: MessageApi) {
 
   async function handleUnauthorized(showMessage = true) {
     clearTokens();
-    setAuthStatus(ANONYMOUS_STATUS);
+    setAuthSessionStatus(ANONYMOUS_AUTH_STATUS, {
+      authLoading: false,
+      authSubmitting: false,
+      initialized: true
+    });
     if (showMessage) {
       messageApi.error("登录状态已失效，请重新登录");
     }

@@ -9,106 +9,107 @@ import type {
   UpdateRoleRequest,
   ResetPasswordRequest
 } from "../types/admin";
-import { API_BASE_URL, ApiError } from "./api";
-import { getAccessToken } from "./tokenStorage";
-
-function authHeaders(): Record<string, string> {
-  const token = getAccessToken();
-  return token ? { Authorization: `Bearer ${token}` } : {};
-}
-
-async function adminRequest<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    ...init,
-    headers: {
-      "Content-Type": "application/json",
-      ...authHeaders(),
-      ...(init?.headers || {})
-    }
-  });
-
-  if (!response.ok) {
-    const text = await response.text();
-    let message = `请求失败: HTTP ${response.status}`;
-    try {
-      const payload = JSON.parse(text) as { message?: string; error?: string };
-      message = payload.message || payload.error || message;
-    } catch {
-      if (text) message = text;
-    }
-    throw new ApiError(message, response.status);
-  }
-
-  return response.json() as Promise<T>;
-}
+import { requestJson } from "./httpClient";
 
 // --- Users ---
 
 export function listUsers() {
-  return adminRequest<User[]>("/admin/users", { method: "GET" });
+  return requestJson<User[]>("/admin/users", {
+    method: "GET",
+    auth: "required",
+    fallbackMessage: "加载用户列表失败"
+  });
 }
 
 export function createUser(request: CreateUserRequest) {
-  return adminRequest<User>("/admin/users", {
+  return requestJson<User>("/admin/users", {
     method: "POST",
-    body: JSON.stringify(request)
+    body: JSON.stringify(request),
+    auth: "required",
+    fallbackMessage: "创建用户失败"
   });
 }
 
 export function updateUser(id: number, request: UpdateUserRequest) {
-  return adminRequest<User>(`/admin/users/${id}`, {
+  return requestJson<User>(`/admin/users/${id}`, {
     method: "PUT",
-    body: JSON.stringify(request)
+    body: JSON.stringify(request),
+    auth: "required",
+    fallbackMessage: "更新用户失败"
   });
 }
 
 export function deleteUser(id: number) {
-  return adminRequest<{ message: string }>(`/admin/users/${id}`, { method: "DELETE" });
+  return requestJson<{ message: string }>(`/admin/users/${id}`, {
+    method: "DELETE",
+    auth: "required",
+    fallbackMessage: "删除用户失败"
+  });
 }
 
 export function resetUserPassword(id: number, request: ResetPasswordRequest) {
-  return adminRequest<{ message: string }>(`/admin/users/${id}/reset-password`, {
+  return requestJson<{ message: string }>(`/admin/users/${id}/reset-password`, {
     method: "POST",
-    body: JSON.stringify(request)
+    body: JSON.stringify(request),
+    auth: "required",
+    fallbackMessage: "重置密码失败"
   });
 }
 
 // --- Roles ---
 
 export function listRoles() {
-  return adminRequest<Role[]>("/admin/roles", { method: "GET" });
+  return requestJson<Role[]>("/admin/roles", {
+    method: "GET",
+    auth: "required",
+    fallbackMessage: "加载角色列表失败"
+  });
 }
 
 export function createRole(request: CreateRoleRequest) {
-  return adminRequest<Role>("/admin/roles", {
+  return requestJson<Role>("/admin/roles", {
     method: "POST",
-    body: JSON.stringify(request)
+    body: JSON.stringify(request),
+    auth: "required",
+    fallbackMessage: "创建角色失败"
   });
 }
 
 export function updateRole(id: number, request: UpdateRoleRequest) {
-  return adminRequest<Role>(`/admin/roles/${id}`, {
+  return requestJson<Role>(`/admin/roles/${id}`, {
     method: "PUT",
-    body: JSON.stringify(request)
+    body: JSON.stringify(request),
+    auth: "required",
+    fallbackMessage: "更新角色失败"
   });
 }
 
 export function deleteRole(id: number) {
-  return adminRequest<{ message: string }>(`/admin/roles/${id}`, { method: "DELETE" });
+  return requestJson<{ message: string }>(`/admin/roles/${id}`, {
+    method: "DELETE",
+    auth: "required",
+    fallbackMessage: "删除角色失败"
+  });
 }
 
 // --- Permissions ---
 
 export function listPermissions() {
-  return adminRequest<Permission[]>("/admin/permissions", { method: "GET" });
+  return requestJson<Permission[]>("/admin/permissions", {
+    method: "GET",
+    auth: "required",
+    fallbackMessage: "加载权限列表失败"
+  });
 }
 
 // --- Change Password ---
 
 export function changePassword(request: ChangePasswordRequest) {
-  return adminRequest<{ message: string }>("/auth/change-password", {
+  return requestJson<{ message: string }>("/auth/change-password", {
     method: "POST",
-    body: JSON.stringify(request)
+    body: JSON.stringify(request),
+    auth: "required",
+    fallbackMessage: "修改密码失败"
   });
 }
 
@@ -142,5 +143,9 @@ export function queryLogs(params: {
   if (params.sort) searchParams.set("sort", params.sort);
   if (params.page) searchParams.set("page", String(params.page));
   if (params.size) searchParams.set("size", String(params.size));
-  return adminRequest<LogPage>(`/admin/logs?${searchParams.toString()}`, { method: "GET" });
+  return requestJson<LogPage>(`/admin/logs?${searchParams.toString()}`, {
+    method: "GET",
+    auth: "required",
+    fallbackMessage: "加载日志失败"
+  });
 }

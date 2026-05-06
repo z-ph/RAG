@@ -218,7 +218,7 @@ qdrant:
 
 ### 登录 / 注册
 
-- 登录成功后建立 Session Cookie
+- 登录成功后返回 access token / refresh token，前端使用 Bearer access token 访问受保护接口
 - 注册时消费一次性注册码并创建 `user_accounts` 记录
 
 ### 创建 / 禁用 / 删除注册码

@@ -29,7 +29,7 @@ frontend (React + Vite)
         |
         v
 Spring Boot API
-  |- /auth/*        <- Session 登录、注册码管理
+  |- /auth/*        <- JWT 登录、刷新与注册码管理
   |- /documents/*   <- 需要登录
   |- /rag/*         <- 匿名可访问
   |
@@ -40,7 +40,8 @@ Spring Boot API
 
 说明：
 
-- 文档模块通过 Session Cookie 鉴权，前端使用同源 `/api` 请求自动携带 Cookie
+- 认证模块采用 `accessToken + refreshToken` 双 token 方案，前端使用 `Authorization: Bearer <accessToken>` 访问受保护接口
+- 当前前端请求层会在 access token 过期后自动调用 `/auth/refresh` 静默续期，并对原请求重试一次
 - 本地开发仍推荐单独启动 `frontend/` 子项目
 - **前端不再由后端托管**，Docker / 生产环境前端需独立构建部署（见下方 Docker 部署说明）
 
@@ -255,10 +256,11 @@ pnpm build
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
-| `POST` | `/auth/login` | 登录并建立 Session |
+| `POST` | `/auth/login` | 登录并返回 access token / refresh token |
 | `POST` | `/auth/register` | 使用一次性注册码注册并自动登录 |
 | `POST` | `/auth/logout` | 退出登录 |
 | `GET` | `/auth/me` | 查看当前登录状态 |
+| `POST` | `/auth/refresh` | 使用 refresh token 刷新 access token |
 | `GET` | `/auth/registration-codes` | 管理员查看注册码列表 |
 | `POST` | `/auth/registration-codes` | 管理员创建注册码 |
 | `PATCH` | `/auth/registration-codes/{id}/disable` | 管理员禁用注册码 |

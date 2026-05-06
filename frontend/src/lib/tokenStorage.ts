@@ -1,6 +1,11 @@
 const ACCESS_TOKEN_KEY = "access_token";
 const REFRESH_TOKEN_KEY = "refresh_token";
 
+export interface StoredTokens {
+  accessToken: string | null;
+  refreshToken: string | null;
+}
+
 export function getAccessToken(): string | null {
   return localStorage.getItem(ACCESS_TOKEN_KEY);
 }
@@ -19,6 +24,18 @@ export function clearTokens() {
   localStorage.removeItem(REFRESH_TOKEN_KEY);
 }
 
+export function getStoredTokens(): StoredTokens {
+  return {
+    accessToken: getAccessToken(),
+    refreshToken: getRefreshToken()
+  };
+}
+
+export function hasStoredTokens(): boolean {
+  const { accessToken, refreshToken } = getStoredTokens();
+  return !!(accessToken || refreshToken);
+}
+
 export function hasToken(): boolean {
-  return !!getAccessToken();
+  return hasStoredTokens();
 }

@@ -20,145 +20,16 @@ import type {
   UploadCompleteEvent
 } from "../types";
 import { consumeSseStream } from "./sse";
-import { clearTokens, getAccessToken, getRefreshToken, setTokens } from "./tokenStorage";
+import {
+  API_BASE_URL,
+  ApiError,
+  ensureOkResponse,
+  requestJson,
+  requestResponse,
+  requestText
+} from "./httpClient";
 
-const API_BASE_URL = import.meta.env.VITE_BACKEND_URL
-
-export { API_BASE_URL };
-
-export class ApiError extends Error {
-  readonly status: number;
-
-  constructor(message: string, status: number) {
-    super(message);
-    this.name = "ApiError";
-    this.status = status;
-  }
-}
-
-async function parseError(response: Response, fallbackMessage: string) {
-  const text = await response.text();
-
-  if (!text) {
-    return new ApiError(fallbackMessage, response.status);
-  }
-
-  try {
-    const payload = JSON.parse(text) as { message?: string; error?: string };
-    return new ApiError(payload.message || payload.error || fallbackMessage, response.status);
-  } catch {
-    return new ApiError(text || fallbackMessage, response.status);
-  }
-}
-
-async function ensureOk(response: Response, fallbackMessage: string) {
-  if (response.ok) {
-    return;
-  }
-
-  throw await parseError(response, fallbackMessage);
-}
-
-function authHeaders(): Record<string, string> {
-  const token = getAccessToken();
-  return token ? { Authorization: `Bearer ${token}` } : {};
-}
-
-// Concurrent refresh mutex: only one refresh request in flight at a time
-let refreshPromise: Promise<boolean> | null = null;
-
-async function refreshAccessToken(): Promise<boolean> {
-  if (refreshPromise) {
-    return refreshPromise;
-  }
-
-  refreshPromise = (async () => {
-    try {
-      const refreshToken = getRefreshToken();
-      if (!refreshToken) return false;
-
-      const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ refreshToken })
-      });
-
-      if (!response.ok) {
-        clearTokens();
-        return false;
-      }
-
-      const data = await response.json() as { accessToken: string; refreshToken: string };
-      setTokens(data.accessToken, data.refreshToken);
-      return true;
-    } catch {
-      clearTokens();
-      return false;
-    } finally {
-      refreshPromise = null;
-    }
-  })();
-
-  return refreshPromise;
-}
-
-async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    ...init,
-    headers: {
-      "Content-Type": "application/json",
-      ...authHeaders(),
-      ...(init?.headers || {})
-    }
-  });
-
-  if (response.status === 401 && getRefreshToken()) {
-    const refreshed = await refreshAccessToken();
-    if (refreshed) {
-      const retryResponse = await fetch(`${API_BASE_URL}${path}`, {
-        ...init,
-        headers: {
-          "Content-Type": "application/json",
-          ...authHeaders(),
-          ...(init?.headers || {})
-        }
-      });
-      await ensureOk(retryResponse, `请求失败: HTTP ${retryResponse.status}`);
-      return retryResponse.json() as Promise<T>;
-    }
-  }
-
-  await ensureOk(response, `请求失败: HTTP ${response.status}`);
-  return response.json() as Promise<T>;
-}
-
-async function requestText(path: string, init?: RequestInit) {
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    ...init,
-    headers: {
-      ...authHeaders(),
-      ...(init?.headers || {})
-    }
-  });
-
-  if (response.status === 401 && getRefreshToken()) {
-    const refreshed = await refreshAccessToken();
-    if (refreshed) {
-      const retryResponse = await fetch(`${API_BASE_URL}${path}`, {
-        ...init,
-        headers: {
-          ...authHeaders(),
-          ...(init?.headers || {})
-        }
-      });
-      await ensureOk(retryResponse, `请求失败: HTTP ${retryResponse.status}`);
-      return retryResponse.text();
-    }
-  }
-
-  await ensureOk(response, `请求失败: HTTP ${response.status}`);
-  return response.text();
-}
+export { API_BASE_URL, ApiError };
 
 function parseJsonPayload<T>(value: string): T {
   return JSON.parse(value) as T;
@@ -166,58 +37,76 @@ function parseJsonPayload<T>(value: string): T {
 
 export function getAuthStatus() {
   return requestJson<AuthStatusResponse>("/auth/me", {
-    method: "GET"
+    method: "GET",
+    auth: "required",
+    fallbackMessage: "鉴权状态检查失败"
   });
 }
 
 export function login(username: string, password: string) {
   return requestJson<AuthSuccessResponse>("/auth/login", {
     method: "POST",
-    body: JSON.stringify({ username, password })
+    body: JSON.stringify({ username, password }),
+    auth: "none",
+    fallbackMessage: "登录失败"
   });
 }
 
 export function register(username: string, password: string, registrationCode: string) {
   return requestJson<AuthSuccessResponse>("/auth/register", {
     method: "POST",
-    body: JSON.stringify({ username, password, registrationCode })
+    body: JSON.stringify({ username, password, registrationCode }),
+    auth: "none",
+    fallbackMessage: "注册失败"
   });
 }
 
 export function logout() {
   return requestJson<MessageResponse>("/auth/logout", {
-    method: "POST"
+    method: "POST",
+    auth: "required",
+    fallbackMessage: "退出失败"
   });
 }
 
 export function listRegistrationCodes() {
   return requestJson<RegistrationCodeListResponse>("/auth/registration-codes", {
-    method: "GET"
+    method: "GET",
+    auth: "required",
+    fallbackMessage: "加载注册码失败"
   });
 }
 
 export function createRegistrationCode(request: RegistrationCodeCreateRequest) {
   return requestJson<RegistrationCode>("/auth/registration-codes", {
     method: "POST",
-    body: JSON.stringify(request)
+    body: JSON.stringify(request),
+    auth: "required",
+    fallbackMessage: "创建注册码失败"
   });
 }
 
 export function disableRegistrationCode(id: number) {
   return requestJson<RegistrationCode>(`/auth/registration-codes/${id}/disable`, {
-    method: "PATCH"
+    method: "PATCH",
+    auth: "required",
+    fallbackMessage: "禁用注册码失败"
   });
 }
 
 export function deleteRegistrationCode(id: number) {
   return requestJson<MessageResponse>(`/auth/registration-codes/${id}`, {
-    method: "DELETE"
+    method: "DELETE",
+    auth: "required",
+    fallbackMessage: "删除注册码失败"
   });
 }
 
 export function listDocuments() {
   return requestJson<DocumentListResponse>("/documents", {
-    method: "GET"
+    method: "GET",
+    auth: "required",
+    fallbackMessage: "加载文档失败"
   });
 }
 
@@ -226,37 +115,46 @@ export async function uploadDocument(file: File) {
   const baseName = file.name.replace(/^.*[/\\]/, "");
   formData.append("file", file, baseName);
 
-  const response = await fetch(`${API_BASE_URL}/documents/upload`, {
+  const response = await requestResponse("/documents/upload", {
     method: "POST",
-    headers: authHeaders(),
-    body: formData
+    body: formData,
+    auth: "required",
+    fallbackMessage: "上传失败"
   });
 
-  await ensureOk(response, "上传失败");
+  await ensureOkResponse(response, "上传失败");
   return response.json() as Promise<DocumentResponse>;
 }
 
 export function deleteDocument(documentId: string) {
   return requestJson<DocumentDeleteResponse>(`/documents/${documentId}`, {
-    method: "DELETE"
+    method: "DELETE",
+    auth: "required",
+    fallbackMessage: "删除失败"
   });
 }
 
 export function getDocumentHealth() {
   return requestText("/documents/health", {
-    method: "GET"
+    method: "GET",
+    auth: "none",
+    fallbackMessage: "文档服务不可用"
   });
 }
 
 export function listPublicDocuments() {
   return requestJson<PublicDocumentListResponse>("/documents/public", {
-    method: "GET"
+    method: "GET",
+    auth: "none",
+    fallbackMessage: "加载公开文档失败"
   });
 }
 
 export function getPublicDocumentDetail(documentId: string) {
   return requestJson<PublicDocumentDetailResponse>(`/documents/public/${documentId}`, {
-    method: "GET"
+    method: "GET",
+    auth: "none",
+    fallbackMessage: "获取文档详情失败"
   });
 }
 
@@ -271,13 +169,17 @@ export interface DownloadUrlResponse {
 
 export function getDocumentDownloadLink(documentId: string) {
   return requestJson<DownloadUrlResponse>(`/documents/public/${documentId}/download-url`, {
-    method: "GET"
+    method: "GET",
+    auth: "none",
+    fallbackMessage: "获取下载链接失败"
   });
 }
 
 export function getRagHealth() {
   return requestText("/rag/health", {
-    method: "GET"
+    method: "GET",
+    auth: "none",
+    fallbackMessage: "RAG 服务不可用"
   });
 }
 
@@ -300,28 +202,40 @@ export interface AdminSegmentListResponse {
 
 export function adminListSegments(documentId: string) {
   return requestJson<AdminSegmentListResponse>(`/admin/documents/${documentId}/segments`, {
-    method: "GET"
+    method: "GET",
+    auth: "required",
+    fallbackMessage: "加载切片失败"
   });
 }
 
 export function adminUpdateSegment(documentId: string, pointId: string, text: string) {
   return requestJson<AdminSegmentInfo>(`/admin/documents/${documentId}/segments/${pointId}`, {
     method: "PUT",
-    body: JSON.stringify({ text })
+    body: JSON.stringify({ text }),
+    auth: "required",
+    fallbackMessage: "更新切片失败"
   });
 }
 
 export function adminDeleteSegment(documentId: string, pointId: string) {
   return requestJson<{ message: string; pointId: string }>(
     `/admin/documents/${documentId}/segments/${pointId}`,
-    { method: "DELETE" }
+    {
+      method: "DELETE",
+      auth: "required",
+      fallbackMessage: "删除切片失败"
+    }
   );
 }
 
 export function adminReindexDocument(documentId: string) {
   return requestJson<{ message: string; documentId: string; deletedSegments: number; newSegments: number }>(
     `/admin/documents/${documentId}/reindex`,
-    { method: "POST" }
+    {
+      method: "POST",
+      auth: "required",
+      fallbackMessage: "重建索引失败"
+    }
   );
 }
 
@@ -337,18 +251,28 @@ export interface PromptInfo {
 }
 
 export function listPrompts() {
-  return requestJson<PromptInfo[]>("/admin/prompts", { method: "GET" });
+  return requestJson<PromptInfo[]>("/admin/prompts", {
+    method: "GET",
+    auth: "required",
+    fallbackMessage: "加载提示词失败"
+  });
 }
 
 export function updatePrompt(key: string, content: string, description?: string) {
   return requestJson<PromptInfo>(`/admin/prompts/${key}`, {
     method: "PUT",
-    body: JSON.stringify({ content, description })
+    body: JSON.stringify({ content, description }),
+    auth: "required",
+    fallbackMessage: "更新提示词失败"
   });
 }
 
 export function resetPrompt(key: string) {
-  return requestJson<PromptInfo>(`/admin/prompts/${key}/reset`, { method: "POST" });
+  return requestJson<PromptInfo>(`/admin/prompts/${key}/reset`, {
+    method: "POST",
+    auth: "required",
+    fallbackMessage: "重置提示词失败"
+  });
 }
 
 export async function askWithImage(
@@ -369,25 +293,30 @@ export async function askWithImage(
     formData.append("minScore", String(options.minScore));
   }
 
-  const response = await fetch(`${API_BASE_URL}/rag/ask/with-image`, {
+  const response = await requestResponse("/rag/ask/with-image", {
     method: "POST",
-    headers: authHeaders(),
-    body: formData
+    body: formData,
+    auth: "none",
+    fallbackMessage: "图片问答失败"
   });
 
-  await ensureOk(response, "图片问答失败");
+  await ensureOkResponse(response, "图片问答失败");
   return response.json() as Promise<ImageAskResponse>;
 }
 
 export function cancelConversation(conversationId: string) {
   return requestText(`/rag/conversations/${conversationId}/cancel`, {
-    method: "POST"
+    method: "POST",
+    auth: "none",
+    fallbackMessage: "取消请求失败"
   });
 }
 
 export function clearConversation(conversationId: string) {
   return requestText(`/rag/conversations/${conversationId}`, {
-    method: "DELETE"
+    method: "DELETE",
+    auth: "none",
+    fallbackMessage: "清空会话失败"
   });
 }
 
@@ -404,11 +333,12 @@ export async function uploadDocumentStream(
   const baseName = file.name.replace(/^.*[/\\]/, "");
   formData.append("file", file, baseName);
 
-  const response = await fetch(`${API_BASE_URL}/documents/upload/stream`, {
+  const response = await requestResponse("/documents/upload/stream", {
     method: "POST",
-    headers: authHeaders(),
     body: formData,
-    signal
+    signal,
+    auth: "required",
+    fallbackMessage: "上传失败"
   });
 
   await consumeSseStream(response, ({ event, data }) => {
@@ -459,18 +389,17 @@ export async function streamRagAnswer(
   handlers: StreamHandlers,
   signal?: AbortSignal
 ) {
-  const response = await fetch(`${API_BASE_URL}/rag/ask/stream`, {
+  const response = await requestResponse("/rag/ask/stream", {
     method: "POST",
     headers: {
-      Accept: "text/event-stream",
-      "Content-Type": "application/json",
-      ...authHeaders()
+      Accept: "text/event-stream"
     },
     body: JSON.stringify(request),
-    signal
+    signal,
+    auth: "none",
+    contentType: "json",
+    fallbackMessage: "生成失败"
   });
-
-  await ensureOk(response, "生成失败");
 
   await consumeSseStream(response, ({ event, data }) => {
     if (event === "start") {

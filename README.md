@@ -271,7 +271,16 @@ pnpm build
 | `POST` | `/documents/upload` | 上传并处理 `PDF/TXT/DOC/DOCX` 文档 |
 | `GET` | `/documents` | 列出当前 Qdrant collection 中的文档 |
 | `DELETE` | `/documents/{documentId}` | 删除指定文档对应的全部向量片段 |
+| `GET` | `/documents/images/{documentId}/{imageId}` | 公开读取文档内嵌图片 |
 | `GET` | `/documents/health` | 文档服务健康检查 |
+
+### 管理员文档维护接口
+
+以下接口要求管理员或超级管理员身份：
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| `POST` | `/admin/documents/{documentId}/reindex` | 基于原始文件重建指定文档的分块与向量 |
 
 ### RAG 接口
 

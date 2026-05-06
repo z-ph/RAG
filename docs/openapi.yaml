@@ -20,6 +20,8 @@ tags:
     description: 文档上传、列表查询、删除和健康检查
   - name: Public Documents
     description: 公开文档浏览与下载（无需鉴权）
+  - name: Admin Documents
+    description: 管理员文档维护接口
   - name: RAG
     description: 同步问答、流式问答、会话控制和健康检查
 paths:
@@ -452,6 +454,90 @@ paths:
               schema:
                 type: string
               example: 文档服务运行正常
+  /documents/images/{documentId}/{imageId}:
+    get:
+      tags:
+        - Public Documents
+      summary: 获取文档内嵌图片
+      operationId: getDocumentImage
+      description: 公开返回文档解析时抽取出的内嵌图片，无需鉴权。图片正文中推荐使用该规范路径；服务端仍兼容旧的 `/rag/documents/images/**` 前缀。
+      parameters:
+        - $ref: '#/components/parameters/DocumentId'
+        - name: imageId
+          in: path
+          required: true
+          description: 图片文件名，包含扩展名，例如 `f69ed81fbb6a40c1.png`
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 图片二进制流
+          content:
+            image/png:
+              schema:
+                type: string
+                format: binary
+            image/jpeg:
+              schema:
+                type: string
+                format: binary
+            image/gif:
+              schema:
+                type: string
+                format: binary
+            image/bmp:
+              schema:
+                type: string
+                format: binary
+        '403':
+          description: 图片路径非法
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: 图片不存在
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /admin/documents/{documentId}/reindex:
+    post:
+      tags:
+        - Admin Documents
+      summary: 重建指定文档索引
+      operationId: reindexDocument
+      description: 仅管理员可调用。服务会读取原始文件，按当前切块策略重新生成片段并覆盖旧向量；当旧片段已丢失但原始文件仍在时，也可按原 documentId 恢复。
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/DocumentId'
+      responses:
+        '200':
+          description: 重建完成
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  documentId:
+                    type: string
+                  deletedSegments:
+                    type: integer
+                  newSegments:
+                    type: integer
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          description: 原始文件不存在或文档无法恢复
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /rag/ask:
     post:
       tags:

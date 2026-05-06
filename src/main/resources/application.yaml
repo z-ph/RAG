@@ -53,7 +53,6 @@ rag:
   min-text-length: ${RAG_MIN_TEXT_LENGTH:80}
   keyword-count: ${RAG_KEYWORD_COUNT:6}
   max-results: ${RAG_MAX_RESULTS:5}
-  min-score: ${RAG_MIN_SCORE:0.5}
   memory-window: ${RAG_MEMORY_WINDOW:6}
   session-ttl-seconds: ${RAG_SESSION_TTL_SECONDS:1800}
   memory-cleanup-interval-ms: ${RAG_MEMORY_CLEANUP_INTERVAL_MS:300000}

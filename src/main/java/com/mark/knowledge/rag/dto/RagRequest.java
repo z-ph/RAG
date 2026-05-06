@@ -6,7 +6,8 @@ package com.mark.knowledge.rag.dto;
 public record RagRequest(
     String question,
     String conversationId,
-    Integer maxResults
+    Integer maxResults,
+    Double minScore
 ) {
     public RagRequest {
         if (question == null || question.isBlank()) {
@@ -15,6 +16,6 @@ public record RagRequest(
     }
 
     public static RagRequest of(String question) {
-        return new RagRequest(question, null, 5);
+        return new RagRequest(question, null, 4, 0.5);
     }
 }

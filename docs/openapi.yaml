@@ -6,7 +6,8 @@ info:
     基于当前代码实现整理的接口规范，覆盖登录鉴权、注册码管理、文档上传管理、公开文档浏览与 RAG 问答接口。
 
     说明：
-    - 文档管理接口使用 Session Cookie 鉴权，登录成功后服务端会写入 `JSESSIONID`。
+    - 受保护接口使用 Bearer access token 鉴权，客户端在 `Authorization` 头中传递 `Bearer <accessToken>`。
+    - 当前前端采用 access token + refresh token 双 token 机制，并在 access token 过期后自动调用 `/auth/refresh` 静默续期。
     - 公开文档接口（`/documents/public/**`）无需鉴权，所有限流保护。
     - RAG 问答接口保持匿名可访问。
     - `/auth/register` 只能使用管理员创建的一次性注册码注册。
@@ -52,6 +53,8 @@ paths:
                 user:
                   username: admin
                   role: ADMIN
+                accessToken: eyJhbGciOi...
+                refreshToken: eyJhbGciOi...
         '400':
           description: 参数不合法
           content:
@@ -92,8 +95,49 @@ paths:
                 user:
                   username: editor01
                   role: USER
+                accessToken: eyJhbGciOi...
+                refreshToken: eyJhbGciOi...
         '400':
           description: 用户名冲突、注册码无效、已使用、已禁用或已过期
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /auth/refresh:
+    post:
+      tags:
+        - Auth
+      summary: 刷新访问令牌
+      operationId: refreshToken
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - refreshToken
+              properties:
+                refreshToken:
+                  type: string
+                  description: 当前有效的 refresh token
+            example:
+              refreshToken: eyJhbGciOi...
+      responses:
+        '200':
+          description: 刷新成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenResponse'
+        '400':
+          description: 缺少 refresh token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: refresh token 无效或已过期
           content:
             application/json:
               schema:
@@ -144,7 +188,7 @@ paths:
       summary: 管理员查看注册码列表
       operationId: listRegistrationCodes
       security:
-        - cookieAuth: []
+        - bearerAuth: []
       responses:
         '200':
           description: 注册码列表
@@ -162,7 +206,7 @@ paths:
       summary: 管理员创建注册码
       operationId: createRegistrationCode
       security:
-        - cookieAuth: []
+        - bearerAuth: []
       requestBody:
         required: false
         content:
@@ -196,7 +240,7 @@ paths:
       summary: 管理员禁用注册码
       operationId: disableRegistrationCode
       security:
-        - cookieAuth: []
+        - bearerAuth: []
       parameters:
         - $ref: '#/components/parameters/RegistrationCodeId'
       responses:
@@ -223,7 +267,7 @@ paths:
       summary: 管理员删除注册码
       operationId: deleteRegistrationCode
       security:
-        - cookieAuth: []
+        - bearerAuth: []
       parameters:
         - $ref: '#/components/parameters/RegistrationCodeId'
       responses:
@@ -252,7 +296,7 @@ paths:
       summary: 上传并处理文档
       operationId: uploadDocument
       security:
-        - cookieAuth: []
+        - bearerAuth: []
       requestBody:
         required: true
         content:
@@ -294,7 +338,7 @@ paths:
       summary: 获取已上传文档列表
       operationId: listDocuments
       security:
-        - cookieAuth: []
+        - bearerAuth: []
       responses:
         '200':
           description: 文档列表
@@ -317,7 +361,7 @@ paths:
       summary: 删除指定文档
       operationId: deleteDocument
       security:
-        - cookieAuth: []
+        - bearerAuth: []
       parameters:
         - $ref: '#/components/parameters/DocumentId'
       responses:
@@ -550,7 +594,8 @@ paths:
         注意：
         - `conversationId` 可选。
         - 如果未传 `conversationId`，服务不会自动生成会话 ID，响应中的 `conversationId` 也会是 `null`。
-        - `maxResults` 的最终生效值不会超过服务端配置 `rag.max-results`。
+        - `maxResults` 表示检索片段数量上限，最终生效值不会超过服务端配置 `rag.max-results`。
+        - `minScore` 表示最低语义分数阈值，低于该阈值的检索片段不会进入回答上下文。
       requestBody:
         required: true
         content:
@@ -560,7 +605,8 @@ paths:
             example:
               question: 信访受理流程是什么？
               conversationId: case-001
-              maxResults: 5
+              maxResults: 4
+              minScore: 0.5
       responses:
         '200':
           description: 问答成功
@@ -588,6 +634,10 @@ paths:
       operationId: askRagStream
       description: |
         使用 `text/event-stream` 持续推送回答过程。
+
+        检索参数说明：
+        - `maxResults` 表示检索片段数量上限，最终生效值不会超过服务端配置 `rag.max-results`。
+        - `minScore` 表示最低语义分数阈值，低于该阈值的检索片段不会进入回答上下文。
 
         典型事件顺序：
         - `start`
@@ -702,10 +752,10 @@ paths:
                 timestamp: '2026-04-29T12:00:00'
 components:
   securitySchemes:
-    cookieAuth:
-      type: apiKey
-      in: cookie
-      name: JSESSIONID
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
   responses:
     UnauthorizedError:
       description: 未登录
@@ -790,11 +840,31 @@ components:
       required:
         - message
         - user
+        - accessToken
+        - refreshToken
       properties:
         message:
           type: string
         user:
           $ref: '#/components/schemas/AuthUserResponse'
+        accessToken:
+          type: string
+          description: 短期有效的访问令牌
+        refreshToken:
+          type: string
+          description: 用于续签 access token 的刷新令牌
+    TokenResponse:
+      type: object
+      required:
+        - accessToken
+        - refreshToken
+      properties:
+        accessToken:
+          type: string
+          description: 新签发的访问令牌
+        refreshToken:
+          type: string
+          description: 新签发的刷新令牌
     AuthStatusResponse:
       type: object
       required:
@@ -891,6 +961,13 @@ components:
           type: integer
           nullable: true
           minimum: 1
+          description: 检索片段数量上限；服务最终使用的片段数不会超过该值，且仍受服务端 `rag.max-results` 配置约束。
+        minScore:
+          type: number
+          format: double
+          nullable: true
+          minimum: 0
+          description: 最低语义分数阈值；低于该阈值的检索片段不会进入回答上下文。
     RagResponse:
       type: object
       required:

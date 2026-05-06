@@ -29,7 +29,7 @@ class RagControllerTest {
             "not-an-image".getBytes()
         );
 
-        ResponseEntity<?> response = controller.askWithImage(image, "这是什么", "conv-1");
+        ResponseEntity<?> response = controller.askWithImage(image, "这是什么", "conv-1", null, null);
 
         assertEquals(400, response.getStatusCode().value());
         assertInstanceOf(ErrorResponse.class, response.getBody());

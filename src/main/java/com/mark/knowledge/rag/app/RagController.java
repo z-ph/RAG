@@ -155,7 +155,9 @@ public class RagController {
     public ResponseEntity<?> askWithImage(
             @RequestParam("image") MultipartFile image,
             @RequestParam("question") String question,
-            @RequestParam(value = "conversationId", required = false) String conversationId) {
+            @RequestParam(value = "conversationId", required = false) String conversationId,
+            @RequestParam(value = "maxResults", required = false) Integer maxResults,
+            @RequestParam(value = "minScore", required = false) Double minScore) {
         try {
             if (image.isEmpty()) {
                 return ResponseEntity.badRequest()

@@ -63,9 +63,6 @@ public class RagService {
     @Value("${rag.max-results:5}")
     private int maxResults;
 
-    @Value("${rag.min-score:0.5}")
-    private double minScore;
-
     @Value("${rag.stream-timeout-ms:300000}")
     private long streamTimeoutMs;
 
@@ -130,6 +127,7 @@ public class RagService {
             String rewrittenQuestion = rewriteQuestion(request.question(), history);
             PipelineLogger.logStep(conversationId, "question_rewrite", request.question(), rewrittenQuestion, elapsedMillis(rewriteStart));
             int requestedMaxResults = resolveRequestedMaxResults(request);
+            double requestedMinScore = resolveRequestedMinScore(request);
 
             long questionEmbeddingStart = System.nanoTime();
             var questionEmbedding = embeddingModel.embed(rewrittenQuestion).content();
@@ -138,7 +136,7 @@ public class RagService {
             EmbeddingSearchRequest searchRequest = EmbeddingSearchRequest.builder()
                 .queryEmbedding(questionEmbedding)
                 .maxResults(resolveCandidateMaxResults(requestedMaxResults))
-                .minScore(minScore)
+                .minScore(requestedMinScore)
                 .build();
 
             log.info("问题向量维度: {}", questionEmbedding.dimension());
@@ -148,7 +146,7 @@ public class RagService {
             List<EmbeddingMatch<TextSegment>> vectorMatches = searchResult.matches();
             PipelineLogger.logStep(conversationId, "vector_search", "dim=" + questionEmbedding.dimension(), "matches=" + vectorMatches.size(), elapsedMillis(searchStart));
 
-            log.info("向量检索召回 {} 条候选片段，最小分数阈值: {}", vectorMatches.size(), minScore);
+            log.info("向量检索召回 {} 条候选片段，最小分数阈值: {}", vectorMatches.size(), requestedMinScore);
 
             if (vectorMatches.isEmpty()) {
                 conversationMemoryService.appendUserMessage(conversationId, request.question());
@@ -166,8 +164,20 @@ public class RagService {
             PipelineLogger.logStep(conversationId, "bm25_rerank", "candidates=" + vectorMatches.size(), "retained=" + matches.size(), elapsedMillis(rerankStart));
             log.info("BM25 重排耗时: {} ms，最终保留 {} 条片段", elapsedMillis(rerankStart), matches.size());
 
-            matches = enrichWithCrossDocumentResults(request, matches, requestedMaxResults);
+            matches = enrichWithCrossDocumentResults(request, matches, requestedMaxResults, requestedMinScore);
+            matches = filterMatchesByMinScore(matches, requestedMinScore);
             PipelineLogger.logStep(conversationId, "cross_document", "initialMatches=" + matches.size(), "finalMatches=" + matches.size(), 0);
+
+            if (matches.isEmpty()) {
+                conversationMemoryService.appendUserMessage(conversationId, request.question());
+                conversationMemoryService.appendAiMessage(conversationId, EMPTY_MATCH_ANSWER, null);
+                return new RagResponse(
+                    EMPTY_MATCH_ANSWER,
+                    null,
+                    conversationId,
+                    new ArrayList<>()
+                );
+            }
 
             String newContext = buildNewContext(conversationId, matches);
             extractAndRecordChunkHashes(conversationId, matches);
@@ -267,6 +277,7 @@ public class RagService {
             }
 
             int requestedMaxResults = resolveRequestedMaxResults(request);
+            double requestedMinScore = resolveRequestedMinScore(request);
             long questionEmbeddingStart = System.nanoTime();
             var questionEmbedding = embeddingModel.embed(rewrittenQuestion).content();
             log.info("[TTFT-DETAIL] 问题向量: conversationId={}, stepMs={}, dimension={}, totalMs={}",
@@ -279,7 +290,7 @@ public class RagService {
             EmbeddingSearchRequest searchRequest = EmbeddingSearchRequest.builder()
                 .queryEmbedding(questionEmbedding)
                 .maxResults(resolveCandidateMaxResults(requestedMaxResults))
-                .minScore(minScore)
+                .minScore(requestedMinScore)
                 .build();
 
             EmbeddingSearchResult<TextSegment> searchResult = searchEmbeddingStore(searchRequest);
@@ -295,7 +306,8 @@ public class RagService {
                 conversationId, elapsedMillis(rerankStart), matches.size(), elapsedMillis(pipelineStart));
 
             long crossStart = System.nanoTime();
-            matches = enrichWithCrossDocumentResults(request, matches, requestedMaxResults);
+            matches = enrichWithCrossDocumentResults(request, matches, requestedMaxResults, requestedMinScore);
+            matches = filterMatchesByMinScore(matches, requestedMinScore);
             PipelineLogger.logStep(conversationId, "cross_document", "initialMatches=" + matches.size(), "finalMatches=" + matches.size(), elapsedMillis(crossStart));
             log.info("[TTFT-DETAIL] 跨文档检索: conversationId={}, stepMs={}, total={}, totalMs={}",
                 conversationId, elapsedMillis(crossStart), matches.size(), elapsedMillis(pipelineStart));
@@ -444,6 +456,13 @@ public class RagService {
         return Math.max(1, maxResults);
     }
 
+    private double resolveRequestedMinScore(RagRequest request) {
+        if (request.minScore() == null) {
+            return 0.5;
+        }
+        return Math.max(0.0, Math.min(1.0, request.minScore()));
+    }
+
     private int resolveCandidateMaxResults(int requestedMaxResults) {
         int candidateMultiplier = Math.max(1, rerankCandidateMultiplier);
         return Math.max(requestedMaxResults, requestedMaxResults * candidateMultiplier);
@@ -544,14 +563,15 @@ public class RagService {
     private List<HybridMatch> crossDocumentSearch(
             String question,
             List<String> referencedDocs,
-            int maxResults) {
+            int maxResults,
+            double requestedMinScore) {
         String enhancedQuery = question + " " + String.join(" ", referencedDocs);
         var embedding = embeddingModel.embed(enhancedQuery).content();
 
         EmbeddingSearchRequest searchRequest = EmbeddingSearchRequest.builder()
             .queryEmbedding(embedding)
             .maxResults(resolveCandidateMaxResults(maxResults))
-            .minScore(minScore * 0.8)
+            .minScore(Math.max(0.0, requestedMinScore * 0.8))
             .build();
 
         EmbeddingSearchResult<TextSegment> result = searchEmbeddingStore(searchRequest);
@@ -564,7 +584,8 @@ public class RagService {
     private List<HybridMatch> enrichWithCrossDocumentResults(
             RagRequest request,
             List<HybridMatch> matches,
-            int requestedMaxResults) {
+            int requestedMaxResults,
+            double requestedMinScore) {
         String initialContext = matches.stream()
             .map(m -> m.segment().text())
             .collect(Collectors.joining("\n\n"));
@@ -576,7 +597,7 @@ public class RagService {
 
         log.info("检测到跨文档引用: {}", refs);
         List<HybridMatch> crossMatches = crossDocumentSearch(
-            request.question(), refs, requestedMaxResults);
+            request.question(), refs, requestedMaxResults, requestedMinScore);
 
         if (crossMatches.isEmpty()) {
             return matches;
@@ -600,6 +621,24 @@ public class RagService {
             .sorted(Comparator.comparingDouble(HybridMatch::finalScore).reversed())
             .limit(requestedMaxResults)
             .collect(Collectors.toList());
+    }
+
+    private List<HybridMatch> filterMatchesByMinScore(List<HybridMatch> matches, double requestedMinScore) {
+        if (matches == null || matches.isEmpty()) {
+            return List.of();
+        }
+
+        List<HybridMatch> filteredMatches = matches.stream()
+            .filter(match -> match.semanticScore() >= requestedMinScore)
+            .collect(Collectors.toList());
+
+        int filteredCount = matches.size() - filteredMatches.size();
+        if (filteredCount > 0) {
+            log.info("按最低语义分数阈值过滤片段: threshold={}, removed={}, retained={}",
+                requestedMinScore, filteredCount, filteredMatches.size());
+        }
+
+        return filteredMatches;
     }
 
     private void extractAndRecordChunkHashes(String conversationId, List<HybridMatch> matches) {
@@ -789,7 +828,7 @@ public class RagService {
                     ? segment.metadata().getString("filename")
                     : "unknown";
                 List<String> images = extractImageUrls(segment.text());
-                return new SourceReference(filename, segment.text(), match.finalScore(), images);
+                return new SourceReference(filename, segment.text(), match.semanticScore(), images);
             })
             .collect(Collectors.toList());
     }

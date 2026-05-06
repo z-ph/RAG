@@ -21,7 +21,7 @@ class RagServiceStreamStartTest {
     @Test
     void shouldReturnEmitterBeforeSendingStartEvent() throws Exception {
         TestableRagService service = new TestableRagService();
-        RagRequest request = new RagRequest("test", "conv-1", null);
+        RagRequest request = new RagRequest("test", "conv-1", null, null);
 
         SseEmitter emitter = service.askStream(request);
 

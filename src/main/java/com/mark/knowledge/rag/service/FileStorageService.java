@@ -11,6 +11,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
+import java.util.stream.Stream;
 import java.util.regex.Pattern;
 
 @Service
@@ -72,6 +73,25 @@ public class FileStorageService {
                 }
             }
             log.info("文件已删除: {}", file);
+        }
+    }
+
+    public String findStoredFilename(String documentId) {
+        validateDocumentId(documentId);
+        Path docDir = storageRoot.resolve(documentId).normalize();
+        if (!docDir.startsWith(storageRoot) || !Files.isDirectory(docDir)) {
+            return null;
+        }
+
+        try (Stream<Path> files = Files.list(docDir)) {
+            return files
+                .filter(Files::isRegularFile)
+                .map(path -> path.getFileName().toString())
+                .findFirst()
+                .orElse(null);
+        } catch (IOException e) {
+            log.warn("读取文档目录失败: {}", docDir, e);
+            return null;
         }
     }
 

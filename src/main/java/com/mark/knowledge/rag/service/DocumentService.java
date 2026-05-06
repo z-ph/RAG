@@ -110,6 +110,14 @@ public class DocumentService {
             InputStream inputStream,
             String filename,
             DocumentProgressCallback callback) {
+        return processDocument(inputStream, filename, null, callback);
+    }
+
+    public ProcessedDocument processDocument(
+            InputStream inputStream,
+            String filename,
+            String fixedDocumentId,
+            DocumentProgressCallback callback) {
         long startTime = System.currentTimeMillis();
         ChunkSettings chunkSettings = resolveChunkSettings();
 
@@ -125,7 +133,9 @@ public class DocumentService {
             callback.onProgress(DocumentProgressEvent.start(filename));
         }
 
-        String documentId = UUID.randomUUID().toString();
+        String documentId = fixedDocumentId != null && !fixedDocumentId.isBlank()
+            ? fixedDocumentId
+            : UUID.randomUUID().toString();
 
         try {
             log.info("📖 [步骤1/4] 解析文档: {}", filename);
@@ -236,7 +246,11 @@ public class DocumentService {
      * @return 处理后的文档（包含文本块）
      */
     public ProcessedDocument processDocument(InputStream inputStream, String filename) {
-        return processDocument(inputStream, filename, null);
+        return processDocument(inputStream, filename, null, null);
+    }
+
+    public ProcessedDocument processDocument(InputStream inputStream, String filename, String fixedDocumentId) {
+        return processDocument(inputStream, filename, fixedDocumentId, null);
     }
 
     private ChunkBuildResult splitText(
@@ -248,7 +262,8 @@ public class DocumentService {
         log.debug("开始文本切分过程...");
         log.debug("  文本总长度: {} 字符", profile.bodyText().length());
 
-        DeduplicationResult unitDeduplication = deduplicateUnits(splitIntoUnits(profile.bodyText(), chunkSettings));
+        ProtectedImageMarkdown protectedMarkdown = protectImageMarkdown(profile.bodyText());
+        DeduplicationResult unitDeduplication = deduplicateUnits(splitIntoUnits(protectedMarkdown.protectedText(), chunkSettings));
         List<String> chunks = mergeShortChunks(assembleChunks(unitDeduplication.units(), chunkSettings), chunkSettings);
 
         List<TextSegment> segments = new ArrayList<>();
@@ -258,6 +273,7 @@ public class DocumentService {
         int chunkIndex = 0;
 
         for (String chunk : chunks) {
+            chunk = restoreImageMarkdown(chunk, protectedMarkdown.placeholders());
             String normalizedChunk = normalizeForDedup(chunk);
             if (normalizedChunk.length() < minTextLength) {
                 filteredShortCount++;
@@ -511,7 +527,10 @@ public class DocumentService {
     }
 
     private static final Pattern IMAGE_URL_PATTERN = Pattern.compile(
-        "!\\[.*?\\]\\(/rag/documents/images/([^/]+)/([^)]+?)\\)"
+        "!\\[.*?\\]\\((?:/rag)?/documents/images/([^/]+)/([^)]+?)\\)"
+    );
+    private static final Pattern IMAGE_MARKDOWN_PATTERN = Pattern.compile(
+        "!\\[[^\\]]*\\]\\((?:/rag)?/documents/images/[^)]+\\)"
     );
 
     private List<String> extractChunkImageIds(String chunk, List<ImageReference> docImages) {
@@ -533,6 +552,39 @@ public class DocumentService {
             }
         }
         return found.isEmpty() ? List.of() : List.copyOf(found);
+    }
+
+    private ProtectedImageMarkdown protectImageMarkdown(String text) {
+        Matcher matcher = IMAGE_MARKDOWN_PATTERN.matcher(text);
+        StringBuilder builder = new StringBuilder();
+        List<String> placeholders = new ArrayList<>();
+        int lastEnd = 0;
+
+        while (matcher.find()) {
+            builder.append(text, lastEnd, matcher.start());
+            builder.append(imagePlaceholder(placeholders.size()));
+            placeholders.add(matcher.group());
+            lastEnd = matcher.end();
+        }
+
+        if (placeholders.isEmpty()) {
+            return new ProtectedImageMarkdown(text, List.of());
+        }
+
+        builder.append(text.substring(lastEnd));
+        return new ProtectedImageMarkdown(builder.toString(), List.copyOf(placeholders));
+    }
+
+    private String restoreImageMarkdown(String text, List<String> placeholders) {
+        String restored = text;
+        for (int i = 0; i < placeholders.size(); i++) {
+            restored = restored.replace(imagePlaceholder(i), placeholders.get(i));
+        }
+        return restored;
+    }
+
+    private String imagePlaceholder(int index) {
+        return "__IMG_TOKEN_" + index + "__";
     }
 
     private String buildEnhancedText(String title, String chunk, List<String> chunkKeywords) {
@@ -1110,6 +1162,12 @@ public class DocumentService {
         List<TextSegment> segments,
         int filteredShortCount,
         int filteredDuplicateCount
+    ) {
+    }
+
+    private record ProtectedImageMarkdown(
+        String protectedText,
+        List<String> placeholders
     ) {
     }
 

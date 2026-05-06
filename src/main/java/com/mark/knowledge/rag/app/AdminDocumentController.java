@@ -96,20 +96,11 @@ public class AdminDocumentController {
     @PostMapping("/{documentId}/reindex")
     public ResponseEntity<?> reindexDocument(@PathVariable String documentId) {
         try {
-            List<SegmentAdminService.SegmentInfo> segments = segmentAdminService.listSegments(documentId);
-            if (segments.isEmpty()) {
-                return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                    .body(new ErrorResponse("未找到文档", "documentId=" + documentId + " 没有片段"));
-            }
-
             String filename = resolveFilename(documentId);
             if (filename == null) {
                 return ResponseEntity.status(HttpStatus.NOT_FOUND)
                     .body(new ErrorResponse("文件不存在", "无法找到原始文件进行重新索引"));
             }
-
-            int deletedCount = segmentAdminService.deleteByDocumentId(documentId);
-            log.info("重新索引: 已删除旧片段 {} 个, documentId={}", deletedCount, documentId);
 
             Path filePath = fileStorageService.getFilePath(documentId, filename);
             if (filePath == null) {
@@ -117,8 +108,17 @@ public class AdminDocumentController {
                     .body(new ErrorResponse("文件不存在", "原始文件未找到"));
             }
 
+            List<SegmentAdminService.SegmentInfo> segments = segmentAdminService.listSegments(documentId);
+            int deletedCount = 0;
+            if (!segments.isEmpty()) {
+                deletedCount = segmentAdminService.deleteByDocumentId(documentId);
+                log.info("重新索引: 已删除旧片段 {} 个, documentId={}", deletedCount, documentId);
+            } else {
+                log.info("重新索引: documentId={} 当前无旧片段，直接按原文档ID恢复", documentId);
+            }
+
             try (InputStream is = java.nio.file.Files.newInputStream(filePath)) {
-                DocumentService.ProcessedDocument processed = documentService.processDocument(is, filename);
+                DocumentService.ProcessedDocument processed = documentService.processDocument(is, filename, documentId);
                 int newCount = embeddingService.storeSegments(processed.segments());
 
                 return ResponseEntity.ok(Map.of(
@@ -138,10 +138,12 @@ public class AdminDocumentController {
     private String resolveFilename(String documentId) {
         try {
             var detail = documentAdminService.getPublicDocumentDetail(documentId);
-            return detail != null ? detail.filename() : null;
+            if (detail != null) {
+                return detail.filename();
+            }
         } catch (Exception e) {
             log.debug("通过 DocumentAdminService 解析文件名失败: {}", e.getMessage());
-            return null;
         }
+        return fileStorageService.findStoredFilename(documentId);
     }
 }

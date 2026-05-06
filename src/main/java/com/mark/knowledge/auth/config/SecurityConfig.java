@@ -73,7 +73,7 @@ public class SecurityConfig {
                 .requestMatchers("/auth/login", "/auth/register", "/auth/logout", "/auth/refresh").permitAll()
                 .requestMatchers("/auth/me", "/auth/change-password").authenticated()
                 .requestMatchers("/auth/registration-codes/**").hasAnyRole("ADMIN", "SUPER_ADMIN")
-                .requestMatchers("/admin/**").authenticated()
+                .requestMatchers("/admin/**").hasAnyRole("ADMIN", "SUPER_ADMIN")
                 .requestMatchers("/documents/**").authenticated()
                 .anyRequest().permitAll()
             )

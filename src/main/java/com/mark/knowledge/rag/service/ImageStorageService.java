@@ -32,8 +32,14 @@ public class ImageStorageService {
         Path dir = storageRoot.resolve(sanitize(documentId));
         try {
             Files.createDirectories(dir);
-            Path file = dir.resolve(sanitize(imageId) + "." + sanitize(extension));
-            Files.write(file, data);
+            LlmImageSupport.NormalizedImage normalized = LlmImageSupport.normalizeImage(data, extension)
+                .orElseGet(() -> new LlmImageSupport.NormalizedImage(
+                    data,
+                    sanitize(extension),
+                    "application/octet-stream"
+                ));
+            Path file = dir.resolve(sanitize(imageId) + "." + sanitize(normalized.extension()));
+            Files.write(file, normalized.bytes());
             log.debug("图片已保存: {}/{} ({} bytes)", documentId, file.getFileName(), data.length);
         } catch (IOException e) {
             log.error("保存图片失败: documentId={}, imageId={}", documentId, imageId, e);
@@ -44,7 +50,10 @@ public class ImageStorageService {
     public byte[] readImage(String documentId, String imageFileName) {
         Path file = resolveAndValidate(documentId, imageFileName);
         try {
-            return Files.readAllBytes(file);
+            byte[] rawBytes = Files.readAllBytes(file);
+            return LlmImageSupport.normalizeImage(rawBytes, extensionOf(file.getFileName().toString()))
+                .map(LlmImageSupport.NormalizedImage::bytes)
+                .orElse(rawBytes);
         } catch (IOException e) {
             throw new RuntimeException("读取图片失败: " + e.getMessage(), e);
         }
@@ -53,6 +62,11 @@ public class ImageStorageService {
     public String detectContentType(String documentId, String imageFileName) {
         Path file = resolveAndValidate(documentId, imageFileName);
         try {
+            byte[] rawBytes = Files.readAllBytes(file);
+            var normalized = LlmImageSupport.normalizeImage(rawBytes, extensionOf(file.getFileName().toString()));
+            if (normalized.isPresent()) {
+                return normalized.get().contentType();
+            }
             String contentType = Files.probeContentType(file);
             return contentType != null ? contentType : "application/octet-stream";
         } catch (IOException e) {
@@ -103,5 +117,13 @@ public class ImageStorageService {
             throw new IllegalArgumentException("参数清理后为空: " + input);
         }
         return sanitized;
+    }
+
+    private String extensionOf(String filename) {
+        int dotIndex = filename.lastIndexOf('.');
+        if (dotIndex < 0 || dotIndex == filename.length() - 1) {
+            return "png";
+        }
+        return filename.substring(dotIndex + 1);
     }
 }

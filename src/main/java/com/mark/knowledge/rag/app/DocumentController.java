@@ -377,27 +377,6 @@ public class DocumentController {
         return ResponseEntity.ok("文档服务运行正常");
     }
 
-    @GetMapping("/images/{documentId}/{imageId}")
-    public ResponseEntity<?> serveImage(
-            @PathVariable String documentId,
-            @PathVariable String imageId) {
-        try {
-            byte[] imageBytes = imageStorageService.readImage(documentId, imageId);
-            String contentType = imageStorageService.detectContentType(documentId, imageId);
-            return ResponseEntity.ok()
-                .contentType(MediaType.parseMediaType(contentType))
-                .header("Cache-Control", "public, max-age=86400")
-                .contentLength(imageBytes.length)
-                .body(imageBytes);
-        } catch (SecurityException e) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                .body(new ErrorResponse("非法请求", e.getMessage()));
-        } catch (RuntimeException e) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                .body(new ErrorResponse("图片不存在", e.getMessage()));
-        }
-    }
-
     private String resolveContentType(String filename) {
         String lower = filename.toLowerCase(Locale.ROOT);
         if (lower.endsWith(".pdf")) return MediaType.APPLICATION_PDF_VALUE;

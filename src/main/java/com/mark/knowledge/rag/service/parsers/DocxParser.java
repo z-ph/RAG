@@ -48,7 +48,7 @@ public class DocxParser {
                                 String imageId = UUID.randomUUID().toString().replace("-", "").substring(0, 16);
                                 String ext = resolveExtension(pictureData.suggestFileExtension());
                                 String publicUrl = documentId != null
-                                    ? String.format("/rag/documents/images/%s/%s.%s", documentId, imageId, ext)
+                                    ? String.format("/documents/images/%s/%s.%s", documentId, imageId, ext)
                                     : "";
                                 ref = new ImageReference(imageId, documentId != null ? documentId : "", ext, publicUrl, pictureData.getData());
                                 pictureCache.put(cacheKey, ref);

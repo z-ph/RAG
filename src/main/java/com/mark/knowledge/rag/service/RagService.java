@@ -36,7 +36,6 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Base64;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
@@ -624,14 +623,7 @@ public class RagService {
         }
 
         String historyText = history.stream()
-            .map(msg -> {
-                if (msg instanceof UserMessage userMsg) {
-                    return "用户：" + userMsg.singleText();
-                } else if (msg instanceof AiMessage aiMsg) {
-                    return "助手：" + aiMsg.text();
-                }
-                return null;
-            })
+            .map(this::formatHistoryMessage)
             .filter(Objects::nonNull)
             .collect(Collectors.joining("\n"));
 
@@ -667,10 +659,12 @@ public class RagService {
                     try {
                         byte[] imageBytes = readImageFromUrl(url);
                         if (imageBytes != null) {
-                            String mimeType = detectImageMimeType(imageBytes);
-                            String base64 = Base64.getEncoder().encodeToString(imageBytes);
-                            String dataUri = "data:" + mimeType + ";base64," + base64;
-                            contentParts.add(ImageContent.from(dataUri));
+                            var dataUri = LlmImageSupport.toPngDataUri(imageBytes);
+                            if (dataUri.isPresent()) {
+                                contentParts.add(ImageContent.from(dataUri.get()));
+                            } else {
+                                log.info("跳过无法被模型识别的文档图片: {}", url);
+                            }
                         }
                     } catch (Exception e) {
                         log.warn("注入图片到 LLM 上下文失败: {}", url, e);
@@ -691,7 +685,7 @@ public class RagService {
             if (msg instanceof SystemMessage sysMsg) {
                 preview = "[System] " + truncate(sysMsg.text(), 80);
             } else if (msg instanceof UserMessage userMsg) {
-                preview = "[User] " + truncate(userMsg.singleText(), 80);
+                preview = "[User] " + truncate(summarizeUserMessage(userMsg), 80);
             } else if (msg instanceof AiMessage aiMsg) {
                 String thinking = aiMsg.thinking();
                 preview = "[Ai] text=" + truncate(aiMsg.text(), 60)
@@ -704,6 +698,52 @@ public class RagService {
         }
 
         return toSend;
+    }
+
+    private String formatHistoryMessage(ChatMessage msg) {
+        if (msg instanceof UserMessage userMsg) {
+            return "用户：" + summarizeUserMessage(userMsg);
+        } else if (msg instanceof AiMessage aiMsg) {
+            return "助手：" + aiMsg.text();
+        }
+        return null;
+    }
+
+    private String summarizeUserMessage(UserMessage userMsg) {
+        List<String> textParts = new ArrayList<>();
+        int imageCount = 0;
+        int otherContentCount = 0;
+
+        for (Content content : userMsg.contents()) {
+            if (content instanceof TextContent textContent) {
+                if (StringUtils.hasText(textContent.text())) {
+                    textParts.add(textContent.text());
+                }
+            } else if (content instanceof ImageContent) {
+                imageCount++;
+            } else {
+                otherContentCount++;
+            }
+        }
+
+        String text = String.join("\n", textParts);
+        List<String> attachments = new ArrayList<>();
+        if (imageCount > 0) {
+            attachments.add("附带" + imageCount + "张图片");
+        }
+        if (otherContentCount > 0) {
+            attachments.add("附带" + otherContentCount + "个非文本内容");
+        }
+
+        if (attachments.isEmpty()) {
+            return text;
+        }
+
+        String attachmentSummary = "[" + String.join("，", attachments) + "]";
+        if (StringUtils.hasText(text)) {
+            return text + "\n" + attachmentSummary;
+        }
+        return attachmentSummary;
     }
 
     private static String truncate(String s, int maxLen) {
@@ -755,7 +795,7 @@ public class RagService {
     }
 
     private static final Pattern IMAGE_URL_IN_CHUNK = Pattern.compile(
-        "!\\[.*?\\]\\((/rag/documents/images/[^)]+)\\)"
+        "!\\[.*?\\]\\(((?:/rag)?/documents/images/[^)]+)\\)"
     );
 
     private List<String> extractImageUrls(String text) {
@@ -1212,20 +1252,10 @@ public class RagService {
     }
 
     private byte[] readImageFromUrl(String url) {
-        Matcher m = Pattern.compile("/documents/images/([^/]+)/([^/]+)").matcher(url);
+        Matcher m = Pattern.compile("(?:/rag)?/documents/images/([^/]+)/([^/]+)").matcher(url);
         if (!m.find()) {
             return null;
         }
         return imageStorageService.readImage(m.group(1), m.group(2));
-    }
-
-    private static String detectImageMimeType(byte[] bytes) {
-        if (bytes.length >= 4) {
-            if (bytes[0] == (byte) 0x89 && bytes[1] == (byte) 0x50) return "image/png";
-            if (bytes[0] == (byte) 0xFF && bytes[1] == (byte) 0xD8) return "image/jpeg";
-            if (bytes[0] == (byte) 0x47 && bytes[1] == (byte) 0x49) return "image/gif";
-            if (bytes[0] == (byte) 0x42 && bytes[1] == (byte) 0x4D) return "image/bmp";
-        }
-        return "image/png";
     }
 }

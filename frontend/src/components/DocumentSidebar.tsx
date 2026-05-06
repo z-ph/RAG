@@ -18,6 +18,7 @@ import {
   Button,
   Empty,
   Modal,
+  Popconfirm,
   Progress,
   Space,
   Spin,
@@ -33,12 +34,15 @@ interface DocumentSidebarProps {
   uploading: boolean;
   fileUploads: FileUploadEntry[];
   deletingId: string | null;
+  reindexingId: string | null;
   authenticated: boolean;
+  canManageDocuments: boolean;
   onClose: () => void;
   onRefreshDocuments: () => Promise<void>;
   onUpload: (fileOrFiles: File | File[]) => Promise<void>;
   onCancelUpload: () => void;
   onDeleteDocument: (documentId: string) => Promise<void>;
+  onReindexDocument: (documentId: string) => Promise<void>;
   onViewDocument: (documentId: string) => void;
   onShowDownloadLink: (documentId: string, filename: string) => void;
 }
@@ -224,14 +228,14 @@ export function DocumentSidebar(props: DocumentSidebarProps) {
                     文档 ID: {item.documentId}
                   </p>
                 </div>
-                <div className="flex shrink-0 flex-wrap items-center gap-2 max-[720px]:gap-1.5">
-                  <span className="inline-flex bg-ink-950/6 px-3 py-1 text-xs font-medium text-ink-700">
+                <div className="flex shrink-0 flex-wrap items-center gap-1.5 max-[720px]:gap-1">
+                  <span className="inline-flex bg-ink-950/6 px-2.5 py-0.5 text-[11px] font-medium text-ink-700">
                     {item.segmentCount} 段
                   </span>
                   <Button
                     type="text"
                     size="small"
-                    className="!min-h-[36px] !min-w-[36px] !text-ink-600 hover:!text-accent-500"
+                    className="!min-h-[32px] !min-w-[32px] !px-2 !text-ink-600 hover:!text-accent-500"
                     icon={<EyeOutlined />}
                     onClick={() => props.onViewDocument(item.documentId)}
                   >
@@ -240,17 +244,36 @@ export function DocumentSidebar(props: DocumentSidebarProps) {
                   <Button
                     type="text"
                     size="small"
-                    className="!min-h-[36px] !min-w-[36px] !text-ink-600 hover:!text-accent-500"
+                    className="!min-h-[32px] !min-w-[32px] !px-2 !text-ink-600 hover:!text-accent-500"
                     icon={<DownloadOutlined />}
                     onClick={() => props.onShowDownloadLink(item.documentId, item.filename)}
                   >
                     下载
                   </Button>
+                  {props.canManageDocuments && (
+                    <Popconfirm
+                      title="重建索引"
+                      description="将删除当前片段并基于原文件重新切分入库。"
+                      okText="重建"
+                      cancelText="取消"
+                      onConfirm={() => void props.onReindexDocument(item.documentId)}
+                    >
+                      <Button
+                        type="text"
+                        size="small"
+                        className="!min-h-[32px] !min-w-[32px] !px-2 !text-ink-600 hover:!text-accent-500"
+                        icon={<ReloadOutlined />}
+                        loading={props.reindexingId === item.documentId}
+                      >
+                        重建
+                      </Button>
+                    </Popconfirm>
+                  )}
                   {props.authenticated && (
                     <Button
                       type="text"
                       size="small"
-                      className="!min-h-[36px] !min-w-[36px] !text-accent-500 hover:!text-accent-400"
+                      className="!min-h-[32px] !min-w-[32px] !px-2 !text-accent-500 hover:!text-accent-400"
                       icon={<DeleteOutlined />}
                       loading={props.deletingId === item.documentId}
                       onClick={() => void props.onDeleteDocument(item.documentId)}

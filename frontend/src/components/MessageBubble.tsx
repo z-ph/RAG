@@ -231,7 +231,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
         </div>
 
         <div
-          className={`inline-flex max-w-full flex-col px-3 py-2.5 shadow-[0_0_0_1px_rgba(19,34,56,0.06)] ${bubbleClass}`}
+          className={`inline-flex min-w-0 max-w-full flex-col px-3 py-2.5 shadow-[0_0_0_1px_rgba(19,34,56,0.06)] ${bubbleClass}`}
         >
           {showSourceLoading ? (
             <div
@@ -258,14 +258,17 @@ export function MessageBubble({ message }: MessageBubbleProps) {
                   ▾
                 </span>
               </summary>
-              <div className="grid gap-2">
+              <div className="grid min-w-0 gap-2">
                 {message.sources.map((source, index) => (
                   <section
                     key={`${source.filename}-${index}`}
-                    className={`border-l-[3px] pl-2.5 ${sourceAccentClass}`}
+                    className={`min-w-0 border-l-[3px] pl-2.5 ${sourceAccentClass}`}
                   >
-                    <div className="flex items-center justify-between gap-2">
-                      <strong className={`block truncate text-sm font-semibold ${sourceTitleClass}`}>
+                    <div className="flex min-w-0 items-start justify-between gap-2">
+                      <strong
+                        className={`block min-w-0 flex-1 truncate text-sm font-semibold ${sourceTitleClass}`}
+                        title={source.filename}
+                      >
                         {source.filename}
                       </strong>
                       <span
@@ -274,7 +277,9 @@ export function MessageBubble({ message }: MessageBubbleProps) {
                         {formatScore(source.relevanceScore)}
                       </span>
                     </div>
-                    <p className={`mt-1 text-[13px] leading-[1.55] ${sourceExcerptClass}`}>
+                    <p
+                      className={`mt-1 min-w-0 whitespace-pre-wrap break-words text-[13px] leading-[1.55] [overflow-wrap:anywhere] ${sourceExcerptClass}`}
+                    >
                       {source.excerpt}
                     </p>
                     {source.images && source.images.length > 0 ? (
@@ -282,7 +287,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
                         {source.images.map((imgUrl, imgIdx) => (
                           <Image
                             key={imgIdx}
-                            src={imgUrl}
+                            src={import.meta.env.VITE_BACKEND_URL + imgUrl}
                             alt={`图片 ${imgIdx + 1}`}
                             width={120}
                             height={90}

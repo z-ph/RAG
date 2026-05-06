@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { ApiError, deleteDocument, getDocumentDownloadLink, getPublicDocumentDetail, listDocuments, listPublicDocuments, uploadDocumentStream } from "../lib/api";
+import { ApiError, adminReindexDocument, deleteDocument, getDocumentDownloadLink, getPublicDocumentDetail, listDocuments, listPublicDocuments, uploadDocumentStream } from "../lib/api";
 import type { DocumentListItem, FileUploadEntry, PublicDocumentDetailResponse } from "../types";
 
 interface MessageApi {
@@ -22,11 +22,18 @@ export function useDocumentLibrary(
   const [documentsLoading, setDocumentsLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [fileUploads, setFileUploads] = useState<FileUploadEntry[]>([]);
-  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [documentActionState, setDocumentActionState] = useState<{
+    deletingId: string | null;
+    reindexingId: string | null;
+  }>({
+    deletingId: null,
+    reindexingId: null
+  });
   const [viewingDocument, setViewingDocument] = useState<PublicDocumentDetailResponse | null>(null);
   const [viewingLoading, setViewingLoading] = useState(false);
   const [downloadLinkInfo, setDownloadLinkInfo] = useState<DownloadLinkInfo | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
+  const { deletingId, reindexingId } = documentActionState;
 
   useEffect(() => {
     void refreshDocuments();
@@ -148,7 +155,10 @@ export function useDocumentLibrary(
       return;
     }
 
-    setDeletingId(documentId);
+    setDocumentActionState((current) => ({
+      ...current,
+      deletingId: documentId
+    }));
 
     try {
       const response = await deleteDocument(documentId);
@@ -163,7 +173,44 @@ export function useDocumentLibrary(
 
       messageApi.error(error instanceof Error ? error.message : "删除失败");
     } finally {
-      setDeletingId(null);
+      setDocumentActionState((current) => ({
+        ...current,
+        deletingId: null
+      }));
+    }
+  }
+
+  async function handleReindexDocument(documentId: string) {
+    if (!authenticated) {
+      return;
+    }
+
+    setDocumentActionState((current) => ({
+      ...current,
+      reindexingId: documentId
+    }));
+
+    try {
+      const response = await adminReindexDocument(documentId);
+      messageApi.success(`${response.message}，删除 ${response.deletedSegments} 段，新增 ${response.newSegments} 段`);
+      await refreshDocuments();
+      if (viewingDocument?.documentId === documentId) {
+        const detail = await getPublicDocumentDetail(documentId);
+        setViewingDocument(detail);
+      }
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 401) {
+        setDocuments([]);
+        await onUnauthorized();
+        return;
+      }
+
+      messageApi.error(error instanceof Error ? error.message : "重建索引失败");
+    } finally {
+      setDocumentActionState((current) => ({
+        ...current,
+        reindexingId: null
+      }));
     }
   }
 
@@ -203,10 +250,12 @@ export function useDocumentLibrary(
     uploading,
     fileUploads,
     deletingId,
+    reindexingId,
     refreshDocuments,
     handleUpload,
     cancelUpload,
     handleDeleteDocument,
+    handleReindexDocument,
     handleViewDocument,
     handleShowDownloadLink,
     handleCloseDownloadLink,

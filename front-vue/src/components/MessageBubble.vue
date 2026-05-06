@@ -84,7 +84,7 @@
                 <a-image
                   v-for="(imgUrl, imgIdx) in source.images"
                   :key="imgIdx"
-                  :src="imgUrl"
+                  :src="import.meta.env.VITE_BACKEND_URL + imgUrl"
                   :alt="`图片 ${imgIdx + 1}`"
                   :width="120"
                   :height="90"

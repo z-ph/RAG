@@ -75,9 +75,7 @@
                 #{{ segment.chunkIndex }}
               </span>
             </div>
-            <p class="text-sm leading-relaxed text-ink-900 whitespace-pre-wrap break-words">
-              {{ segment.text }}
-            </p>
+            <MarkdownContent :content="segment.text" tone="assistant" class="text-sm leading-relaxed text-ink-900" />
           </div>
           <p v-if="detail.segments.length === 0" class="py-8 text-center text-sm text-ink-500">
             暂无段落内容（文档需重新上传以启用文本存储）
@@ -98,6 +96,7 @@ import {
   TagOutlined
 } from "@ant-design/icons-vue";
 import type { PublicDocumentDetailResponse } from "../types";
+import { MarkdownContent } from "./MarkdownContent.vue";
 
 defineProps<{
   detail: PublicDocumentDetailResponse | null;

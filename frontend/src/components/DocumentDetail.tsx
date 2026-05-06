@@ -7,6 +7,7 @@ import {
 } from "@ant-design/icons";
 import { Button, Spin } from "antd";
 import type { PublicDocumentDetailResponse } from "../types";
+import { MarkdownContent } from "./MarkdownContent";
 
 interface DocumentDetailProps {
   detail: PublicDocumentDetailResponse | null;
@@ -106,9 +107,7 @@ export function DocumentDetail(props: DocumentDetailProps) {
                   #{segment.chunkIndex}
                 </span>
               </div>
-              <p className="text-sm leading-relaxed text-ink-900 whitespace-pre-wrap break-words">
-                {segment.text}
-              </p>
+              <MarkdownContent content={segment.text} tone="assistant" className="text-sm leading-relaxed text-ink-900" />
             </div>
           ))}
           {detail.segments.length === 0 && (

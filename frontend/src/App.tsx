@@ -67,9 +67,13 @@ function ChatPage() {
         open={documentDrawerOpen}
         onClose={() => setDocumentDrawerOpen(false)}
         placement="left"
-        width={drawerWidth}
         closable={false}
         title={null}
+        styles={{
+          section: {
+            width: drawerWidth
+          }
+        }}
         classNames={{
           mask: "!backdrop-blur-[3px]",
           wrapper: "!shadow-none",
@@ -82,12 +86,21 @@ function ChatPage() {
           documentsLoading={documentLibrary.documentsLoading}
           uploading={documentLibrary.uploading}
           deletingId={documentLibrary.deletingId}
+          reindexingId={documentLibrary.reindexingId}
           fileUploads={documentLibrary.fileUploads}
           authenticated={authSession.authStatus.authenticated}
+          canManageDocuments={
+            authSession.authStatus.authenticated
+            && (
+              authSession.authStatus.user?.roleCode === "ADMIN"
+              || authSession.authStatus.user?.roleCode === "SUPER_ADMIN"
+            )
+          }
           onClose={() => setDocumentDrawerOpen(false)}
           onRefreshDocuments={documentLibrary.refreshDocuments}
           onUpload={documentLibrary.handleUpload}
           onDeleteDocument={documentLibrary.handleDeleteDocument}
+          onReindexDocument={documentLibrary.handleReindexDocument}
           onCancelUpload={documentLibrary.cancelUpload}
           onViewDocument={documentLibrary.handleViewDocument}
           onShowDownloadLink={documentLibrary.handleShowDownloadLink}
@@ -98,9 +111,13 @@ function ChatPage() {
         open={!!documentLibrary.viewingDocument}
         onClose={documentLibrary.handleCloseDocumentDetail}
         placement="left"
-        width={drawerWidth}
         closable={false}
         title={null}
+        styles={{
+          section: {
+            width: drawerWidth
+          }
+        }}
         classNames={{
           mask: "!backdrop-blur-[3px]",
           wrapper: "!shadow-none",
@@ -179,9 +196,13 @@ function ChatPage() {
         open={authDrawerOpen}
         onClose={() => setAuthDrawerOpen(false)}
         placement="right"
-        width={drawerWidth}
         closable={false}
         title={null}
+        styles={{
+          section: {
+            width: drawerWidth
+          }
+        }}
         classNames={{
           mask: "!backdrop-blur-[3px]",
           wrapper: "!shadow-none",

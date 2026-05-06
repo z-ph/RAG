@@ -28,6 +28,10 @@ marked.use({
       const validLang = lang && hljs.getLanguage(lang) ? lang : "plaintext";
       const highlighted = hljs.highlight(text, { language: validLang }).value;
       return `<pre class="code-block"><code class="hljs language-${validLang}">${highlighted}</code></pre>`;
+    },
+    image({ href, title, text }: { href?: string; title?: string; text?: string }) {
+      const fullSrc = import.meta.env.VITE_BACKEND_URL + href;
+      return `<img src="${fullSrc}" alt="${text || "图片"}" style="max-width:100%;border-radius:4px" />`;
     }
   }
 });

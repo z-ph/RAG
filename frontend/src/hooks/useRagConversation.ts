@@ -23,7 +23,7 @@ export function useRagConversation(messageApi: MessageApi) {
   const [conversationId, setConversationId] = useState<string | null>(
     stored.current?.conversationId ?? null
   );
-  const [maxResults, setMaxResults] = useState(64);
+  const [maxResults, setMaxResults] = useState(5);
   const [streaming, setStreaming] = useState(false);
   const abortControllerRef = useRef<AbortController | null>(null);
 

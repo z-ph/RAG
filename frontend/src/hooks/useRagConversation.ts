@@ -23,7 +23,8 @@ export function useRagConversation(messageApi: MessageApi) {
   const [conversationId, setConversationId] = useState<string | null>(
     stored.current?.conversationId ?? null
   );
-  const [maxResults, setMaxResults] = useState(5);
+  const [maxResults, setMaxResults] = useState(4);
+  const [minScore, setMinScore] = useState(0.5);
   const [streaming, setStreaming] = useState(false);
   const abortControllerRef = useRef<AbortController | null>(null);
 
@@ -74,7 +75,8 @@ export function useRagConversation(messageApi: MessageApi) {
         {
           question,
           conversationId: nextConversationId,
-          maxResults
+          maxResults,
+          minScore
         },
         {
           onStart(payload) {
@@ -235,7 +237,11 @@ export function useRagConversation(messageApi: MessageApi) {
     ]);
 
     try {
-      const response = await askWithImage(image, question, nextConversationId);
+      const response = await askWithImage(image, question, {
+        conversationId: nextConversationId,
+        maxResults,
+        minScore
+      });
 
       if (response.conversationId) {
         setConversationId(response.conversationId);
@@ -269,6 +275,8 @@ export function useRagConversation(messageApi: MessageApi) {
     conversationId,
     maxResults,
     setMaxResults,
+    minScore,
+    setMinScore,
     streaming,
     handleSend,
     handleSendWithImage,

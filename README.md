@@ -106,6 +106,8 @@ docker run --rm -v "$(pwd)/dist:/output/dist" knowledge-rag sh -c \
 cd dist && npx serve .
 ```
 
+注意：前端使用基于浏览器历史的客户端路由，静态部署时需要把 `/rag/*` 回退到同一个 `index.html`，否则刷新 `/rag/documents`、`/rag/documents/{documentId}` 或 `/rag/admin/*` 会返回 404。
+
 补充说明：
 
 - compose 默认把 `Qdrant` 作为独立容器启动
@@ -239,11 +241,11 @@ pnpm build
 
 ### 8. 初始使用流程
 
-1. 使用 `.env` 中的管理员账号登录文档控制台。
-2. 管理员在侧边栏创建注册码，可选设置备注和有效期。
+1. 打开聊天首页，通过顶部「文档控制台」入口进入独立的文档管理页面。
+2. 使用 `.env` 中的管理员账号登录后上传文档，或进入管理后台创建注册码。
 3. 新用户使用注册码注册并自动登录。
-4. 登录后即可上传、查看和删除知识库文档。
-5. RAG 问答接口和聊天界面无需登录。
+4. 登录后即可在文档控制台中上传、查看和删除知识库文档。
+5. RAG 问答接口和聊天界面无需登录，公开文档也可直接浏览。
 
 ## API 概览
 
@@ -294,6 +296,12 @@ pnpm build
 | `DELETE` | `/rag/conversations/{conversationId}` | 清空会话上下文 |
 | `GET` | `/rag/health` | RAG 服务健康检查 |
 | `POST` | `/rag/health` | RAG 服务健康检查（POST，可用于验证请求体转发） |
+
+RAG 请求体支持以下检索参数：
+
+- `maxResults`：检索片段数量上限。服务最终用于生成回答的来源片段数不会超过该值。
+- `minScore`：最低语义分数阈值。低于该阈值的检索片段不会进入回答上下文。
+- 当前前端默认值为 `maxResults=4`、`minScore=0.5`。
 
 ### SSE 事件
 
@@ -384,7 +392,6 @@ rag:
   min-text-length: ${RAG_MIN_TEXT_LENGTH:80}
   keyword-count: ${RAG_KEYWORD_COUNT:6}
   max-results: ${RAG_MAX_RESULTS:5}
-  min-score: ${RAG_MIN_SCORE:0.5}
   memory-window: ${RAG_MEMORY_WINDOW:6}
   session-ttl-seconds: ${RAG_SESSION_TTL_SECONDS:1800}
   memory-cleanup-interval-ms: ${RAG_MEMORY_CLEANUP_INTERVAL_MS:300000}
@@ -395,6 +402,8 @@ rag:
 说明：
 
 - `chunk-dedup-enabled` 控制跨轮次检索片段去重，默认开启
+- `max-results` 是服务端允许返回的检索片段数量上限
+- `minScore` 由前端请求动态传入，低于该阈值的片段不会进入回答上下文
 
 ## 数据与存储
 
@@ -428,6 +437,7 @@ rag:
 - 登录 / 登出
 - 使用注册码注册
 - 管理员创建、禁用、删除注册码
+- 独立文档控制台与文档详情页
 - 上传文档
 - 刷新文档列表
 - 删除文档

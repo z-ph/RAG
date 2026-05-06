@@ -1,14 +1,12 @@
 import {
+  ArrowLeftOutlined,
   CheckCircleOutlined,
-  CloseOutlined,
   CloudUploadOutlined,
-  CopyOutlined,
   DeleteOutlined,
   DownloadOutlined,
   CloseCircleOutlined,
   EyeOutlined,
   FolderOpenOutlined,
-  LinkOutlined,
   LoadingOutlined,
   ReloadOutlined,
   StopOutlined
@@ -17,7 +15,6 @@ import {
   Alert,
   Button,
   Empty,
-  Modal,
   Popconfirm,
   Progress,
   Space,
@@ -25,7 +22,7 @@ import {
   Upload,
   type UploadProps
 } from "antd";
-import { useRef } from "react";
+import { useRef, type ReactNode } from "react";
 import type { DocumentListItem, FileUploadEntry } from "../types";
 
 interface DocumentSidebarProps {
@@ -37,7 +34,8 @@ interface DocumentSidebarProps {
   reindexingId: string | null;
   authenticated: boolean;
   canManageDocuments: boolean;
-  onClose: () => void;
+  onBack?: () => void;
+  onClose?: () => void;
   onRefreshDocuments: () => Promise<void>;
   onUpload: (fileOrFiles: File | File[]) => Promise<void>;
   onCancelUpload: () => void;
@@ -45,6 +43,7 @@ interface DocumentSidebarProps {
   onReindexDocument: (documentId: string) => Promise<void>;
   onViewDocument: (documentId: string) => void;
   onShowDownloadLink: (documentId: string, filename: string) => void;
+  headerActions?: ReactNode;
 }
 
 export function DocumentSidebar(props: DocumentSidebarProps) {
@@ -78,25 +77,34 @@ export function DocumentSidebar(props: DocumentSidebarProps) {
     ? `上传中 (${props.fileUploads.filter(f => f.status === "complete").length}/${props.fileUploads.length})...`
     : "上传中...";
 
+  const handleReturn = props.onBack ?? props.onClose ?? (() => undefined);
+
   return (
     <section className="flex h-full min-h-0 flex-col overflow-hidden px-6 py-6 max-[720px]:px-[18px] max-[720px]:py-[18px]">
       <div className="flex items-start justify-between gap-4">
-        <div className="min-w-0">
-          <p className="text-xs font-bold uppercase tracking-[0.12em] text-ink-500">
-            文档集合
-          </p>
-          <h2 className="mt-1 text-lg font-semibold text-ink-950">
-            浏览和下载知识库文档
-          </h2>
+        <div className="flex min-w-0 items-start gap-3">
+          <Button
+            type="text"
+            shape="circle"
+            className="!mt-0.5 !text-ink-500 transition-colors hover:!bg-white/80 hover:!text-ink-950"
+            icon={<ArrowLeftOutlined />}
+            onClick={handleReturn}
+            title="返回对话"
+          />
+          <div className="min-w-0">
+            <p className="text-xs font-bold uppercase tracking-[0.12em] text-ink-500">
+              文档控制台
+            </p>
+            <h2 className="mt-1 text-lg font-semibold text-ink-950">
+              浏览、上传和维护知识库文档
+            </h2>
+          </div>
         </div>
-        <Button
-          type="text"
-          shape="circle"
-          className="!text-ink-500 transition-colors hover:!bg-white/80 hover:!text-ink-950"
-          icon={<CloseOutlined />}
-          onClick={props.onClose}
-          title="关闭文档集合"
-        />
+        {props.headerActions ? (
+          <div className="flex items-center gap-2">
+            {props.headerActions}
+          </div>
+        ) : null}
       </div>
 
       {props.authenticated && (

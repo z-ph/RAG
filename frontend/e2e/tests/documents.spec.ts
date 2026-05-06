@@ -4,7 +4,6 @@ import { DocumentsPage } from "../pages/documents.page";
 import {
   uploadDocument,
   deleteDocument,
-  listPublicDocuments,
   listDocuments,
 } from "../utils/api";
 
@@ -19,7 +18,8 @@ test.describe("文档集合交互", () => {
     await chat.goto();
     await chat.openDocuments();
 
-    await expect(docs.drawer).toBeVisible();
+    await docs.waitForConsole();
+    await expect(anonymousPage).toHaveURL(/\/documents$/);
     await expect(
       anonymousPage.locator("text=已入库文档")
     ).toBeVisible();
@@ -44,6 +44,7 @@ test.describe("文档集合交互", () => {
       ).toBeVisible({ timeout: 10_000 });
 
       await docs.viewDocument("e2e-test-doc.txt");
+      await docs.waitForDetail(uploaded.documentId ?? undefined);
 
       // 验证详情页内容
       await expect(
@@ -52,6 +53,8 @@ test.describe("文档集合交互", () => {
       await expect(
         anonymousPage.locator("text=e2e-test-doc.txt")
       ).toBeVisible();
+      await docs.goBack();
+      await docs.waitForConsole();
     } finally {
       if (uploaded.documentId) {
         await deleteDocument(uploaded.documentId);
@@ -65,6 +68,7 @@ test.describe("文档集合交互", () => {
 
     await chat.goto();
     await chat.openDocuments();
+    await docs.waitForConsole();
 
     // 创建临时测试文件并通过 UI 上传
     const testContent = "E2E 上传测试文档内容。关键词：测试、上传、Playwright。";
@@ -113,6 +117,7 @@ test.describe("文档集合交互", () => {
 
       await chat.goto();
       await chat.openDocuments();
+      await docs.waitForConsole();
 
       // 等待文档出现
       await expect(
@@ -143,8 +148,7 @@ test.describe("文档集合交互", () => {
 
     await chat.goto();
     await chat.openDocuments();
-
-    await expect(docs.drawer).toBeVisible();
+    await docs.waitForConsole();
 
     // 验证刷新按钮可用
     await docs.refreshButton.click();

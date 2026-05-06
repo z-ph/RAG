@@ -8,7 +8,9 @@ export class ChatPage {
 
   // 顶部工具栏
   readonly documentsButton: Locator;
+  readonly parameterButton: Locator;
   readonly maxResultsInput: Locator;
+  readonly minScoreInput: Locator;
   readonly clearConversationButton: Locator;
   readonly adminButton: Locator;
   readonly authButton: Locator;
@@ -24,8 +26,10 @@ export class ChatPage {
   constructor(page: Page) {
     this.page = page;
 
-    this.documentsButton = page.getByRole("button", { name: "文档集合" });
-    this.maxResultsInput = page.locator('input[type="number"]');
+    this.documentsButton = page.getByRole("button", { name: "文档控制台" });
+    this.parameterButton = page.getByRole("button", { name: /参数/ });
+    this.maxResultsInput = page.locator('input[aria-valuemin="1"]').first();
+    this.minScoreInput = page.locator('input[aria-valuemax="1"]').first();
     this.clearConversationButton = page.getByRole("button", { name: "清空对话" });
     this.adminButton = page.getByRole("button", { name: "管理" });
     this.authButton = page.getByRole("button", { name: /用户登录|已登录/ });
@@ -70,6 +74,10 @@ export class ChatPage {
 
   async openDocuments(): Promise<void> {
     await this.documentsButton.click();
+  }
+
+  async openParameterConsole(): Promise<void> {
+    await this.parameterButton.click();
   }
 
   async openAuth(): Promise<void> {

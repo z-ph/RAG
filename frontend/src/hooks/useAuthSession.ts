@@ -119,3 +119,5 @@ export function useAuthSession(messageApi: MessageApi) {
     handleUnauthorized
   };
 }
+
+export type AuthSessionState = ReturnType<typeof useAuthSession>;

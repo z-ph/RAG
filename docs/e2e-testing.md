@@ -1,6 +1,6 @@
 # 前端 E2E 测试指南
 
-前端 E2E 测试基于 [Playwright](https://playwright.dev/)，覆盖智能问答、文档集合、用户认证、管理后台四大功能模块的完整交互链路。
+前端 E2E 测试基于 [Playwright](https://playwright.dev/)，覆盖智能问答、文档控制台、用户认证、管理后台四大功能模块的完整交互链路。
 
 ---
 
@@ -12,9 +12,9 @@ frontend/
 │   ├── fixtures.ts          # 扩展测试上下文（匿名/管理员/成员 page）
 │   ├── pages/
 │   │   ├── chat.page.ts     # 主聊天页面 PO
-│   │   ├── documents.page.ts# 文档集合抽屉 PO
+│   │   ├── documents.page.ts# 文档控制台 / 详情页 PO
 │   │   ├── auth.page.ts     # 用户认证抽屉 PO
-│   │   └── admin.page.ts    # 管理后台抽屉 PO
+│   │   └── admin.page.ts    # 管理后台页面 PO
 │   ├── tests/
 │   │   ├── auth.spec.ts     # 认证交互（6 例）
 │   │   ├── chat.spec.ts     # 问答交互（6 例）
@@ -160,10 +160,10 @@ export PLAYWRIGHT_ADMIN_PASSWORD=MySecret
 - 复制回答按钮（验证文案切换为"已复制"）
 - 图片问答（Base64 图片上传 + 提问）
 
-### 文档集合交互（documents.spec.ts）
+### 文档控制台交互（documents.spec.ts）
 
 - 匿名访客可查看公开文档列表
-- 匿名访客可查看文档详情
+- 匿名访客可进入文档详情页并返回列表
 - 管理员上传文档（通过 hidden input 模拟文件上传）
 - 管理员删除文档
 - 已登录成员可查看完整文档列表

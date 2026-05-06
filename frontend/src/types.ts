@@ -9,6 +9,14 @@ export interface RagRequest {
   question: string;
   conversationId?: string | null;
   maxResults?: number | null;
+  minScore?: number | null;
+}
+
+export interface ImageAskResponse {
+  conversationId?: string | null;
+  answer?: string | null;
+  thinking?: string | null;
+  sources?: SourceReference[] | null;
 }
 
 export interface DocumentResponse {

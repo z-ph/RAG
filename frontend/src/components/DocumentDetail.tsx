@@ -6,17 +6,23 @@ import {
   TagOutlined
 } from "@ant-design/icons";
 import { Button, Spin } from "antd";
+import type { ReactNode } from "react";
 import type { PublicDocumentDetailResponse } from "../types";
 import { MarkdownContent } from "./MarkdownContent";
 
 interface DocumentDetailProps {
   detail: PublicDocumentDetailResponse | null;
   loading: boolean;
-  onClose: () => void;
+  onBack?: () => void;
+  onClose?: () => void;
   onDownload: (documentId: string, filename: string) => void;
+  emptyState?: ReactNode;
+  headerActions?: ReactNode;
 }
 
 export function DocumentDetail(props: DocumentDetailProps) {
+  const handleReturn = props.onBack ?? props.onClose ?? (() => undefined);
+
   if (props.loading) {
     return (
       <div className="grid h-full min-h-[300px] place-items-center">
@@ -26,7 +32,13 @@ export function DocumentDetail(props: DocumentDetailProps) {
   }
 
   if (!props.detail) {
-    return null;
+    return (
+      <div className="grid h-full min-h-[300px] place-items-center px-6 py-8 text-center">
+        {props.emptyState ?? (
+          <p className="text-sm text-ink-500">未找到文档详情。</p>
+        )}
+      </div>
+    );
   }
 
   const { detail } = props;
@@ -34,22 +46,29 @@ export function DocumentDetail(props: DocumentDetailProps) {
   return (
     <section className="flex h-full min-h-0 flex-col overflow-hidden px-6 py-6 max-[720px]:px-[18px] max-[720px]:py-[18px]">
       <div className="flex items-start justify-between gap-4">
-        <div className="min-w-0">
-          <p className="text-xs font-bold uppercase tracking-[0.12em] text-ink-500">
-            文档详情
-          </p>
-          <h2 className="mt-1 text-lg font-semibold text-ink-950 truncate">
-            {detail.title || detail.filename}
-          </h2>
+        <div className="flex min-w-0 items-start gap-3">
+          <Button
+            type="text"
+            shape="circle"
+            className="!mt-0.5 !text-ink-500 hover:!bg-white/[0.8] hover:!text-ink-950"
+            icon={<ArrowLeftOutlined />}
+            onClick={handleReturn}
+            title="返回文档控制台"
+          />
+          <div className="min-w-0">
+            <p className="text-xs font-bold uppercase tracking-[0.12em] text-ink-500">
+              文档详情
+            </p>
+            <h2 className="mt-1 text-lg font-semibold text-ink-950 truncate">
+              {detail.title || detail.filename}
+            </h2>
+          </div>
         </div>
-        <Button
-          type="text"
-          shape="circle"
-          className="!text-ink-500 hover:!bg-white/[0.8] hover:!text-ink-950"
-          icon={<ArrowLeftOutlined />}
-          onClick={props.onClose}
-          title="返回文档列表"
-        />
+        {props.headerActions ? (
+          <div className="flex items-center gap-2">
+            {props.headerActions}
+          </div>
+        ) : null}
       </div>
 
       <div className="mt-4 flex flex-wrap items-center gap-2">

@@ -52,6 +52,7 @@ VITE_BACKEND_URL=http://your-backend-domain:8081
 
 ## 功能
 
+- 独立文档控制台与文档详情页（`/documents`、`/documents/:documentId`）
 - 文档上传、列表查询、删除
 - RAG 流式问答
 - 文档检索、思考内容折叠展示与自动收起
@@ -59,3 +60,7 @@ VITE_BACKEND_URL=http://your-backend-domain:8081
 - 来源片段展示
 - 消息复制
 - 服务健康状态检查
+
+## 路由部署
+
+前端使用 `BrowserRouter`，生产环境部署时需要把 `/rag/*` 路由回退到同一个 `index.html`，否则刷新 `/rag/documents`、`/rag/documents/:documentId`、`/rag/admin/*` 会返回 404。

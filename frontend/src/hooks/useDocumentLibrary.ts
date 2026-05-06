@@ -215,11 +215,13 @@ export function useDocumentLibrary(
   }
 
   async function handleViewDocument(documentId: string) {
+    setViewingDocument(null);
     setViewingLoading(true);
     try {
       const detail = await getPublicDocumentDetail(documentId);
       setViewingDocument(detail);
     } catch (error) {
+      setViewingDocument(null);
       messageApi.error(error instanceof Error ? error.message : "获取文档详情失败");
     } finally {
       setViewingLoading(false);
@@ -234,7 +236,11 @@ export function useDocumentLibrary(
     try {
       const response = await getDocumentDownloadLink(documentId);
       const downloadUrl = import.meta.env.VITE_BACKEND_URL + response.downloadUrl;
-      setDownloadLinkInfo({ documentId, filename, downloadUrl });
+      setDownloadLinkInfo({
+        documentId,
+        filename: response.filename || filename,
+        downloadUrl
+      });
     } catch (error) {
       messageApi.error(error instanceof Error ? error.message : "获取下载链接失败");
     }
@@ -265,3 +271,5 @@ export function useDocumentLibrary(
     handleCloseDocumentDetail
   };
 }
+
+export type DocumentLibraryState = ReturnType<typeof useDocumentLibrary>;

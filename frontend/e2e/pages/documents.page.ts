@@ -1,29 +1,41 @@
 import { Locator, Page } from "@playwright/test";
 
 /**
- * 文档集合抽屉 Page Object
+ * 文档控制台 / 文档详情页面 Page Object
  */
 export class DocumentsPage {
   readonly page: Page;
-  readonly drawer: Locator;
-
+  readonly pageTitle: Locator;
+  readonly refreshButton: Locator;
   readonly uploadButton: Locator;
   readonly uploadFolderButton: Locator;
-  readonly refreshButton: Locator;
-  readonly closeButton: Locator;
+  readonly backButton: Locator;
 
   constructor(page: Page) {
     this.page = page;
-    this.drawer = page.locator(".ant-drawer-body").first();
+    this.pageTitle = page.getByRole("heading", { level: 2 });
+    this.refreshButton = page.getByRole("button", { name: "刷新" });
     this.uploadButton = page.getByRole("button", { name: "上传文档" });
     this.uploadFolderButton = page.getByRole("button", { name: "上传文件夹" });
-    this.refreshButton = page.getByRole("button", { name: "刷新" });
-    this.closeButton = page.locator('button[title="关闭文档集合"]').first();
+    this.backButton = page.locator('button[title="返回对话"], button[title="返回文档控制台"]').first();
   }
 
-  async close(): Promise<void> {
-    await this.closeButton.click();
-    await this.drawer.waitFor({ state: "hidden" });
+  async waitForConsole(): Promise<void> {
+    await this.page.waitForURL("**/documents");
+    await this.page.getByText("文档控制台").waitFor();
+  }
+
+  async waitForDetail(documentId?: string): Promise<void> {
+    if (documentId) {
+      await this.page.waitForURL(`**/documents/${documentId}`);
+    } else {
+      await this.page.waitForURL(/\/documents\/[^/]+$/);
+    }
+    await this.page.getByText("文档详情").waitFor();
+  }
+
+  async goBack(): Promise<void> {
+    await this.backButton.click();
   }
 
   async uploadFile(filePath: string): Promise<void> {
@@ -39,17 +51,17 @@ export class DocumentsPage {
 
   async viewDocument(filename: string): Promise<void> {
     const item = this.getDocumentItem(filename);
-    await item.locator("button", { hasText: "查看" }).click();
+    await item.getByRole("button", { name: "查看" }).click();
   }
 
   async downloadDocument(filename: string): Promise<void> {
     const item = this.getDocumentItem(filename);
-    await item.locator("button", { hasText: "下载" }).click();
+    await item.getByRole("button", { name: "下载" }).click();
   }
 
   async deleteDocument(filename: string): Promise<void> {
     const item = this.getDocumentItem(filename);
-    await item.locator("button", { hasText: "删除" }).click();
+    await item.getByRole("button", { name: "删除" }).click();
   }
 
   async waitForUploadComplete(timeout = 60_000): Promise<void> {

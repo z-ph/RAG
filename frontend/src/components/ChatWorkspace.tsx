@@ -1,13 +1,14 @@
 import {
   ClearOutlined,
   DatabaseOutlined,
+  FilterOutlined,
   PictureOutlined,
   SendOutlined,
   PauseCircleFilled,
   SettingOutlined,
   UserOutlined
 } from "@ant-design/icons";
-import { Button, Input } from "antd";
+import { Button, Input, InputNumber, Popover, Space, Typography } from "antd";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { MessageBubble } from "./MessageBubble";
@@ -17,14 +18,16 @@ interface ChatWorkspaceProps {
   messages: ChatMessage[];
   prompt: string;
   maxResults: number;
+  minScore: number;
   streaming: boolean;
   authenticated: boolean;
   authUser: { username: string; role: string; roleCode: string } | null;
-  onOpenDocuments: () => void;
+  onOpenDocuments: string;
   onOpenAuth: () => void;
   onOpenAdmin?: string;
   onPromptChange: (value: string) => void;
   onMaxResultsChange: (value: number) => void;
+  onMinScoreChange: (value: number) => void;
   onSend: (question?: string) => Promise<void>;
   onSendWithImage?: (image: File, question: string, previewUrl: string) => Promise<void>;
   onCancel: () => Promise<void>;
@@ -33,6 +36,7 @@ interface ChatWorkspaceProps {
 
 export function ChatWorkspace(props: ChatWorkspaceProps) {
   const navigate = useNavigate();
+  const [consoleOpen, setConsoleOpen] = useState(false);
   const [pendingImage, setPendingImage] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
@@ -90,27 +94,96 @@ export function ChatWorkspace(props: ChatWorkspaceProps) {
     });
   }
 
+  const parameterConsole = (
+    <div className="w-[260px]">
+      <div className="mb-3 flex items-start justify-between gap-3">
+        <div>
+          <Typography.Text className="!text-sm !font-medium !text-ink-900">
+            检索参数
+          </Typography.Text>
+          <Typography.Paragraph className="!mb-0 !mt-1 !text-xs !text-ink-500">
+            控制召回片段数量与最低匹配分数。
+          </Typography.Paragraph>
+        </div>
+      </div>
+      <div className="flex flex-col gap-3">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <Typography.Text className="!text-sm !text-ink-800">最大片段数</Typography.Text>
+            <Typography.Paragraph className="!mb-0 !mt-0.5 !text-xs !text-ink-500">
+              默认 4
+            </Typography.Paragraph>
+          </div>
+          <InputNumber
+            min={1}
+            max={20}
+            precision={0}
+            value={props.maxResults}
+            className="!w-24"
+            controls
+            onChange={(value) => {
+              if (typeof value === "number" && Number.isFinite(value) && value >= 1) {
+                props.onMaxResultsChange(value);
+              }
+            }}
+          />
+        </div>
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <Typography.Text className="!text-sm !text-ink-800">最低分数</Typography.Text>
+            <Typography.Paragraph className="!mb-0 !mt-0.5 !text-xs !text-ink-500">
+              默认 0.5
+            </Typography.Paragraph>
+          </div>
+          <InputNumber
+            min={0}
+            max={1}
+            step={0.1}
+            precision={1}
+            value={props.minScore}
+            className="!w-24"
+            controls
+            onChange={(value) => {
+              if (typeof value === "number" && Number.isFinite(value)) {
+                props.onMinScoreChange(value);
+              }
+            }}
+          />
+        </div>
+      </div>
+    </div>
+  );
+
   return (
     <section className="flex min-h-0 w-full flex-1 flex-col overflow-hidden">
       <div className="grid min-h-0 flex-1 grid-rows-[auto_minmax(0,1fr)_auto] gap-4">
-          <div className="flex flex-wrap items-center gap-2 justify-end">
+          <div className="flex flex-wrap items-center justify-end gap-2">
             <Button
               className="!border-ink-950/10 !bg-sky-50/90 !px-4 !text-ink-900 !shadow-none hover:!border-accent-500/25 hover:!text-accent-500"
               icon={<DatabaseOutlined />}
-              onClick={props.onOpenDocuments}
+              onClick={() => navigate(props.onOpenDocuments)}
             >
-              文档集合
+              文档控制台
             </Button>
-            <Input
-              type="number"
-              min={1}
-              value={props.maxResults}
-              className="!w-[72px] !border-ink-950/10 !bg-white/80 !text-center !shadow-none hover:!border-accent-500/25"
-              onChange={(e) => {
-                const v = parseInt(e.target.value, 10);
-                if (!isNaN(v) && v >= 1) props.onMaxResultsChange(v);
-              }}
-            />
+            <Popover
+              trigger="click"
+              placement="bottomRight"
+              open={consoleOpen}
+              onOpenChange={setConsoleOpen}
+              content={parameterConsole}
+            >
+              <Button
+                className="!border-ink-950/10 !bg-white/80 !px-3 !text-ink-700 !shadow-none hover:!border-accent-500/25 hover:!text-accent-500"
+                icon={<FilterOutlined />}
+              >
+                <Space size={6}>
+                  <span>参数</span>
+                  <span className="text-xs text-ink-500">
+                    {props.maxResults} / {props.minScore.toFixed(1)}
+                  </span>
+                </Space>
+              </Button>
+            </Popover>
             <Button
               className="!border-ink-950/10 !bg-white/80 !px-4 !text-ink-700 !shadow-none hover:!border-accent-500/25 hover:!text-accent-500"
               icon={<ClearOutlined />}

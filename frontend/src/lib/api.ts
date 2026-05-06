@@ -4,6 +4,7 @@ import type {
   DocumentDeleteResponse,
   DocumentListResponse,
   DocumentResponse,
+  ImageAskResponse,
   MessageResponse,
   PublicDocumentDetailResponse,
   PublicDocumentListResponse,
@@ -350,12 +351,22 @@ export function resetPrompt(key: string) {
   return requestJson<PromptInfo>(`/admin/prompts/${key}/reset`, { method: "POST" });
 }
 
-export async function askWithImage(image: File, question: string, conversationId?: string) {
+export async function askWithImage(
+  image: File,
+  question: string,
+  options?: { conversationId?: string; maxResults?: number; minScore?: number }
+) {
   const formData = new FormData();
   formData.append("image", image);
   formData.append("question", question);
-  if (conversationId) {
-    formData.append("conversationId", conversationId);
+  if (options?.conversationId) {
+    formData.append("conversationId", options.conversationId);
+  }
+  if (typeof options?.maxResults === "number") {
+    formData.append("maxResults", String(options.maxResults));
+  }
+  if (typeof options?.minScore === "number") {
+    formData.append("minScore", String(options.minScore));
   }
 
   const response = await fetch(`${API_BASE_URL}/rag/ask/with-image`, {
@@ -365,7 +376,7 @@ export async function askWithImage(image: File, question: string, conversationId
   });
 
   await ensureOk(response, "图片问答失败");
-  return response.json();
+  return response.json() as Promise<ImageAskResponse>;
 }
 
 export function cancelConversation(conversationId: string) {

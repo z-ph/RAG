@@ -1,4 +1,4 @@
-# syntax=docker/dockerfile:1
+# syntax=docker.m.daocloud.io/docker/dockerfile:1
 
 # 阶段1：前端构建（产物最终存放在 /app/dist，可通过 volume 挂载导出）
 FROM docker.1ms.run/node:20-alpine AS frontend-builder

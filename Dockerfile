@@ -1,7 +1,7 @@
 # syntax=docker.m.daocloud.io/docker/dockerfile:1
 
 # 阶段1：前端构建（产物最终存放在 /app/dist，可通过 volume 挂载导出）
-FROM docker.1ms.run/node:20-alpine AS frontend-builder
+FROM docker.1ms.run/node:22-alpine AS frontend-builder
 WORKDIR /workspace/frontend
 COPY frontend/package.json frontend/pnpm-lock.yaml ./
 RUN --mount=type=cache,target=/root/.local/share/pnpm/store \

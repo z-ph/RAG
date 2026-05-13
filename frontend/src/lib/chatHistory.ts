@@ -9,10 +9,9 @@ interface StoredConversation {
 }
 
 export function saveConversation(messages: ChatMessage[], conversationId: string | null): void {
-  const completed = messages.filter((m) => m.status !== "streaming");
   try {
     const data: StoredConversation = {
-      messages: completed.slice(-MAX_MESSAGES),
+      messages: messages.filter((m) => m.status !== "streaming").slice(-MAX_MESSAGES),
       conversationId,
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data));

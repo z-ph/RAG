@@ -284,3 +284,5 @@ export function useRagConversation(messageApi: MessageApi) {
     handleClearConversation
   };
 }
+
+export type RagConversationState = ReturnType<typeof useRagConversation>;

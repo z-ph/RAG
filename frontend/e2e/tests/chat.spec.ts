@@ -1,5 +1,6 @@
 import { test, expect } from "../fixtures";
 import { ChatPage } from "../pages/chat.page";
+import { DocumentsPage } from "../pages/documents.page";
 
 test.describe("智能问答交互", () => {
   test("匿名访客发送文本问题，AI 流式回答", async ({ anonymousPage }) => {
@@ -35,6 +36,36 @@ test.describe("智能问答交互", () => {
     await expect(chat.getLatestAssistantMessage()).toBeVisible();
 
     await chat.waitForAssistantResponse(60_000);
+  });
+
+  test("流式回答时切换到文档控制台再返回，不丢失已生成内容", async ({ adminPage }) => {
+    const chat = new ChatPage(adminPage);
+    const docs = new DocumentsPage(adminPage);
+    await chat.goto();
+
+    const question = "请持续详细介绍一下当前知识库系统的能力与适用场景";
+    await chat.sendMessage(question);
+    await expect(chat.getUserMessage(question)).toBeVisible();
+
+    const assistant = chat.getLatestAssistantMessage();
+    await expect(assistant).toBeVisible();
+    await expect
+      .poll(async () => {
+        const content = await assistant.locator(".text-sm").first().textContent();
+        return (content ?? "").trim().length;
+      }, { timeout: 30_000 })
+      .toBeGreaterThan(0);
+
+    const partialContent = ((await assistant.locator(".text-sm").first().textContent()) ?? "").trim();
+
+    await chat.openDocuments();
+    await docs.waitForConsole();
+    await docs.goBack();
+    await chat.page.waitForURL("**/");
+
+    await expect(chat.getUserMessage(question)).toBeVisible();
+    await expect(chat.getLatestAssistantMessage()).toBeVisible();
+    await expect(chat.getLatestAssistantMessage()).toContainText(partialContent);
   });
 
   test("清空对话", async ({ adminPage }) => {

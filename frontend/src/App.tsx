@@ -3,6 +3,7 @@ import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { App as AntdApp } from "antd";
 import { LazyPageFallback } from "./components/LazyPageFallback";
 import { useAuthSession } from "./hooks/useAuthSession";
+import { useRagConversation } from "./hooks/useRagConversation";
 
 const ChatPage = lazy(async () => import("./pages/ChatPage").then((module) => ({ default: module.ChatPage })));
 const DocumentsLayout = lazy(async () => import("./pages/DocumentsLayout").then((module) => ({ default: module.DocumentsLayout })));
@@ -63,6 +64,9 @@ function AdminRoutes() {
 }
 
 function App() {
+  const { message } = AntdApp.useApp();
+  const conversation = useRagConversation(message);
+
   return (
     <BrowserRouter basename="/rag">
       <Routes>
@@ -70,7 +74,7 @@ function App() {
           path="/"
           element={(
             <AppSuspense>
-              <ChatPage />
+              <ChatPage conversation={conversation} />
             </AppSuspense>
           )}
         />

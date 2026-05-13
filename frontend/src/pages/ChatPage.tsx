@@ -3,14 +3,17 @@ import { App as AntdApp, Drawer, Grid } from "antd";
 import { ChatWorkspace } from "../components/ChatWorkspace";
 import { AuthPanel } from "../components/AuthPanel";
 import { useAuthSession } from "../hooks/useAuthSession";
-import { useRagConversation } from "../hooks/useRagConversation";
+import type { RagConversationState } from "../hooks/useRagConversation";
 
-export function ChatPage() {
+interface ChatPageProps {
+  conversation: RagConversationState;
+}
+
+export function ChatPage({ conversation }: ChatPageProps) {
   const { message } = AntdApp.useApp();
   const screens = Grid.useBreakpoint();
   const [authDrawerOpen, setAuthDrawerOpen] = useState(false);
   const authSession = useAuthSession(message);
-  const conversation = useRagConversation(message);
   const drawerWidth = screens.xl
     ? "32vw"
     : screens.lg

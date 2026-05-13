@@ -17,7 +17,7 @@ services:
       retries: 10
       start_period: 30s
     ports:
-      - "3306:3306"
+      # - "3306:3306"
 
   app:
     build:
@@ -108,8 +108,8 @@ services:
     volumes:
       - qdrant-data:/qdrant/storage
     ports:
-      - "6333:6333"
-      - "6334:6334"
+      # - "6333:6333"
+      # - "6334:6334"
 
 volumes:
   mysql-data:

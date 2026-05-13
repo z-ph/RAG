@@ -65,6 +65,7 @@ export function DocumentSidebar(props: DocumentSidebarProps) {
     multiple: true,
     showUploadList: false,
     beforeUpload: handleBeforeUpload,
+    accept: ".pdf,.txt,.docx,.doc,.md,.xlsx,.xls",
   };
 
   const folderUploadProps: UploadProps = {
@@ -139,11 +140,11 @@ export function DocumentSidebar(props: DocumentSidebarProps) {
             </Button>
           </div>
           <Alert
-            type="warning"
+            type="info"
             showIcon
-            className="!border-amber-200 !bg-amber-50"
-            message="Word 文档建议优先上传 DOCX"
-            description="如果是 DOC 文件，建议先转换为 DOCX 后再上传，以获得更好的兼容性和检索效果。"
+            className="!border-sky-200 !bg-sky-50"
+            message="支持 PDF、TXT、DOCX、DOC、XLSX、XLS、MD"
+            description="Word 文档建议优先上传 DOCX；Excel 表格会直接提取所有工作表的文本内容；扫描版 PDF 会自动尝试 OCR 识别。"
           />
         </div>
       )}

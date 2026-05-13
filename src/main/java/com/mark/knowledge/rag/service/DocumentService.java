@@ -5,6 +5,7 @@ import com.mark.knowledge.rag.service.parsers.DocParseResult;
 import com.mark.knowledge.rag.service.parsers.DocParser;
 import com.mark.knowledge.rag.service.parsers.DocxParseResult;
 import com.mark.knowledge.rag.service.parsers.DocxParser;
+import com.mark.knowledge.rag.service.parsers.ExcelParser;
 import com.mark.knowledge.rag.service.parsers.ImageReference;
 import dev.langchain4j.data.document.Metadata;
 import dev.langchain4j.data.segment.TextSegment;
@@ -93,9 +94,11 @@ public class DocumentService {
     private int keywordCount;
 
     private final ImageStorageService imageStorageService;
+    private final OcrService ocrService;
 
-    public DocumentService(ImageStorageService imageStorageService) {
+    public DocumentService(ImageStorageService imageStorageService, OcrService ocrService) {
         this.imageStorageService = imageStorageService;
+        this.ocrService = ocrService;
     }
 
     /**
@@ -159,6 +162,9 @@ public class DocumentService {
                 docImages = parseResult.imageReferences();
                 saveImages(documentId, "DOC", docImages);
                 log.info("DOC解析成功 ({} 字符)", rawContent.length());
+            } else if (lowerFilename.endsWith(".xlsx") || lowerFilename.endsWith(".xls")) {
+                rawContent = ExcelParser.parse(inputStream);
+                log.info("Excel解析成功 ({} 字符)", rawContent.length());
             } else {
                 rawContent = parseText(inputStream);
                 log.info("文本解析成功 ({} 字符)", rawContent.length());
@@ -974,7 +980,10 @@ public class DocumentService {
     }
 
     /**
-     * 使用PDFBox 3.x解析PDF文档
+     * 使用PDFBox 3.x解析PDF文档，支持OCR fallback
+     *
+     * <p>先用 PDFTextStripper 提取原生文本；如果文本极少或为空
+     *（常见于扫描版/图片型PDF），则自动 fallback 到 Tesseract OCR。</p>
      *
      * @param inputStream PDF输入流
      * @return 提取的文本内容
@@ -1002,6 +1011,17 @@ public class DocumentService {
                 .trim();
 
             log.debug("  文本提取完成: {} 字符", cleaned.length());
+
+            if (ocrService != null && ocrService.shouldAttemptOcr(cleaned, minTextLength)) {
+                log.info("PDF 原生文本极少 ({} 字符)，尝试 OCR 识别...", cleaned.length());
+                String ocrText = ocrService.ocrPdf(bytes);
+                if (ocrText != null && !ocrText.isBlank()) {
+                    log.info("OCR 识别成功，提取 {} 字符", ocrText.length());
+                    return ocrText;
+                }
+                log.warn("OCR 未识别到文字，回退使用原生文本");
+            }
+
             return cleaned;
         } catch (Exception e) {
             log.error("PDF文档解析失败", e);

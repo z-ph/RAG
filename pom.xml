@@ -111,12 +111,19 @@
 			<version>${langchain4j-qdrant.version}</version>
 		</dependency>
 
-		<!-- PDF Parsing -->
+        <!-- PDF Parsing -->
 		<dependency>
 			<groupId>org.apache.pdfbox</groupId>
 			<artifactId>pdfbox</artifactId>
-			<version>3.0.3</version>
+			<version>3.0.7</version>
 		</dependency>
+
+        <!-- Tesseract OCR for scanned PDFs -->
+        <dependency>
+            <groupId>net.sourceforge.tess4j</groupId>
+            <artifactId>tess4j</artifactId>
+            <version>5.18.0</version>
+        </dependency>
 
 		<!-- Apache POI for Office formats (DOCX, XLSX, PPTX) -->
 		<dependency>

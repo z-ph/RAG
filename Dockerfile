@@ -23,11 +23,18 @@ RUN --mount=type=cache,target=/root/.m2/repository \
 # 阶段4：最终运行镜像（仅运行 Spring Boot，不托管前端静态资源）
 FROM docker.m.daocloud.io/eclipse-temurin:21-jre
 
-# Install mysql-client for wait script
+# Install mysql-client for wait script and tesseract-ocr for PDF OCR
 RUN apt-get update && \
-    apt-get install -y default-mysql-client && \
+    apt-get install -y \
+        default-mysql-client \
+        tesseract-ocr \
+        tesseract-ocr-eng \
+        tesseract-ocr-chi-sim \
+        tesseract-ocr-osd && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
+
+ENV TESSDATA_PREFIX=/usr/share/tesseract-ocr/5/tessdata
 
 WORKDIR /app
 
@@ -59,6 +66,6 @@ ENV TZ=Asia/Shanghai \
 
 VOLUME ["/app/uploads"]
 
-EXPOSE 8080
+EXPOSE 8081
 
 CMD ["/app/scripts/start.sh"]

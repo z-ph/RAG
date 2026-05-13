@@ -455,3 +455,5 @@ rag:
 - [docs/Docker-Deployment.md](docs/Docker-Deployment.md)：Docker 单镜像部署说明
 - [docs/Mixed-Model-Architecture-Guide.md](docs/Mixed-Model-Architecture-Guide.md)：provider 配置说明
 - [docs/Database-Schema.md](docs/Database-Schema.md)：MySQL、Qdrant 与内存存储结构说明
+- [docs/technical-innovation-and-patentability-assessment.md](docs/technical-innovation-and-patentability-assessment.md)：技术改进与可专利性评估
+- [docs/teacher-report-rag-innovation-summary.md](docs/teacher-report-rag-innovation-summary.md)：教师可直接阅读的项目汇报版

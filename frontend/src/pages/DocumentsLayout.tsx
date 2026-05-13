@@ -19,11 +19,11 @@ export function DocumentsLayout() {
     authSession.handleUnauthorized
   );
   const drawerWidth = screens.xl
-    ? "32vw"
+    ? 560
     : screens.lg
-      ? "38vw"
+      ? 520
       : screens.md
-        ? "46vw"
+        ? 460
         : "100vw";
   const canManageDocuments = authSession.authStatus.authenticated
     && (
@@ -80,13 +80,9 @@ export function DocumentsLayout() {
         open={authDrawerOpen}
         onClose={() => setAuthDrawerOpen(false)}
         placement="right"
+        width={drawerWidth}
         closable={false}
         title={null}
-        styles={{
-          section: {
-            width: drawerWidth
-          }
-        }}
         classNames={{
           mask: "!backdrop-blur-[3px]",
           wrapper: "!shadow-none",

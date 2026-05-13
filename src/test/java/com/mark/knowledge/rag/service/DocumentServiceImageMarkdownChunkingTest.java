@@ -16,7 +16,10 @@ class DocumentServiceImageMarkdownChunkingTest {
 
     @Test
     void shouldKeepImageMarkdownWholeWhenChunkingLongParagraph() throws Exception {
-        DocumentService service = new DocumentService(mock(ImageStorageService.class));
+        DocumentService service = new DocumentService(
+            mock(ImageStorageService.class),
+            mock(OcrService.class)
+        );
         setIntField(service, "chunkSize", 80);
         setIntField(service, "chunkMinSize", 60);
         setIntField(service, "chunkMaxSize", 90);

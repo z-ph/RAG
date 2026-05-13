@@ -11,7 +11,10 @@ class DocumentServiceFixedDocumentIdTest {
 
     @Test
     void shouldPreserveProvidedDocumentId() {
-        DocumentService service = new DocumentService(mock(ImageStorageService.class));
+        DocumentService service = new DocumentService(
+            mock(ImageStorageService.class),
+            mock(OcrService.class)
+        );
 
         DocumentService.ProcessedDocument processed = service.processDocument(
             new ByteArrayInputStream("第一段文本\n\n第二段文本".getBytes()),

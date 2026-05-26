@@ -1,7 +1,22 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ApiError, adminReindexDocument, deleteDocument, getBatchReindexStatus, getDocumentDownloadLink, getPublicDocumentDetail, listDocuments, listPublicDocuments, startBatchReindex, uploadDocumentStream } from "../lib/api";
+import {
+  ApiError,
+  adminReindexDocument,
+  deleteDocument,
+  getBatchReindexStatus,
+  getDocumentDownloadLink,
+  getPublicDocumentDetail,
+  listDocuments,
+  listPublicDocuments,
+  startBatchReindex,
+  uploadDocumentStream,
+} from "../lib/api";
 import type { BatchReindexStatus } from "../lib/api";
-import type { DocumentListItem, FileUploadEntry, PublicDocumentDetailResponse } from "../types";
+import type {
+  DocumentListItem,
+  FileUploadEntry,
+  PublicDocumentDetailResponse,
+} from "../types";
 
 interface MessageApi {
   error: (content: string) => void;
@@ -17,7 +32,7 @@ interface DownloadLinkInfo {
 export function useDocumentLibrary(
   messageApi: MessageApi,
   authenticated: boolean,
-  onUnauthorized: () => Promise<void> | void
+  onUnauthorized: () => Promise<void> | void,
 ) {
   const [documents, setDocuments] = useState<DocumentListItem[]>([]);
   const [documentsLoading, setDocumentsLoading] = useState(false);
@@ -28,16 +43,23 @@ export function useDocumentLibrary(
     reindexingId: string | null;
   }>({
     deletingId: null,
-    reindexingId: null
+    reindexingId: null,
   });
-  const [viewingDocument, setViewingDocument] = useState<PublicDocumentDetailResponse | null>(null);
+  const [viewingDocument, setViewingDocument] =
+    useState<PublicDocumentDetailResponse | null>(null);
   const [viewingLoading, setViewingLoading] = useState(false);
-  const [downloadLinkInfo, setDownloadLinkInfo] = useState<DownloadLinkInfo | null>(null);
-  const [batchReindexTaskId, setBatchReindexTaskId] = useState<string | null>(null);
-  const [batchReindexProgress, setBatchReindexProgress] = useState<BatchReindexStatus | null>(null);
+  const [downloadLinkInfo, setDownloadLinkInfo] =
+    useState<DownloadLinkInfo | null>(null);
+  const [batchReindexTaskId, setBatchReindexTaskId] = useState<string | null>(
+    null,
+  );
+  const [batchReindexProgress, setBatchReindexProgress] =
+    useState<BatchReindexStatus | null>(null);
   const [batchReindexing, setBatchReindexing] = useState(false);
   const abortControllerRef = useRef<AbortController | null>(null);
-  const batchReindexPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const batchReindexPollRef = useRef<ReturnType<typeof setInterval> | null>(
+    null,
+  );
   const { deletingId, reindexingId } = documentActionState;
 
   useEffect(() => {
@@ -100,28 +122,36 @@ export function useDocumentLibrary(
           {
             onProgress: (event) => {
               setFileUploads((prev) =>
-                prev.map((entry, i) => i === index ? { ...entry, progress: event } : entry)
+                prev.map((entry, i) =>
+                  i === index ? { ...entry, progress: event } : entry,
+                ),
               );
             },
             onComplete: (event) => {
               successCount++;
               setFileUploads((prev) =>
-                prev.map((entry, i) => i === index ? { ...entry, status: "complete" as const } : entry)
+                prev.map((entry, i) =>
+                  i === index
+                    ? { ...entry, status: "complete" as const }
+                    : entry,
+                ),
               );
               messageApi.success(
-                `${event.filename || file.name} 已入库，切分 ${event.segmentCount} 段`
+                `${event.filename || file.name} 已入库，切分 ${event.segmentCount} 段`,
               );
             },
             onError: (errorMessage) => {
               setFileUploads((prev) =>
                 prev.map((entry, i) =>
-                  i === index ? { ...entry, status: "error" as const, errorMessage } : entry
-                )
+                  i === index
+                    ? { ...entry, status: "error" as const, errorMessage }
+                    : entry,
+                ),
               );
               messageApi.error(`${file.name}: ${errorMessage}`);
-            }
+            },
           },
-          signal
+          signal,
         ).catch((error) => {
           if (error instanceof ApiError && error.status === 401) {
             setDocuments([]);
@@ -130,13 +160,19 @@ export function useDocumentLibrary(
           } else if (error instanceof Error && error.name !== "AbortError") {
             setFileUploads((prev) =>
               prev.map((entry, i) =>
-                i === index ? { ...entry, status: "error" as const, errorMessage: "上传失败" } : entry
-              )
+                i === index
+                  ? {
+                      ...entry,
+                      status: "error" as const,
+                      errorMessage: "上传失败",
+                    }
+                  : entry,
+              ),
             );
             messageApi.error(`${file.name}: 上传失败`);
           }
-        })
-      )
+        }),
+      ),
     );
 
     setUploading(false);
@@ -162,12 +198,14 @@ export function useDocumentLibrary(
 
     setDocumentActionState((current) => ({
       ...current,
-      deletingId: documentId
+      deletingId: documentId,
     }));
 
     try {
       const response = await deleteDocument(documentId);
-      messageApi.success(`${response.message}，删除 ${response.deletedSegments} 段`);
+      messageApi.success(
+        `${response.message}，删除 ${response.deletedSegments} 段`,
+      );
       await refreshDocuments();
     } catch (error) {
       if (error instanceof ApiError && error.status === 401) {
@@ -180,7 +218,7 @@ export function useDocumentLibrary(
     } finally {
       setDocumentActionState((current) => ({
         ...current,
-        deletingId: null
+        deletingId: null,
       }));
     }
   }
@@ -192,12 +230,14 @@ export function useDocumentLibrary(
 
     setDocumentActionState((current) => ({
       ...current,
-      reindexingId: documentId
+      reindexingId: documentId,
     }));
 
     try {
       const response = await adminReindexDocument(documentId);
-      messageApi.success(`${response.message}，删除 ${response.deletedSegments} 段，新增 ${response.newSegments} 段`);
+      messageApi.success(
+        `${response.message}，删除 ${response.deletedSegments} 段，新增 ${response.newSegments} 段`,
+      );
       await refreshDocuments();
       if (viewingDocument?.documentId === documentId) {
         const detail = await getPublicDocumentDetail(documentId);
@@ -214,7 +254,7 @@ export function useDocumentLibrary(
     } finally {
       setDocumentActionState((current) => ({
         ...current,
-        reindexingId: null
+        reindexingId: null,
       }));
     }
   }
@@ -247,7 +287,9 @@ export function useDocumentLibrary(
         await onUnauthorized();
         return;
       }
-      messageApi.error(error instanceof Error ? error.message : "启动批量重载失败");
+      messageApi.error(
+        error instanceof Error ? error.message : "启动批量重建失败",
+      );
     }
   }
 
@@ -263,16 +305,18 @@ export function useDocumentLibrary(
           cancelBatchReindex();
           if (status.status === "COMPLETED") {
             messageApi.success(
-              `批量重载完成: ${status.totalDocuments} 篇文档，成功 ${status.completedDocuments} 篇，失败 ${status.failedDocuments} 篇`
+              `批量重建: ${status.totalDocuments} 篇文档，成功 ${status.completedDocuments} 篇，失败 ${status.failedDocuments} 篇`,
             );
           } else {
-            messageApi.error("批量重载失败");
+            messageApi.error("批量重建失败");
           }
           void refreshDocuments();
         }
       } catch (error) {
         cancelBatchReindex();
-        messageApi.error(error instanceof Error ? error.message : "查询重载进度失败");
+        messageApi.error(
+          error instanceof Error ? error.message : "查询重建进度失败",
+        );
       }
     };
 
@@ -295,7 +339,9 @@ export function useDocumentLibrary(
       setViewingDocument(detail);
     } catch (error) {
       setViewingDocument(null);
-      messageApi.error(error instanceof Error ? error.message : "获取文档详情失败");
+      messageApi.error(
+        error instanceof Error ? error.message : "获取文档详情失败",
+      );
     } finally {
       setViewingLoading(false);
     }
@@ -308,14 +354,17 @@ export function useDocumentLibrary(
   async function handleShowDownloadLink(documentId: string, filename: string) {
     try {
       const response = await getDocumentDownloadLink(documentId);
-      const downloadUrl = import.meta.env.VITE_BACKEND_URL + response.downloadUrl;
+      const downloadUrl =
+        import.meta.env.VITE_BACKEND_URL + response.downloadUrl;
       setDownloadLinkInfo({
         documentId,
         filename: response.filename || filename,
-        downloadUrl
+        downloadUrl,
       });
     } catch (error) {
-      messageApi.error(error instanceof Error ? error.message : "获取下载链接失败");
+      messageApi.error(
+        error instanceof Error ? error.message : "获取下载链接失败",
+      );
     }
   }
 
@@ -346,7 +395,7 @@ export function useDocumentLibrary(
     downloadLinkInfo,
     viewingDocument,
     viewingLoading,
-    handleCloseDocumentDetail
+    handleCloseDocumentDetail,
   };
 }
 

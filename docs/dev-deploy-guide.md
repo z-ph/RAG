@@ -266,9 +266,9 @@ logging:
     com.mark.knowledge.rag.service: TRACE  # RAG 管道追踪日志
 ```
 
-### 热重载
+### 热重建
 
-添加 Spring Boot DevTools 依赖后自动启用热重载：
+添加 Spring Boot DevTools 依赖后自动启用热重建：
 
 ```xml
 <dependency>

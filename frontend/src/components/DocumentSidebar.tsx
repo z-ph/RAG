@@ -9,7 +9,7 @@ import {
   FolderOpenOutlined,
   LoadingOutlined,
   ReloadOutlined,
-  StopOutlined
+  StopOutlined,
 } from "@ant-design/icons";
 import {
   Alert,
@@ -21,7 +21,7 @@ import {
   Spin,
   Tag,
   Upload,
-  type UploadProps
+  type UploadProps,
 } from "antd";
 import { useRef, type ReactNode } from "react";
 import type { DocumentListItem, FileUploadEntry } from "../types";
@@ -79,9 +79,10 @@ export function DocumentSidebar(props: DocumentSidebarProps) {
     beforeUpload: handleBeforeUpload,
   };
 
-  const batchLabel = props.fileUploads.length > 1
-    ? `上传中 (${props.fileUploads.filter(f => f.status === "complete").length}/${props.fileUploads.length})...`
-    : "上传中...";
+  const batchLabel =
+    props.fileUploads.length > 1
+      ? `上传中 (${props.fileUploads.filter((f) => f.status === "complete").length}/${props.fileUploads.length})...`
+      : "上传中...";
 
   const handleReturn = props.onBack ?? props.onClose ?? (() => undefined);
 
@@ -107,9 +108,7 @@ export function DocumentSidebar(props: DocumentSidebarProps) {
           </div>
         </div>
         {props.headerActions ? (
-          <div className="flex items-center gap-2">
-            {props.headerActions}
-          </div>
+          <div className="flex items-center gap-2">{props.headerActions}</div>
         ) : null}
       </div>
 
@@ -119,7 +118,13 @@ export function DocumentSidebar(props: DocumentSidebarProps) {
             <Upload {...uploadProps}>
               <Button
                 type="primary"
-                icon={props.uploading ? <LoadingOutlined /> : <CloudUploadOutlined />}
+                icon={
+                  props.uploading ? (
+                    <LoadingOutlined />
+                  ) : (
+                    <CloudUploadOutlined />
+                  )
+                }
                 loading={props.uploading}
                 disabled={props.uploading}
               >
@@ -128,7 +133,9 @@ export function DocumentSidebar(props: DocumentSidebarProps) {
             </Upload>
             <Upload {...folderUploadProps}>
               <Button
-                icon={props.uploading ? <LoadingOutlined /> : <FolderOpenOutlined />}
+                icon={
+                  props.uploading ? <LoadingOutlined /> : <FolderOpenOutlined />
+                }
                 loading={props.uploading}
                 disabled={props.uploading}
               >
@@ -145,9 +152,9 @@ export function DocumentSidebar(props: DocumentSidebarProps) {
             </Button>
             {props.canManageDocuments && (
               <Popconfirm
-                title="一键重载全部"
+                title="一键重建全部"
                 description="将基于原始文件重新切分所有文档并重建向量索引，可能需要较长时间。"
-                okText="开始重载"
+                okText="开始重建"
                 cancelText="取消"
                 onConfirm={() => void props.onBatchReindex()}
               >
@@ -157,7 +164,7 @@ export function DocumentSidebar(props: DocumentSidebarProps) {
                   disabled={props.uploading || props.batchReindexing}
                   className="!border-amber-300 !text-amber-700 hover:!border-amber-400 hover:!text-amber-800"
                 >
-                  {props.batchReindexing ? "重载中..." : "一键重载全部"}
+                  {props.batchReindexing ? "重建中..." : "一键重建全部"}
                 </Button>
               </Popconfirm>
             )}
@@ -178,7 +185,12 @@ export function DocumentSidebar(props: DocumentSidebarProps) {
             <span className="text-sm font-medium text-ink-900">
               {props.fileUploads.length > 1 && (
                 <span className="text-ink-500 mr-2">
-                  ({props.fileUploads.filter(f => f.status === "complete").length}/{props.fileUploads.length})
+                  (
+                  {
+                    props.fileUploads.filter((f) => f.status === "complete")
+                      .length
+                  }
+                  /{props.fileUploads.length})
                 </span>
               )}
               上传进度
@@ -198,19 +210,40 @@ export function DocumentSidebar(props: DocumentSidebarProps) {
             {props.fileUploads.map((entry, i) => (
               <div key={`${entry.filename}-${i}`}>
                 <div className="flex items-center gap-1.5 text-xs">
-                  {entry.status === "uploading" && <LoadingOutlined className="text-accent-500" />}
-                  {entry.status === "complete" && <CheckCircleOutlined className="text-emerald-600" />}
-                  {entry.status === "error" && <CloseCircleOutlined className="text-rose-600" />}
-                  <span className="truncate text-ink-900" title={entry.filename}>
+                  {entry.status === "uploading" && (
+                    <LoadingOutlined className="text-accent-500" />
+                  )}
+                  {entry.status === "complete" && (
+                    <CheckCircleOutlined className="text-emerald-600" />
+                  )}
+                  {entry.status === "error" && (
+                    <CloseCircleOutlined className="text-rose-600" />
+                  )}
+                  <span
+                    className="truncate text-ink-900"
+                    title={entry.filename}
+                  >
                     {entry.filename}
                   </span>
                   {entry.status === "error" && entry.errorMessage && (
-                    <span className="text-rose-600">({entry.errorMessage})</span>
+                    <span className="text-rose-600">
+                      ({entry.errorMessage})
+                    </span>
                   )}
                 </div>
                 <Progress
-                  percent={entry.status === "complete" ? 100 : (entry.progress?.percent ?? 0)}
-                  status={entry.status === "error" ? "exception" : entry.status === "complete" ? "success" : "active"}
+                  percent={
+                    entry.status === "complete"
+                      ? 100
+                      : (entry.progress?.percent ?? 0)
+                  }
+                  status={
+                    entry.status === "error"
+                      ? "exception"
+                      : entry.status === "complete"
+                        ? "success"
+                        : "active"
+                  }
                   strokeColor={{ from: "#f25b2a", to: "#ff894f" }}
                   size="small"
                 />
@@ -223,13 +256,18 @@ export function DocumentSidebar(props: DocumentSidebarProps) {
       {props.batchReindexing && props.batchReindexProgress && (
         <div className="mt-4 border border-amber-300 bg-amber-50/60 px-4 py-4">
           <div className="flex items-center justify-between gap-2">
-            <span className="text-sm font-medium text-amber-800">批量重载进度</span>
+            <span className="text-sm font-medium text-amber-800">
+              批量重建进度
+            </span>
             <Button
               type="text"
               size="small"
               className="!text-ink-500 hover:!text-ink-700"
               onClick={() => void props.onRefreshDocuments()}
-              disabled={props.batchReindexProgress.status !== "COMPLETED" && props.batchReindexProgress.status !== "FAILED"}
+              disabled={
+                props.batchReindexProgress.status !== "COMPLETED" &&
+                props.batchReindexProgress.status !== "FAILED"
+              }
             >
               完成后刷新列表
             </Button>
@@ -238,9 +276,10 @@ export function DocumentSidebar(props: DocumentSidebarProps) {
             percent={
               props.batchReindexProgress.totalDocuments > 0
                 ? Math.round(
-                    ((props.batchReindexProgress.completedDocuments + props.batchReindexProgress.failedDocuments) /
+                    ((props.batchReindexProgress.completedDocuments +
+                      props.batchReindexProgress.failedDocuments) /
                       props.batchReindexProgress.totalDocuments) *
-                      100
+                      100,
                   )
                 : 0
             }
@@ -251,27 +290,40 @@ export function DocumentSidebar(props: DocumentSidebarProps) {
                   ? "success"
                   : "active"
             }
-            strokeColor={props.batchReindexProgress.status === "FAILED" ? undefined : { from: "#f25b2a", to: "#ff894f" }}
+            strokeColor={
+              props.batchReindexProgress.status === "FAILED"
+                ? undefined
+                : { from: "#f25b2a", to: "#ff894f" }
+            }
             size="small"
             className="mt-1"
           />
           <div className="mt-2 text-xs text-ink-600">
             {props.batchReindexProgress.status === "RUNNING" && (
               <span>
-                已处理 {props.batchReindexProgress.completedDocuments + props.batchReindexProgress.failedDocuments}
+                已处理{" "}
+                {props.batchReindexProgress.completedDocuments +
+                  props.batchReindexProgress.failedDocuments}
                 /{props.batchReindexProgress.totalDocuments}
-                {props.batchReindexProgress.currentDocument && ` · 正在重载: ${props.batchReindexProgress.currentDocument}`}
+                {props.batchReindexProgress.currentDocument &&
+                  ` · 正在重建: ${props.batchReindexProgress.currentDocument}`}
               </span>
             )}
             {props.batchReindexProgress.status === "COMPLETED" && (
               <span className="text-emerald-700">
-                重载完成: {props.batchReindexProgress.totalDocuments} 篇文档，
-                成功 <span className="font-semibold">{props.batchReindexProgress.completedDocuments}</span> 篇，
-                失败 <span className="font-semibold text-rose-600">{props.batchReindexProgress.failedDocuments}</span> 篇
+                重建: {props.batchReindexProgress.totalDocuments} 篇文档， 成功{" "}
+                <span className="font-semibold">
+                  {props.batchReindexProgress.completedDocuments}
+                </span>{" "}
+                篇， 失败{" "}
+                <span className="font-semibold text-rose-600">
+                  {props.batchReindexProgress.failedDocuments}
+                </span>{" "}
+                篇
               </span>
             )}
             {props.batchReindexProgress.status === "FAILED" && (
-              <span className="text-rose-600">批量重载失败</span>
+              <span className="text-rose-600">批量重建失败</span>
             )}
           </div>
           {props.batchReindexProgress.results.length > 0 && (
@@ -288,7 +340,11 @@ export function DocumentSidebar(props: DocumentSidebarProps) {
                   )}
                   <span
                     className="truncate flex-1 text-ink-800"
-                    title={result.status === "FAILED" ? `${result.filename}: ${result.error ?? "未知错误"}` : result.filename}
+                    title={
+                      result.status === "FAILED"
+                        ? `${result.filename}: ${result.error ?? "未知错误"}`
+                        : result.filename
+                    }
                   >
                     {result.filename}
                   </span>
@@ -303,7 +359,9 @@ export function DocumentSidebar(props: DocumentSidebarProps) {
                       size="small"
                       className="!h-auto !px-1.5 !py-0 !text-[11px] !text-accent-500 hover:!text-accent-400 shrink-0"
                       icon={<ReloadOutlined className="!text-[11px]" />}
-                      onClick={() => void props.onReindexDocument(result.documentId)}
+                      onClick={() =>
+                        void props.onReindexDocument(result.documentId)
+                      }
                     >
                       重试
                     </Button>
@@ -318,15 +376,6 @@ export function DocumentSidebar(props: DocumentSidebarProps) {
       <div className="mt-6 flex min-h-0 flex-1 flex-col border-t border-ink-950/8 pt-[18px]">
         <div className="mb-3 flex items-center justify-between gap-3 text-sm font-bold text-ink-900">
           <span>已入库文档</span>
-          <Button
-            type="text"
-            size="small"
-            className="!px-0 !text-ink-500 hover:!text-accent-500"
-            icon={<ReloadOutlined />}
-            onClick={() => void props.onRefreshDocuments()}
-          >
-            重载
-          </Button>
         </div>
 
         {props.documentsLoading ? (
@@ -336,7 +385,9 @@ export function DocumentSidebar(props: DocumentSidebarProps) {
         ) : props.documents.length === 0 ? (
           <div className="grid min-h-[180px] place-items-center">
             <Empty
-              description={props.authenticated ? "还没有文档，先上传一份试试" : "暂无文档"}
+              description={
+                props.authenticated ? "还没有文档，先上传一份试试" : "暂无文档"
+              }
               image={Empty.PRESENTED_IMAGE_SIMPLE}
             />
           </div>
@@ -373,7 +424,9 @@ export function DocumentSidebar(props: DocumentSidebarProps) {
                     size="small"
                     className="!min-h-[32px] !min-w-[32px] !px-2 !text-ink-600 hover:!text-accent-500"
                     icon={<DownloadOutlined />}
-                    onClick={() => props.onShowDownloadLink(item.documentId, item.filename)}
+                    onClick={() =>
+                      props.onShowDownloadLink(item.documentId, item.filename)
+                    }
                   >
                     下载
                   </Button>
@@ -383,7 +436,9 @@ export function DocumentSidebar(props: DocumentSidebarProps) {
                       description="将删除当前片段并基于原文件重新切分入库。"
                       okText="重建"
                       cancelText="取消"
-                      onConfirm={() => void props.onReindexDocument(item.documentId)}
+                      onConfirm={() =>
+                        void props.onReindexDocument(item.documentId)
+                      }
                     >
                       <Button
                         type="text"
@@ -403,7 +458,9 @@ export function DocumentSidebar(props: DocumentSidebarProps) {
                       className="!min-h-[32px] !min-w-[32px] !px-2 !text-accent-500 hover:!text-accent-400"
                       icon={<DeleteOutlined />}
                       loading={props.deletingId === item.documentId}
-                      onClick={() => void props.onDeleteDocument(item.documentId)}
+                      onClick={() =>
+                        void props.onDeleteDocument(item.documentId)
+                      }
                     >
                       删除
                     </Button>

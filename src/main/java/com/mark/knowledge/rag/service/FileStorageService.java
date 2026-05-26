@@ -11,6 +11,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.stream.Stream;
 import java.util.regex.Pattern;
 
@@ -94,6 +96,40 @@ public class FileStorageService {
             return null;
         }
     }
+
+    /**
+     * 从本地文件系统扫描所有已上传的文档。
+     *
+     * @return 文档信息列表（documentId + filename），当 Qdrant 不可用时作为回退数据源
+     */
+    public List<StoredDocument> listStoredDocuments() {
+        List<StoredDocument> documents = new ArrayList<>();
+        if (!Files.isDirectory(storageRoot)) {
+            return documents;
+        }
+
+        try (Stream<Path> dirs = Files.list(storageRoot)) {
+            dirs.filter(Files::isDirectory).forEach(dir -> {
+                String documentId = dir.getFileName().toString();
+                if (!UUID_PATTERN.matcher(documentId).matches()) {
+                    return;
+                }
+                String filename = findStoredFilename(documentId);
+                if (filename != null) {
+                    documents.add(new StoredDocument(documentId, filename));
+                }
+            });
+        } catch (IOException e) {
+            log.warn("扫描文件存储目录失败: {}", storageRoot, e);
+        }
+
+        return documents;
+    }
+
+    /**
+     * 本地文件系统中存储的文档信息。
+     */
+    public record StoredDocument(String documentId, String filename) {}
 
     private void validateDocumentId(String documentId) {
         if (documentId == null || !UUID_PATTERN.matcher(documentId).matches()) {

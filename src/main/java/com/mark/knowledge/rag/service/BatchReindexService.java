@@ -1,5 +1,7 @@
 package com.mark.knowledge.rag.service;
 
+import com.mark.knowledge.rag.dto.DocumentListItemResponse;
+
 import jakarta.annotation.PreDestroy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -70,17 +72,17 @@ public class BatchReindexService {
             }
         }
 
-        var docList = documentAdminService.listDocuments();
+        var docList = resolveDocumentList();
         String taskId = UUID.randomUUID().toString();
         List<ReindexResult> results = new ArrayList<>();
 
         var progress = new BatchReindexProgress(
-            taskId, ReindexStatus.RUNNING, docList.total(), 0, 0,
+            taskId, ReindexStatus.RUNNING, docList.size(), 0, 0,
             null, results, Instant.now(), null
         );
         tasks.put(taskId, progress);
 
-        var items = List.copyOf(docList.documents());
+        var items = List.copyOf(docList);
 
         executor.submit(() -> {
             try {
@@ -126,8 +128,29 @@ public class BatchReindexService {
             }
         });
 
-        log.info("批处理重新索引已启动: taskId={}, totalDocuments={}", taskId, docList.total());
+        log.info("批处理重新索引已启动: taskId={}, totalDocuments={}", taskId, docList.size());
         return taskId;
+    }
+
+    /**
+     * 获取待重建的文档列表，Qdrant 无数据时回退到本地文件系统。
+     */
+    private List<DocumentListItemResponse> resolveDocumentList() {
+        var qdrantList = documentAdminService.listDocuments();
+        if (qdrantList.total() > 0) {
+            return qdrantList.documents();
+        }
+
+        List<FileStorageService.StoredDocument> stored = fileStorageService.listStoredDocuments();
+        if (stored.isEmpty()) {
+            log.warn("Qdrant 和本地文件系统均无文档数据");
+            return List.of();
+        }
+
+        log.info("Qdrant 无文档数据，从本地文件系统发现 {} 个文档用于重建", stored.size());
+        return stored.stream()
+            .map(doc -> new DocumentListItemResponse(doc.documentId(), doc.filename(), 0))
+            .toList();
     }
 
     /**

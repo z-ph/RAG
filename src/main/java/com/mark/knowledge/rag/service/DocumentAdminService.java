@@ -35,12 +35,15 @@ public class DocumentAdminService {
 
     private final String collectionName;
     private final WebClient webClient;
+    private final FileStorageService fileStorageService;
 
     public DocumentAdminService(
             @Value("${qdrant.host:localhost}") String qdrantHost,
             @Value("${qdrant.http-port:6333}") int qdrantHttpPort,
-            @Value("${qdrant.collection-name:knowledge-base}") String collectionName) {
+            @Value("${qdrant.collection-name:knowledge-base}") String collectionName,
+            FileStorageService fileStorageService) {
         this.collectionName = collectionName;
+        this.fileStorageService = fileStorageService;
         this.webClient = WebClient.builder()
             .codecs(this::configureCodecs)
             .baseUrl(String.format("http://%s:%d", qdrantHost, qdrantHttpPort))
@@ -69,6 +72,11 @@ public class DocumentAdminService {
             }
         }
 
+        // Qdrant 无数据时回退到本地文件系统
+        if (documents.isEmpty()) {
+            return listDocumentsFromFilesystem();
+        }
+
         List<DocumentListItemResponse> items = documents.values().stream()
             .sorted(Comparator.comparing(DocumentAggregate::filenameOrFallback)
                 .thenComparing(DocumentAggregate::documentId))
@@ -79,6 +87,16 @@ public class DocumentAdminService {
             ))
             .toList();
 
+        return new DocumentListResponse(items, items.size());
+    }
+
+    private DocumentListResponse listDocumentsFromFilesystem() {
+        List<FileStorageService.StoredDocument> stored = fileStorageService.listStoredDocuments();
+        List<DocumentListItemResponse> items = stored.stream()
+            .map(doc -> new DocumentListItemResponse(doc.documentId(), doc.filename(), 0))
+            .toList();
+
+        log.info("Qdrant 无文档数据，从本地文件系统回退列出 {} 个文档", items.size());
         return new DocumentListResponse(items, items.size());
     }
 

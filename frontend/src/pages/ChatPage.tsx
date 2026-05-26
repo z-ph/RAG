@@ -14,18 +14,9 @@ export function ChatPage({ conversation }: ChatPageProps) {
   const screens = Grid.useBreakpoint();
   const [authDrawerOpen, setAuthDrawerOpen] = useState(false);
   const authSession = useAuthSession(message);
-  const drawerWidth = screens.xl
-    ? 560
-    : screens.lg
-      ? 520
-      : screens.md
-        ? 460
-        : "100vw";
 
   return (
-    <main
-      className="relative isolate h-screen min-h-dvh overflow-hidden p-7 max-[1120px]:p-5 max-[720px]:p-3.5 [--message-shell-max:clamp(760px,96%,1440px)] max-[1120px]:[--message-shell-max:min(100%,920px)] max-[720px]:[--message-shell-max:100%]"
-    >
+    <main className="relative isolate h-screen min-h-dvh overflow-hidden p-7 max-[1120px]:p-5 max-[720px]:p-3.5 [--message-shell-max:clamp(760px,96%,1440px)] max-[1120px]:[--message-shell-max:min(100%,920px)] max-[720px]:[--message-shell-max:100%]">
       <div className="relative z-10 mx-auto flex h-full min-h-0 w-full max-w-[1600px]">
         <ChatWorkspace
           messages={conversation.messages}
@@ -37,7 +28,13 @@ export function ChatPage({ conversation }: ChatPageProps) {
           authUser={authSession.authStatus.user || null}
           onOpenDocuments="/documents"
           onOpenAuth={() => setAuthDrawerOpen(true)}
-          onOpenAdmin={authSession.authStatus.authenticated && (authSession.authStatus.user?.roleCode === "ADMIN" || authSession.authStatus.user?.roleCode === "SUPER_ADMIN") ? "/admin" : undefined}
+          onOpenAdmin={
+            authSession.authStatus.authenticated &&
+            (authSession.authStatus.user?.roleCode === "ADMIN" ||
+              authSession.authStatus.user?.roleCode === "SUPER_ADMIN")
+              ? "/admin"
+              : undefined
+          }
           onPromptChange={conversation.setPrompt}
           onMaxResultsChange={conversation.setMaxResults}
           onMinScoreChange={conversation.setMinScore}
@@ -52,14 +49,13 @@ export function ChatPage({ conversation }: ChatPageProps) {
         open={authDrawerOpen}
         onClose={() => setAuthDrawerOpen(false)}
         placement="right"
-        width={drawerWidth}
         closable={false}
         title={null}
         classNames={{
           mask: "!backdrop-blur-[3px]",
           wrapper: "!shadow-none",
           section: "!bg-[#fffaf4]",
-          body: "!h-full !p-0"
+          body: "!h-full !p-0",
         }}
       >
         <AuthPanel

@@ -239,6 +239,40 @@ export function adminReindexDocument(documentId: string) {
   );
 }
 
+// Batch Reindex API
+
+export function startBatchReindex() {
+  return requestJson<{ taskId: string; totalDocuments: number; status: string }>(
+    "/admin/documents/reindex-all",
+    { method: "POST", auth: "required", fallbackMessage: "启动批量重载失败" }
+  );
+}
+
+export interface BatchReindexResult {
+  documentId: string;
+  filename: string;
+  status: "SUCCESS" | "FAILED";
+  segmentCount: number;
+  error: string | null;
+}
+
+export interface BatchReindexStatus {
+  taskId: string;
+  status: "RUNNING" | "COMPLETED" | "FAILED";
+  totalDocuments: number;
+  completedDocuments: number;
+  failedDocuments: number;
+  currentDocument: string;
+  results: BatchReindexResult[];
+}
+
+export function getBatchReindexStatus(taskId: string) {
+  return requestJson<BatchReindexStatus>(
+    `/admin/documents/reindex-all/${taskId}/status`,
+    { method: "GET", auth: "required", fallbackMessage: "查询重载进度失败" }
+  );
+}
+
 // Prompt Management API
 
 export interface PromptInfo {

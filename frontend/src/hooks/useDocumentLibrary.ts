@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState } from "react";
-import { ApiError, adminReindexDocument, deleteDocument, getDocumentDownloadLink, getPublicDocumentDetail, listDocuments, listPublicDocuments, uploadDocumentStream } from "../lib/api";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { ApiError, adminReindexDocument, deleteDocument, getBatchReindexStatus, getDocumentDownloadLink, getPublicDocumentDetail, listDocuments, listPublicDocuments, startBatchReindex, uploadDocumentStream } from "../lib/api";
+import type { BatchReindexStatus } from "../lib/api";
 import type { DocumentListItem, FileUploadEntry, PublicDocumentDetailResponse } from "../types";
 
 interface MessageApi {
@@ -32,7 +33,11 @@ export function useDocumentLibrary(
   const [viewingDocument, setViewingDocument] = useState<PublicDocumentDetailResponse | null>(null);
   const [viewingLoading, setViewingLoading] = useState(false);
   const [downloadLinkInfo, setDownloadLinkInfo] = useState<DownloadLinkInfo | null>(null);
+  const [batchReindexTaskId, setBatchReindexTaskId] = useState<string | null>(null);
+  const [batchReindexProgress, setBatchReindexProgress] = useState<BatchReindexStatus | null>(null);
+  const [batchReindexing, setBatchReindexing] = useState(false);
   const abortControllerRef = useRef<AbortController | null>(null);
+  const batchReindexPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const { deletingId, reindexingId } = documentActionState;
 
   useEffect(() => {
@@ -214,6 +219,74 @@ export function useDocumentLibrary(
     }
   }
 
+  function cancelBatchReindex() {
+    if (batchReindexPollRef.current != null) {
+      clearInterval(batchReindexPollRef.current);
+      batchReindexPollRef.current = null;
+    }
+    setBatchReindexTaskId(null);
+    setBatchReindexProgress(null);
+    setBatchReindexing(false);
+  }
+
+  async function handleBatchReindex() {
+    if (!authenticated) {
+      return;
+    }
+
+    cancelBatchReindex();
+
+    try {
+      setBatchReindexing(true);
+      const response = await startBatchReindex();
+      setBatchReindexTaskId(response.taskId);
+    } catch (error) {
+      setBatchReindexing(false);
+      if (error instanceof ApiError && error.status === 401) {
+        setDocuments([]);
+        await onUnauthorized();
+        return;
+      }
+      messageApi.error(error instanceof Error ? error.message : "启动批量重载失败");
+    }
+  }
+
+  useEffect(() => {
+    if (!batchReindexTaskId || !batchReindexing) return;
+
+    const poll = async () => {
+      try {
+        const status = await getBatchReindexStatus(batchReindexTaskId);
+        setBatchReindexProgress(status);
+
+        if (status.status === "COMPLETED" || status.status === "FAILED") {
+          cancelBatchReindex();
+          if (status.status === "COMPLETED") {
+            messageApi.success(
+              `批量重载完成: ${status.totalDocuments} 篇文档，成功 ${status.completedDocuments} 篇，失败 ${status.failedDocuments} 篇`
+            );
+          } else {
+            messageApi.error("批量重载失败");
+          }
+          void refreshDocuments();
+        }
+      } catch (error) {
+        cancelBatchReindex();
+        messageApi.error(error instanceof Error ? error.message : "查询重载进度失败");
+      }
+    };
+
+    batchReindexPollRef.current = setInterval(poll, 3000);
+    void poll(); // immediate first poll
+
+    return () => {
+      if (batchReindexPollRef.current != null) {
+        clearInterval(batchReindexPollRef.current);
+        batchReindexPollRef.current = null;
+      }
+    };
+  }, [batchReindexTaskId, batchReindexing]);
+
   async function handleViewDocument(documentId: string) {
     setViewingDocument(null);
     setViewingLoading(true);
@@ -257,11 +330,16 @@ export function useDocumentLibrary(
     fileUploads,
     deletingId,
     reindexingId,
+    batchReindexTaskId,
+    batchReindexProgress,
+    batchReindexing,
     refreshDocuments,
     handleUpload,
     cancelUpload,
     handleDeleteDocument,
     handleReindexDocument,
+    handleBatchReindex,
+    cancelBatchReindex,
     handleViewDocument,
     handleShowDownloadLink,
     handleCloseDownloadLink,

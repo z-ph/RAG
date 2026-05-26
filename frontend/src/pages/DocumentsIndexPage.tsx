@@ -19,11 +19,14 @@ export function DocumentsIndexPage() {
           fileUploads={documentLibrary.fileUploads}
           authenticated={authSession.authStatus.authenticated}
           canManageDocuments={canManageDocuments}
+          batchReindexing={documentLibrary.batchReindexing}
+          batchReindexProgress={documentLibrary.batchReindexProgress}
           onBack={() => navigate("/")}
           onRefreshDocuments={documentLibrary.refreshDocuments}
           onUpload={documentLibrary.handleUpload}
           onDeleteDocument={documentLibrary.handleDeleteDocument}
           onReindexDocument={documentLibrary.handleReindexDocument}
+          onBatchReindex={documentLibrary.handleBatchReindex}
           onCancelUpload={documentLibrary.cancelUpload}
           onViewDocument={(documentId) => navigate(`/documents/${documentId}`)}
           onShowDownloadLink={documentLibrary.handleShowDownloadLink}

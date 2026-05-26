@@ -19,11 +19,13 @@ import {
   Progress,
   Space,
   Spin,
+  Tag,
   Upload,
   type UploadProps
 } from "antd";
 import { useRef, type ReactNode } from "react";
 import type { DocumentListItem, FileUploadEntry } from "../types";
+import type { BatchReindexStatus } from "../lib/api";
 
 interface DocumentSidebarProps {
   documents: DocumentListItem[];
@@ -34,6 +36,8 @@ interface DocumentSidebarProps {
   reindexingId: string | null;
   authenticated: boolean;
   canManageDocuments: boolean;
+  batchReindexing: boolean;
+  batchReindexProgress: BatchReindexStatus | null;
   onBack?: () => void;
   onClose?: () => void;
   onRefreshDocuments: () => Promise<void>;
@@ -41,6 +45,7 @@ interface DocumentSidebarProps {
   onCancelUpload: () => void;
   onDeleteDocument: (documentId: string) => Promise<void>;
   onReindexDocument: (documentId: string) => Promise<void>;
+  onBatchReindex: () => Promise<void>;
   onViewDocument: (documentId: string) => void;
   onShowDownloadLink: (documentId: string, filename: string) => void;
   headerActions?: ReactNode;
@@ -138,6 +143,24 @@ export function DocumentSidebar(props: DocumentSidebarProps) {
             >
               刷新
             </Button>
+            {props.canManageDocuments && (
+              <Popconfirm
+                title="一键重载全部"
+                description="将基于原始文件重新切分所有文档并重建向量索引，可能需要较长时间。"
+                okText="开始重载"
+                cancelText="取消"
+                onConfirm={() => void props.onBatchReindex()}
+              >
+                <Button
+                  icon={<ReloadOutlined />}
+                  loading={props.batchReindexing}
+                  disabled={props.uploading || props.batchReindexing}
+                  className="!border-amber-300 !text-amber-700 hover:!border-amber-400 hover:!text-amber-800"
+                >
+                  {props.batchReindexing ? "重载中..." : "一键重载全部"}
+                </Button>
+              </Popconfirm>
+            )}
           </div>
           <Alert
             type="info"
@@ -194,6 +217,101 @@ export function DocumentSidebar(props: DocumentSidebarProps) {
               </div>
             ))}
           </div>
+        </div>
+      )}
+
+      {props.batchReindexing && props.batchReindexProgress && (
+        <div className="mt-4 border border-amber-300 bg-amber-50/60 px-4 py-4">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-sm font-medium text-amber-800">批量重载进度</span>
+            <Button
+              type="text"
+              size="small"
+              className="!text-ink-500 hover:!text-ink-700"
+              onClick={() => void props.onRefreshDocuments()}
+              disabled={props.batchReindexProgress.status !== "COMPLETED" && props.batchReindexProgress.status !== "FAILED"}
+            >
+              完成后刷新列表
+            </Button>
+          </div>
+          <Progress
+            percent={
+              props.batchReindexProgress.totalDocuments > 0
+                ? Math.round(
+                    ((props.batchReindexProgress.completedDocuments + props.batchReindexProgress.failedDocuments) /
+                      props.batchReindexProgress.totalDocuments) *
+                      100
+                  )
+                : 0
+            }
+            status={
+              props.batchReindexProgress.status === "FAILED"
+                ? "exception"
+                : props.batchReindexProgress.status === "COMPLETED"
+                  ? "success"
+                  : "active"
+            }
+            strokeColor={props.batchReindexProgress.status === "FAILED" ? undefined : { from: "#f25b2a", to: "#ff894f" }}
+            size="small"
+            className="mt-1"
+          />
+          <div className="mt-2 text-xs text-ink-600">
+            {props.batchReindexProgress.status === "RUNNING" && (
+              <span>
+                已处理 {props.batchReindexProgress.completedDocuments + props.batchReindexProgress.failedDocuments}
+                /{props.batchReindexProgress.totalDocuments}
+                {props.batchReindexProgress.currentDocument && ` · 正在重载: ${props.batchReindexProgress.currentDocument}`}
+              </span>
+            )}
+            {props.batchReindexProgress.status === "COMPLETED" && (
+              <span className="text-emerald-700">
+                重载完成: {props.batchReindexProgress.totalDocuments} 篇文档，
+                成功 <span className="font-semibold">{props.batchReindexProgress.completedDocuments}</span> 篇，
+                失败 <span className="font-semibold text-rose-600">{props.batchReindexProgress.failedDocuments}</span> 篇
+              </span>
+            )}
+            {props.batchReindexProgress.status === "FAILED" && (
+              <span className="text-rose-600">批量重载失败</span>
+            )}
+          </div>
+          {props.batchReindexProgress.results.length > 0 && (
+            <div className="mt-3 max-h-[260px] space-y-1.5 overflow-y-auto border-t border-amber-200 pt-2">
+              {props.batchReindexProgress.results.map((result) => (
+                <div
+                  key={result.documentId}
+                  className="flex items-center gap-2 rounded px-2 py-1 text-xs"
+                >
+                  {result.status === "SUCCESS" ? (
+                    <CheckCircleOutlined className="text-emerald-600 shrink-0" />
+                  ) : (
+                    <CloseCircleOutlined className="text-rose-600 shrink-0" />
+                  )}
+                  <span
+                    className="truncate flex-1 text-ink-800"
+                    title={result.status === "FAILED" ? `${result.filename}: ${result.error ?? "未知错误"}` : result.filename}
+                  >
+                    {result.filename}
+                  </span>
+                  {result.status === "SUCCESS" && (
+                    <Tag className="!m-0 shrink-0 !border-ink-200 !bg-ink-50 !text-ink-600 !text-[11px] !leading-none">
+                      {result.segmentCount} 段
+                    </Tag>
+                  )}
+                  {result.status === "FAILED" && (
+                    <Button
+                      type="text"
+                      size="small"
+                      className="!h-auto !px-1.5 !py-0 !text-[11px] !text-accent-500 hover:!text-accent-400 shrink-0"
+                      icon={<ReloadOutlined className="!text-[11px]" />}
+                      onClick={() => void props.onReindexDocument(result.documentId)}
+                    >
+                      重试
+                    </Button>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
